@@ -175,7 +175,12 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
         _mapeia_documentos(rede, dataset, agregado, grupo, config)
         _calcula_indices(dataset, grupo, config)
 
-    frequencia = {no: dataset.frequencia_item(no) for no in rede.nos}
+    if agregado is not None:
+        frequencia = {no: agregado.frequencia_documento_item(no) for no in rede.nos}
+    elif config.matriz != "CoOccurrence":      # acoplamento: os nós são documentos
+        frequencia = {no: dataset.frequencia_documento_item(no) for no in rede.nos}
+    else:
+        frequencia = {no: dataset.frequencia_item(no) for no in rede.nos}
     centralidades = measures.Centralidades(rede)
 
     return ResultadoPeriodo(

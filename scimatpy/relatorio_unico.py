@@ -12,7 +12,7 @@ import datetime
 import re
 from pathlib import Path
 
-from . import longitudinal, report
+from . import dendro_helper, longitudinal, metodo, report
 from .report import (ORDEM_MEDIDAS, ROTULOS_MAPEADOR, ROTULOS_MEDIDA, _esc,
                      _quadrante, _tabela)
 from .viz.cluster import rede_agrupamento_svg
@@ -207,27 +207,19 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
     partes = [doc.cabecalho(2, str(numero), rotulo, f"s{numero}"),
               f'<p>{_esc(secao.get("descricao", ""))}</p>']
 
-    # X.1 Parâmetros
-    partes.append(doc.cabecalho(3, f"{numero}.1", "Parâmetros", f"s{numero}-parametros"))
-    linhas = [
-        ["Unidade de análise", report.ROTULOS_UNIDADE.get(config.unidade, config.unidade)],
-        ["Tipo de rede", report.ROTULOS_MATRIZ.get(config.matriz, config.matriz)],
-        ["Medida de normalização",
-         report.ROTULOS_SIMILARIDADE.get(config.similaridade, config.similaridade)],
-        ["Algoritmo de agrupamento",
-         report.ROTULOS_ALGORITMO.get(config.algoritmo, config.algoritmo)],
-        ["Frequência mínima", str(config.minimo_frequencia)],
-        ["Coocorrência mínima", str(config.minimo_coocorrencia)],
-        ["Tamanho mínimo da rede", str(config.tamanho_minimo)],
-        ["Tamanho máximo da rede", str(config.tamanho_maximo)],
-        ["Ponto de corte", _n(config.corte)],
-        ["Mapeadores", ", ".join(ROTULOS_MAPEADOR.get(m, m) for m in config.mapeadores)],
-        ["Origens das palavras", ", ".join(config.palavras) or "todas"],
-    ]
-    if config.ignorar:
-        linhas.append(["Itens ignorados", ", ".join(config.ignorar)])
-    partes.append(doc.tabela(["Parâmetro", "Valor"], [[_esc(a), _esc(b)] for a, b in linhas],
-                             f"Parâmetros da análise “{rotulo}”."))
+    # X.1 Parâmetros e método
+    partes.append(doc.cabecalho(3, f"{numero}.1", "Parâmetros e método",
+                                f"s{numero}-parametros"))
+    contador = [0]
+
+    def titulo(texto: str) -> str:
+        contador[0] += 1
+        return doc.cabecalho(4, f"{numero}.1.{contador[0]}", texto,
+                             f"s{numero}-metodo-{contador[0]}", no_sumario=False)
+
+    partes.append(metodo.metodo_html(
+        config, periodos, resultados, None, secao.get("medida_temporal", medida_temporal),
+        kb, doc.tabela, rotulo=rotulo.lower(), titulo=titulo))
 
     # X.2 Por período
     partes.append(doc.cabecalho(3, f"{numero}.2", "Por período", f"s{numero}-periodos"))
@@ -311,7 +303,7 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
             partes.append('<div class="redes-grupos">' + "".join(figuras) + "</div>")
 
     # X.4 Evolução e sobreposição
-    if len(resultados) >= 2:
+    if len(resultados) >= 2 and config.matriz == "CoOccurrence":
         partes.append(doc.cabecalho(3, f"{numero}.4", "Evolução e sobreposição temática",
                                     f"s{numero}-evolucao"))
         mapa = cache.obtem((chave, "mapa"), lambda: longitudinal.constroi(
@@ -328,6 +320,18 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
         else:
             partes.append('<p class="nota">Os mapas de evolução e sobreposição não '
                           "puderam ser construídos.</p>")
+    # X.5 Dendrograma
+    partes.append(doc.cabecalho(3, f"{numero}.5", "Dendrograma (agrupamento hierárquico)",
+                                f"s{numero}-dendrograma"))
+    partes.append(
+        "<p>Complementa os agrupamentos da rede: junta, passo a passo, os itens mais "
+        "parecidos (distância = 1 − similaridade; ligação média). Cortar a árvore mais "
+        "alto dá poucos temas amplos; mais baixo, muitos temas finos. A linha tracejada "
+        "marca o corte sugerido (maior salto entre fusões); a concordância com os "
+        "agrupamentos da rede é medida por ARI e NMI (1 = idêntico).</p>")
+    for r in resultados:
+        partes.append(dendro_helper.bloco(
+            r, f"Dendrograma — {rotulo.lower()}, {r.periodo}", doc.figura))
     return "\n".join(partes), omitidas
 
 

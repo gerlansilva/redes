@@ -302,12 +302,99 @@ def _config(dados: dict) -> Configuracao:
     )
 
 
+def _inteiro_limitado(valor, padrao: int, minimo: int, maximo: int, nome: str) -> int:
+    if valor in (None, ""):
+        return padrao
+    try:
+        return max(minimo, min(maximo, int(valor)))
+    except (TypeError, ValueError):
+        raise ErroApi(f"{nome} precisa ser um número") from None
+
+
+def fluxo_autor_pais_ies(pedido: dict) -> dict:
+    """Dados e SVG do fluxo Autor → País → IES (mesmos parâmetros no GET e no POST)."""
+    from . import fluxos
+    from .viz import sankey
+    caminho = _valida_projeto(str(pedido.get("caminho") or ""))
+    limites = {
+        "limite_autores": _inteiro_limitado(pedido.get("autores"), fluxos.LIMITE_AUTORES, 3, 40, "autores"),
+        "limite_paises": _inteiro_limitado(pedido.get("paises"), fluxos.LIMITE_PAISES, 3, 25, "paises"),
+        "limite_ies": _inteiro_limitado(pedido.get("ies"), fluxos.LIMITE_IES, 3, 40, "ies"),
+    }
+    with ProjetoScimat(caminho) as kb:
+        dados = fluxos.calcula(kb.conexao, **limites)
+    # Na tela o título é o do cartão; o arquivo baixado leva o título dentro do SVG.
+    dados["svg"] = sankey.svg(dados, "") if dados["nos"] else ""
+    if dados["nos"] and pedido.get("baixar") in ("1", "true"):
+        dados["svg"] = sankey.svg(dados, "Fluxo " + " → ".join(dados["colunas"]))
+    return dados
+
+
+def dendrograma_do_pedido(pedido: dict) -> dict:
+    """Dendrograma de um período (GET e POST). Usa ``token`` de uma análise já
+    calculada ou, sem ele, ``projeto``/``caminho`` + a configuração de /api/analisa."""
+    from . import dendrograma, dendro_helper
+    from .viz import dendrograma as viz_dendro
+    ligacao = str(pedido.get("ligacao") or "media")
+    if ligacao not in dendrograma.LIGACOES:
+        raise ErroApi(f"Ligação inválida: {ligacao!r}. "
+                      f"Use uma destas: {', '.join(dendrograma.LIGACOES)}.")
+    limite = _inteiro_limitado(pedido.get("limite"), dendro_helper.LIMITE_NOS,
+                               10, 120, "limite")
+    bruto = pedido.get("n_grupos")
+    n_pedido = None
+    if bruto not in (None, ""):
+        try:
+            n_pedido = int(bruto)
+        except (TypeError, ValueError):
+            raise ErroApi("n_grupos precisa ser um número inteiro") from None
+        if n_pedido < 1:
+            raise ErroApi("n_grupos precisa ser pelo menos 1")
+    token = _token(pedido.get("token"))
+    if token:
+        analise = _analise(token)
+        _recalcula(analise)
+        resultado = analise["resultado"]
+    else:
+        caminho = _valida_projeto(str(pedido.get("projeto") or pedido.get("caminho") or ""))
+        config = _config(pedido)
+        with ProjetoScimat(caminho) as kb:
+            periodo = _periodo(kb, pedido.get("periodo"))
+            resultado = executa_periodo(kb, periodo.id, periodo.nome, config)
+    res, omitidos = dendro_helper.dendrograma_do_periodo(resultado, limite, ligacao)
+    if res is None:
+        raise ErroApi("Poucos itens neste período para um dendrograma (mínimo de 3).")
+    n_total = len(res["nos"])
+    n_grupos = res["n_grupos_sugerido"] if n_pedido is None else min(n_pedido, n_total)
+    particao = res.corte(n_grupos=n_grupos)
+    titulo = ""
+    if pedido.get("baixar") in ("1", "true"):
+        titulo = f"Dendrograma — {resultado.periodo}"
+    return {
+        "svg": viz_dendro.svg(res, n_grupos, titulo),
+        "n_grupos": n_grupos,
+        "n_grupos_sugerido": res["n_grupos_sugerido"],
+        "n_nos": n_total,
+        "ligacao": ligacao,
+        "coph": round(res["coph"], 4),
+        "comparacao": res.comparacao(particao) if res.get("grupos_rede") else None,
+        "frases": dendrograma.interpreta(res, n_grupos),
+        "omitidos": omitidos,
+        "limite": limite,
+        "periodo": resultado.periodo,
+    }
+
+
 def _valida_projeto(caminho: str) -> Path:
     if not caminho:
         raise ErroApi(f"Informe o caminho do projeto ({EXTENSAO}). Abra um "
                       "projeto na lista ou importe um corpus.")
-    destino = Path(caminho).expanduser().resolve()
-    if not destino.exists() or not destino.is_file():
+    try:
+        destino = Path(caminho).expanduser().resolve()
+        existe = destino.exists() and destino.is_file()
+    except (ValueError, OSError):
+        raise ErroApi("Caminho de projeto inválido.")
+    if not existe or not destino.is_file():
         raise ErroApi(f"Projeto não encontrado: {destino}. Ele pode ter sido "
                       "movido ou apagado; abra-o de novo na lista.")
     if not e_projeto(destino):
@@ -898,7 +985,7 @@ ANALISES_COMPLETO = [
      "a base não traz referências"),
     ("frentes", "Frentes de pesquisa (acoplamento bibliográfico)",
      "Documentos ligados por referências compartilhadas.",
-     {"unidade": "References", "matriz": "BasicCoupling"},
+     {"unidade": "References", "matriz": "BasicCoupling", "mapeadores": ["acoplamento"]},
      "SELECT COUNT(*) FROM ReferenceGroup", 3,
      "a base não traz referências"),
     ("veiculos", "Periódicos citados",
@@ -932,7 +1019,9 @@ def _escolhe_frequencia(kb, periodos, base: dict, parametros: dict, fixa=None):
         grupos = [len(r.grupos) for r in resultados]
         if sum(grupos) == 0:
             continue
-        if all(n >= 1 for n in grupos) and sum(grupos) >= 3:
+        com_itens = [n for n, r in zip(grupos, resultados)
+                     if r.dataset_original.quantidade_itens() > 0]
+        if com_itens and all(n >= 1 for n in com_itens) and sum(grupos) >= 3:
             return config, frequencia, resultados
         if melhor is None or sum(grupos) > melhor[0]:
             melhor = (sum(grupos), config, frequencia, resultados)
@@ -989,7 +1078,7 @@ def gera_relatorio_completo(dados: dict) -> dict:
         if not secoes:
             raise ErroApi("Nenhuma análise de mapeamento pôde ser gerada com esta base.")
         report._pagina_bibliometria(destino, kb)
-        report.gera_pagina_completa(destino, kb, secoes, ignoradas)
+        report.gera_pagina_completa(destino, kb, secoes, ignoradas, medida)
         formato = dados.get("formato") or "unico"
         if formato not in ("unico", "pastas"):
             raise ErroApi("formato do relatório completo: unico ou pastas")
@@ -1443,6 +1532,24 @@ class Manipulador(BaseHTTPRequestHandler):
                     (parametros.get("caminho") or [""])[0])
                 with ProjetoScimat(caminho) as kb:
                     self._json(200, bibliometria.calcula(kb.conexao))
+            elif rota == "/api/fluxo":
+                pedido = {k: v[0] for k, v in parametros.items() if v}
+                dados = fluxo_autor_pais_ies(pedido)
+                if pedido.get("baixar") in ("1", "true"):
+                    if not dados["svg"]:
+                        raise ErroApi((dados["avisos"] or ["Sem dados para o fluxo."])[0])
+                    self._arquivo(dados["svg"].encode("utf-8"), "fluxo-autor-pais-ies.svg",
+                                  "image/svg+xml", True)
+                else:
+                    self._json(200, dados)
+            elif rota == "/api/dendrograma":
+                pedido = {k: v[0] for k, v in parametros.items() if v}
+                dados = dendrograma_do_pedido(pedido)
+                if pedido.get("baixar") in ("1", "true"):
+                    self._arquivo(dados["svg"].encode("utf-8"), "dendrograma.svg",
+                                  "image/svg+xml", True)
+                else:
+                    self._json(200, dados)
             elif rota == "/api/rajadas":
                 from . import rajadas
                 from .viz import descritiva
@@ -1565,6 +1672,10 @@ class Manipulador(BaseHTTPRequestHandler):
                 dados = self._json_pedido()
                 caminho = _valida_projeto(dados.get("caminho", ""))
                 self._json(200, descreve_projeto(caminho))
+            elif rota == "/api/fluxo":
+                self._json(200, fluxo_autor_pais_ies(self._json_pedido()))
+            elif rota == "/api/dendrograma":
+                self._json(200, dendrograma_do_pedido(self._json_pedido()))
             elif rota == "/api/analisa":
                 self._json(200, analisa(self._json_pedido()))
             elif rota == "/api/grade":

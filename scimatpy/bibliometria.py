@@ -145,6 +145,16 @@ def zipf(contagem_palavras: Counter) -> dict:
             "palavras": len(frequencias)}
 
 
+def _resumo_fluxo(conexao) -> dict | None:
+    """Resumo do fluxo Autor → País → IES (os nós e o SVG vêm de /api/fluxo)."""
+    try:
+        from . import fluxos
+        dados = fluxos.calcula(conexao)
+    except Exception:  # noqa: BLE001 - a bibliometria não pode cair por causa do fluxo
+        return None
+    return {chave: dados[chave] for chave in ("modo", "qualidade", "cobertura", "avisos")}
+
+
 def calcula(conexao) -> dict:
     documentos = _documentos(conexao)
     if not documentos:
@@ -266,6 +276,12 @@ def calcula(conexao) -> dict:
           "Menos da metade dos documentos tem palavras-chave: os mapas de palavras cobrem só parte do corpus.")
     falta(not cont_fontes, "Sem periódico dos documentos: o ranking de fontes fica vazio.")
 
+    fluxo = _resumo_fluxo(conexao)
+    if fluxo and fluxo["qualidade"] != "exata" and cont_ies:
+        relevantes = [a for a in fluxo["avisos"] if "nem país" not in a]
+        if relevantes:
+            lacunas.append("Fluxo Autor – País – IES: " + relevantes[0])
+
     pares: Counter = Counter()
     for nomes in autores_doc.values():
         for a, b in combinations(sorted(set(nomes)), 2):
@@ -300,4 +316,5 @@ def calcula(conexao) -> dict:
         "lotka": lotka(Counter({a: n for a, n in cont_autores.items()})),
         "bradford": bradford(cont_fontes),
         "zipf": zipf(cont_palavras),
+        "fluxo": fluxo,
     }

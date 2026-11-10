@@ -324,6 +324,7 @@
         <div class="aba" data-aba="grupos" role="tab" tabindex="0" aria-selected="false">Agrupamentos</div>
         <div class="aba" data-aba="indices" role="tab" tabindex="0" aria-selected="false">Índices</div>
         <div class="aba" data-aba="documentos" role="tab" tabindex="0" aria-selected="false">Documentos</div>
+        <div class="aba" data-aba="dendrograma" role="tab" tabindex="0" aria-selected="false">Dendrograma</div>
         <div class="aba" data-aba="longitudinal" role="tab" tabindex="0" aria-selected="false">Comparar períodos</div>
       </div>
       </div>
@@ -591,6 +592,32 @@
         <div class="rodape-tabela" id="rodapeLongitudinal">A comparação usa os mesmos parâmetros da análise.</div>
       </section>
 
+      <section class="tabela-bloco" id="blocoDendrograma" data-bloco="blocoDendrograma">
+        <header>
+          <h2>Dendrograma</h2>
+          <span class="meta" id="metaDendrograma">agrupamento hierárquico dos itens mais frequentes</span>
+        </header>
+        <div class="dendro-controles">
+          <label class="campo-mini">Ligação
+            <select id="dendroLigacao">
+              <option value="media">Média</option>
+              <option value="completa">Completa</option>
+              <option value="simples">Simples</option>
+            </select>
+          </label>
+          <label class="campo-mini dendro-grupos">Nº de grupos: <b id="dendroGruposValor">—</b>
+            <input type="range" id="dendroGrupos" min="1" max="2" value="1" disabled aria-label="Número de grupos do corte">
+          </label>
+          <button type="button" class="botao" id="dendroSugerido" hidden>Usar o sugerido</button>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioDendrograma">Execute uma análise para ver o dendrograma.</div>
+          <div class="dendro-figura" id="dendroFigura" hidden></div>
+        </div>
+        <ul class="dendro-frases" id="dendroFrases"></ul>
+        <div class="rodape-tabela" id="rodapeDendrograma">Distância = 1 − similaridade; a linha tracejada marca o corte.</div>
+      </section>
+
       <section class="acoes-finais">
         <div>
           <div class="rotulo-secao">Exportar e compartilhar</div>
@@ -620,6 +647,8 @@
               <button type="button" role="menuitem" tabindex="-1" data-exp="rede-graphml" data-precisa="resultado">Rede (GraphML)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="grupos-xml" data-precisa="resultado">Grupos da base (XML)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="documentos-tsv" data-precisa="resultado">Documentos do período (TSV)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="dendrograma-svg" data-precisa="resultado">Dendrograma do período (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="fluxo-svg">Fluxo Autor – País – IES (SVG)</button>
             </div>
             <p class="menu-aviso" id="avisoExportar" hidden>Escolha uma análise no menu lateral para liberar os dados.</p>
             <div class="menu-grupo so-avancado" role="group" aria-labelledby="mgGrade">

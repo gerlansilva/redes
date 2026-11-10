@@ -227,7 +227,7 @@ function renderizarBibliometria(painel, d) {
       graficoProducao(d.producao), "bib-larga") +
     secaoBib("Documentos acumulados", "Total de documentos do corpus ao longo dos anos.",
       graficoAcumulado(d.producao), "bib-larga") +
-    secaoNuvem() + secaoRajadas() +
+    secaoNuvem() + secaoRajadas() + secaoFluxo() +
     '<div class="bib-grade">' +
     secaoBib("Autores mais produtivos", "Por número de documentos; h calculado dentro do corpus.", tabelaBib(colAutores, d.autores, "Autores")) +
     secaoBib("Fontes mais produtivas", "Periódicos que mais publicam no corpus.", tabelaBib(colFontes, d.fontes, "Fontes")) +
@@ -247,6 +247,7 @@ function renderizarBibliometria(painel, d) {
     "</div>";
   iniciarNuvem();
   iniciarRajadas();
+  iniciarFluxo();
 }
 
 /* ------------------------------------------------- nuvem de palavras e rajadas */
@@ -354,4 +355,73 @@ function iniciarRajadas() {
   tipo.addEventListener("change", atualizarRajadas);
   document.getElementById("rajadaMinimo").addEventListener("change", atualizarRajadas);
   atualizarRajadas();
+}
+
+/* ------------------------------------------------ fluxo Autor – País – IES */
+
+function secaoFluxo() {
+  const opcoes = (valores, padrao) => valores.map((v) =>
+    `<option value="${v}"${v === padrao ? " selected" : ""}>${v}</option>`).join("");
+  return secaoBib("Fluxo Autor – País – IES",
+    "De onde vêm os autores mais produtivos: autor, país de afiliação e instituição. A espessura é o número de documentos em que o par ocorre.",
+    '<div class="bib-controles">' +
+    `<label>Autores <select id="fluxoAutores">${opcoes([8, 10, 15, 20, 30], 15)}</select></label>` +
+    `<label>Países <select id="fluxoPaises">${opcoes([5, 8, 10, 15, 20], 10)}</select></label>` +
+    `<label>Instituições <select id="fluxoIes">${opcoes([8, 10, 15, 20, 30], 15)}</select></label>` +
+    '<a class="botao-mini" id="fluxoBaixar" href="#" download="fluxo-autor-pais-ies.svg">Baixar SVG</a></div>' +
+    '<div id="fluxoSaida" class="bib-saida">Calculando…</div>',
+    "bib-larga bib-fluxo");
+}
+
+function parametrosFluxo() {
+  const valor = (id) => (document.getElementById(id) || {}).value || "";
+  return new URLSearchParams({
+    caminho: estado.projeto ? estado.projeto.caminho : "",
+    autores: valor("fluxoAutores"), paises: valor("fluxoPaises"), ies: valor("fluxoIes"),
+  });
+}
+
+function urlBaixarFluxo() {
+  const parametrosUrl = parametrosFluxo();
+  parametrosUrl.set("baixar", "1");
+  return `/api/fluxo?${parametrosUrl}`;
+}
+
+function tabelaFluxo(d) {
+  const nome = Object.fromEntries(d.nos.map((n) => [n.id, n.nome]));
+  const linhas = d.ligacoes.slice().sort((a, b) => b.valor - a.valor).map((l) =>
+    `<tr><td>${bibEsc(nome[l.origem])}</td><td>${bibEsc(nome[l.destino])}</td><td class="num">${bibNum.format(l.valor)}</td></tr>`).join("");
+  return '<details class="bib-detalhes"><summary>Ver os fluxos como tabela</summary>' +
+    '<div class="bib-rolagem"><table class="bib-tabela"><thead><tr><th>De</th><th>Para</th><th class="num">Documentos</th></tr></thead>' +
+    `<tbody>${linhas}</tbody></table></div></details>`;
+}
+
+async function atualizarFluxo() {
+  const saida = document.getElementById("fluxoSaida");
+  if (!saida || !estado.projeto) return;
+  const baixar = document.getElementById("fluxoBaixar");
+  saida.textContent = "Calculando…";
+  try {
+    const d = await api(`/api/fluxo?${parametrosFluxo()}`);
+    const avisos = (d.avisos || []).length
+      ? `<div class="bib-lacunas"><b>O que falta</b><ul>${d.avisos.map((t) => `<li>${bibEsc(t)}</li>`).join("")}</ul></div>` : "";
+    const nota = d.svg
+      ? `<p class="bib-nota">${bibEsc((d.notas || []).join(" "))} Qualidade da ligação: ${bibEsc(d.rotulo_qualidade || "")}.</p>` : "";
+    saida.innerHTML = avisos + (d.svg ? `<div class="bib-rolagem">${d.svg}</div>${nota}${tabelaFluxo(d)}` : "");
+    if (baixar) {
+      baixar.href = d.svg ? urlBaixarFluxo() : "#";
+      baixar.toggleAttribute("hidden", !d.svg);
+    }
+  } catch (erro) {
+    saida.innerHTML = `<p class="bib-vazio">${bibEsc(erro.message)}</p>`;
+  }
+}
+
+function iniciarFluxo() {
+  const autores = document.getElementById("fluxoAutores");
+  if (!autores) return;
+  for (const id of ["fluxoAutores", "fluxoPaises", "fluxoIes"]) {
+    document.getElementById(id).addEventListener("change", atualizarFluxo);
+  }
+  atualizarFluxo();
 }

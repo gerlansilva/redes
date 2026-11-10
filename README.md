@@ -33,6 +33,9 @@ normalizar, agrupar, medir, desenhar e relatar, sem depender da interface Java.
 | Relatório HTML (com referências ABNT e página de visão geral descritiva) | pronto |
 | Visão geral descritiva: produção, rankings, leis de Lotka/Bradford/Zipf, nuvens de palavras e rajadas (Kleinberg) | pronto |
 | Revisar grafias: variantes de autores, palavras-chave, IES e países, com lista de grafias corretas e agrupamento (com desfazer) | pronto |
+| Relatório completo (arquivo único ou pastas): cada análise traz parâmetros adotados, algoritmo em linguagem simples e tabela de indicadores por período | pronto |
+| Fluxo Autor – País – IES (Sankey), com aviso do que falta quando a base não traz a afiliação por autor | pronto |
+| Dendrograma (agrupamento hierárquico, corte, cofenética, ARI/NMI contra a rede) | pronto (ver `docs/dendrograma.md`) |
 | Carregadores nativos (BibTeX, RIS, CSV, OpenAlex, WoS, Scopus) | pronto |
 | Armazenamento próprio (`.redes` gravado pelo Python) | pronto: esquema do Bibliomapa (`v1_03`) mais as tabelas de países |
 | Exportações (Pajek, GraphML, XML de grupos, TSV) | pronto |

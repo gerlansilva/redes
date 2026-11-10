@@ -68,7 +68,7 @@ const CONFIG_ABAS = {
               padrao: "rede", redeRotulo: "Rede de periódicos" },
 };
 const ABAS_TODAS = ["resumo", "rede", "paises", "diagrama", "agrupamentos",
-                    "grupos", "indices", "documentos", "longitudinal"];
+                    "grupos", "indices", "documentos", "dendrograma", "longitudinal"];
 // No modo simples só aparecem estas abas; as demais ficam no modo avançado.
 const ABAS_SIMPLES = ["resumo", "rede", "paises", "diagrama", "longitudinal"];
 
@@ -188,6 +188,7 @@ async function iniciar() {
 }
 
 function ligarEventos() {
+  ligarDendrograma();
   $("fecharBase").addEventListener("click", fecharBase);
   $("modalBase").addEventListener("click", (evento) => {
     if (evento.target === $("modalBase")) fecharBase();
@@ -667,6 +668,7 @@ function selecionarAba(chave) {
   }
   mostrarAba(chave);
   if (chave === "longitudinal") compararPeriodos();
+  if (chave === "dendrograma") carregarDendrograma();
 }
 
 function abasDaAnalise(chave) {
@@ -675,6 +677,11 @@ function abasDaAnalise(chave) {
   const totalPeriodos = estado.projeto ? estado.projeto.periodos.length : 0;
   if (totalPeriodos < 2) abas = abas.filter((aba) => aba !== "longitudinal");
   if (!estado.avancado) abas = abas.filter((aba) => ABAS_SIMPLES.includes(aba));
+  // Visão secundária: só no modo avançado, antes de "Comparar períodos".
+  else if (!abas.includes("dendrograma")) {
+    const i = abas.indexOf("longitudinal");
+    abas.splice(i < 0 ? abas.length : i, 0, "dendrograma");
+  }
   return abas;
 }
 
@@ -705,6 +712,7 @@ const BLOCO_POR_ABA = {
   grupos: "blocoGrupos",
   indices: "blocoIndices",
   documentos: "blocoDocumentos",
+  dendrograma: "blocoDendrograma",
   longitudinal: "blocoLongitudinal",
 };
 
@@ -1063,6 +1071,8 @@ async function previsualizar() {
 function renderizarResultado(resultado) {
   estado.token = resultado.token || null;
   estado.desatualizada = false;
+  dendro.token = null;
+  if (abaAtual() === "dendrograma") carregarDendrograma();
   $("seloPrevia").textContent = "Prévia sob demanda";
   $("seloPrevia").classList.remove("alerta");
   fecharDrawer();
@@ -2965,7 +2975,7 @@ async function compararPeriodos() {
     $("downloadEvolucao").href = mapa.download;
     $("downloadEvolucao").hidden = false;
     $("metaLongitudinal").textContent =
-      `${mapa.periodos.length} períodos · ${mapa.nos} agrupamentos · ${mapa.elos} elos`;
+      `${mapa.periodos.length} ${mapa.periodos.length === 1 ? "período" : "períodos"} · ${mapa.nos} agrupamentos · ${mapa.elos} elos`;
     $("rodapeLongitudinal").textContent =
       `Medida de sobreposição: ` +
       `${MEDIDAS_TEMPORAIS[mapa.medida] || mapa.medida}. ` +
@@ -3040,6 +3050,8 @@ function executarExportacao(tipo) {
   else if (tipo === "relatorio-pastas") gerarRelatorioCompleto("pastas");
   else if (tipo === "relatorio-analise") gerarRelatorio("html");
   else if (tipo === "grade") { if (estado.download) window.location.href = estado.download; }
+  else if (tipo === "fluxo-svg") baixarFluxo();
+  else if (tipo === "dendrograma-svg") baixarDendrograma();
   else exportar(tipo);
 }
 
@@ -3085,6 +3097,134 @@ function ligarMenuExportar() {
     if (!lista.hidden && !$("menuExportar").contains(evento.target)) fecharMenuExportar(false);
   });
   atualizarMenuExportar();
+}
+
+/* -------------------------------------------------------------- dendrograma */
+
+const dendro = { token: null, sugerido: null, nos: 0, seq: 0, tempo: null };
+
+function urlDendrograma(extra = {}) {
+  const q = new URLSearchParams({ token: estado.token, ligacao: $("dendroLigacao").value, ...extra });
+  return `/api/dendrograma?${q}`;
+}
+
+// novoCorte: nº de grupos escolhido; sem ele vale o sugerido pela árvore.
+async function carregarDendrograma(novoCorte) {
+  if (!estado.token) {
+    $("vazioDendrograma").hidden = false;
+    $("vazioDendrograma").textContent = "Execute uma análise para ver o dendrograma.";
+    $("dendroFigura").hidden = true;
+    return;
+  }
+  if (novoCorte === undefined && dendro.token === estado.token && !dendro.ligacaoMudou) return;
+  const seq = ++dendro.seq;
+  const token = estado.token;
+  const extra = novoCorte ? { n_grupos: novoCorte } : {};
+  if (!novoCorte) {
+    $("vazioDendrograma").hidden = false;
+    $("vazioDendrograma").textContent = "calculando o dendrograma…";
+    $("dendroFigura").hidden = true;
+  }
+  try {
+    const d = await api(urlDendrograma(extra));
+    if (seq !== dendro.seq || token !== estado.token) return;
+    dendro.token = token;
+    dendro.ligacaoMudou = false;
+    dendro.sugerido = d.n_grupos_sugerido;
+    const barra = $("dendroGrupos");
+    barra.max = String(d.n_nos);
+    barra.value = String(d.n_grupos);
+    barra.disabled = d.n_nos < 2;
+    $("dendroGruposValor").textContent = String(d.n_grupos);
+    $("dendroSugerido").hidden = d.n_grupos === d.n_grupos_sugerido;
+    $("dendroFigura").innerHTML = d.svg;
+    const svg = $("dendroFigura").querySelector("svg");
+    if (svg) { svg.removeAttribute("height"); svg.style.height = "auto"; }
+    $("dendroFigura").hidden = false;
+    $("vazioDendrograma").hidden = true;
+    const lista = $("dendroFrases");
+    lista.replaceChildren(...d.frases.map((f) => {
+      const li = document.createElement("li");
+      li.textContent = f;
+      return li;
+    }));
+    const ligacoes = { media: "média", completa: "completa", simples: "simples" };
+    $("metaDendrograma").textContent =
+      `${d.n_nos} itens · ligação ${ligacoes[d.ligacao]} · correlação cofenética ${String(d.coph).replace(".", ",")}`;
+    $("rodapeDendrograma").textContent = (d.omitidos
+      ? `Foram usados os ${d.limite} itens mais frequentes; ${d.omitidos} ficaram de fora. ` : "")
+      + "Distância = 1 − similaridade; a linha tracejada marca o corte.";
+  } catch (erro) {
+    if (seq !== dendro.seq) return;
+    $("vazioDendrograma").hidden = false;
+    $("vazioDendrograma").textContent = erro.message;
+    $("dendroFigura").hidden = true;
+    $("dendroFrases").replaceChildren();
+    mostrarToast(erro.message, true);
+  }
+}
+
+function ligarDendrograma() {
+  $("dendroLigacao").addEventListener("change", () => {
+    dendro.ligacaoMudou = true;
+    carregarDendrograma();
+  });
+  $("dendroGrupos").addEventListener("input", () => {
+    $("dendroGruposValor").textContent = $("dendroGrupos").value;
+    clearTimeout(dendro.tempo);
+    dendro.tempo = setTimeout(() => carregarDendrograma(Number($("dendroGrupos").value)), 120);
+  });
+  $("dendroSugerido").addEventListener("click", () => {
+    dendro.ligacaoMudou = true;
+    carregarDendrograma();
+  });
+}
+
+async function baixarDendrograma() {
+  if (!estado.token) return;
+  const extra = { baixar: "1" };
+  if (!$("dendroFigura").hidden) extra.n_grupos = $("dendroGrupos").value;
+  try {
+    const resposta = await fetch(urlDendrograma(extra));
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(corpo.erro || "Não há dados para o dendrograma.");
+    }
+    const blob = await resposta.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "dendrograma.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  } catch (erro) {
+    mostrarToast(erro.message, true);
+  }
+}
+
+async function baixarFluxo() {
+  if (!estado.projeto) return;
+  const url = typeof urlBaixarFluxo === "function" ? urlBaixarFluxo()
+    : `/api/fluxo?caminho=${encodeURIComponent(estado.projeto.caminho)}&baixar=1`;
+  try {
+    // Checa antes: sem dados, a rota devolve um erro em JSON e a página não deve navegar.
+    const resposta = await fetch(url);
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(corpo.erro || "Não há dados para o fluxo.");
+    }
+    const blob = await resposta.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "fluxo-autor-pais-ies.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  } catch (erro) {
+    mostrarToast(erro.message, true);
+  }
 }
 
 function exportar(tipo) {
@@ -3152,7 +3292,7 @@ async function carregarBase() {
 
 function renderizarBase(base) {
   $("baseResumo").textContent =
-    `${base.documentos} documentos · ${base.periodos.length} períodos · ` +
+    `${base.documentos} documentos · ${base.periodos.length} ${base.periodos.length === 1 ? "período" : "períodos"} · ` +
     `caminho ${base.caminho}`;
   $("baseUndo").textContent = base.desfazer
     ? `${base.desfazer} alteração(ões) guardada(s)` : "nada para desfazer";

@@ -22,7 +22,7 @@ from contextvars import ContextVar
 import unicodedata
 from pathlib import Path
 
-from . import longitudinal
+from . import longitudinal, metodo
 from .pipeline import executa_periodo
 from . import exports
 from .viz.cluster import rede_agrupamento_svg, rede_de_agrupamentos_svg
@@ -123,7 +123,7 @@ img.mapa-sobreposicao { display:block; margin:10px auto; }
 .aviso ul { margin:6px 0 0; padding-left:18px; }
 .num { text-align:right; }
 nav a { margin-right:14px; }
-"""
+""" + metodo.CSS
 
 
 def _esc(texto) -> str:
@@ -375,7 +375,8 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
 
     if com_bibliometria:
         _pagina_bibliometria(destino, kb)
-    _pagina_indice(destino, resultados, mapa, config, estendido, com_bibliometria)
+    _pagina_indice(destino, resultados, mapa, config, estendido, com_bibliometria,
+                   kb=kb, periodos=periodos, medida_temporal=medida_temporal)
     resumo = {"html": str(destino), "periodos": len(resultados),
               "agrupamentos": sum(len(r.grupos) for r in resultados)}
     if devolve_resultados:
@@ -383,8 +384,21 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
     return resumo
 
 
+def _numerador():
+    """Tabelas com legenda "Tabela N — …", numeradas na ordem em que são pedidas."""
+    contador = [0]
+
+    def tabela(cabecalho, linhas, legenda=None, numericas=(), larguras=None):
+        contador[0] += 1
+        titulo = f"Tabela {contador[0]}" + (f" — {legenda}" if legenda else "")
+        return _tabela(cabecalho, linhas, titulo, numericas=numericas, larguras=larguras)
+
+    return tabela
+
+
 def _pagina_indice(destino, resultados, mapa, config, estendido,
-                   com_bibliometria: bool = True) -> None:
+                   com_bibliometria: bool = True, kb=None, periodos=None,
+                   medida_temporal: str = "EquivalenceIndex") -> None:
     linhas = []
     for indice, resultado in enumerate(resultados):
         linhas.append([
@@ -395,17 +409,21 @@ def _pagina_indice(destino, resultados, mapa, config, estendido,
             f"{resultado.rede.quantidade_nos()}/{resultado.rede.quantidade_arestas()}",
         ])
 
+    tabela = _numerador()
+    bloco_metodo = metodo.metodo_html(
+        config, periodos, resultados, None, medida_temporal, kb, tabela,
+        titulo=lambda texto: f"<h3>{_esc(texto)}</h3>")
     corpo = [
         "<h1>Relatório — Redes</h1>",
         "<p>Relatório gerado automaticamente a partir do projeto analisado.</p>",
         ('<p><a href="bibliometria.html">Visão geral descritiva do corpus</a> '
          "(produção, rankings, rajadas e nuvens de palavras)</p>")
         if com_bibliometria else "",
-        "<h2>Configuração da análise</h2>",
-        _configuracao_tabela(config),
+        "<h2>Parâmetros e método</h2>",
+        bloco_metodo,
         "<h2>Resultados dos períodos</h2>",
-        _tabela(["Período", "Documentos", "Itens", "Agrupamentos", "Nós/arestas"],
-                linhas, "Resumo por período", numericas=(1, 2, 3, 4)),
+        tabela(["Período", "Documentos", "Itens", "Agrupamentos", "Nós/arestas"],
+               linhas, "Resumo por período", numericas=(1, 2, 3, 4)),
         "<h2>Resultados longitudinais</h2>",
         f'<p><img src="images/evolutionMap.svg" '
         f'alt="Mapa de evolução dos temas" width="980"></p>',
@@ -526,6 +544,13 @@ def corpo_bibliometria(kb, estilo=None) -> str | None:
         ], "Leis de Lotka, Bradford e Zipf"),
     ]
 
+    # Fluxo Autor - País - IES
+    from . import fluxos
+    sankey = fluxos.corpo_sankey_html(conexao)
+    if sankey:
+        corpo.append(estilo.titulo(1, "Fluxo Autor – País – IES"))
+        corpo.append(sankey)
+
     # Nuvens de palavras
     corpo.append(estilo.titulo(1, "Nuvens de palavras"))
     for fonte, titulo in (("palavras", "Palavras-chave dos autores"), ("titulos", "Títulos dos documentos")):
@@ -552,6 +577,9 @@ def corpo_bibliometria(kb, estilo=None) -> str | None:
             corpo.append(estilo.figura(svg, titulo, f"bursts-{tipo}.svg"))
     corpo.append('<p class="fonte">Rajadas pelo algoritmo de Kleinberg (s = 2, γ = 1). A contagem é de '
                  "documentos do corpus que usam o termo ou citam a referência, não de citações recebidas.</p>")
+
+    corpo.append(estilo.titulo(1, "Método e parâmetros"))
+    corpo.append(metodo.metodo_bibliometria_html(estilo.tabela))
     return "\n".join(c for c in corpo if c)
 
 
@@ -748,13 +776,19 @@ def gera(destino: str | Path, kb, periodos, config, formato: str = "html",
     return gera_html(Path(destino), kb, periodos, config, estendido, medida_temporal)
 
 
-def gera_pagina_completa(destino: Path, kb, secoes: list[dict], ignoradas: list[dict]) -> None:
+def gera_pagina_completa(destino: Path, kb, secoes: list[dict], ignoradas: list[dict],
+                         medida_temporal: str = "EquivalenceIndex") -> None:
     """Índice do relatório completo: seções numeradas, resumo por período e figuras.
 
     Cada seção é uma análise já gerada em `destino/<pasta>`; `secoes` traz o
     rótulo, a descrição, a pasta, a configuração e os resultados por período.
     """
     numero_figura = 0
+    tabela = _numerador()
+    try:
+        periodos = kb.periodos()
+    except Exception:
+        periodos = None
     sumario = ['<a href="bibliometria.html">1 Visão geral descritiva</a>']
     corpo = ["<h1>Relatório completo — Redes</h1>",
              "<p>Cada seção traz o quadro por período, o diagrama estratégico e a rede de cada período; "
@@ -800,6 +834,12 @@ def gera_pagina_completa(destino: Path, kb, secoes: list[dict], ignoradas: list[
                     f'{_esc(secao["rotulo"].lower())}, {_esc(r.periodo)}.</figcaption></figure>')
         if figuras:
             bloco.append('<div class="miniaturas">' + "".join(figuras) + "</div>")
+        bloco.append(f'<h3 id="{ancora}-metodo">{posicao}.2 Parâmetros e método</h3>')
+        bloco.append(metodo.metodo_html(
+            secao["config"], periodos, resultados, None,
+            secao.get("medida_temporal", medida_temporal), kb, tabela,
+            rotulo=secao["rotulo"].lower(),
+            titulo=lambda texto: f"<h4>{_esc(texto)}</h4>"))
         blocos.append("\n".join(bloco))
     if ignoradas:
         sumario.append('<a href="#nao-gerados">Não gerados</a>')

@@ -1081,6 +1081,17 @@ tbody tr:hover td { background: #FBFCFE; }
 .grade-mapas figcaption { margin-top: 6px; font-size: 11.5px; color: var(--tinta-fraca); }
 .grade-mapas .figura-sobreposicao { text-align: center; }
 
+/* -------------------------------------------------------------- dendrograma */
+
+.dendro-controles { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 18px; padding: 12px 18px 4px; }
+.dendro-grupos { flex: 1 1 220px; min-width: 0; }
+.dendro-grupos input[type=range] { display: block; width: 100%; margin-top: 6px; }
+.dendro-caixa { position: relative; min-height: 90px; padding: 8px 18px 0; }
+.dendro-figura { max-width: 100%; overflow-x: auto; }
+.dendro-figura svg { display: block; min-width: 680px; max-width: none; height: auto; margin: 0 auto; background: var(--branco); border: 1px solid var(--linha); border-radius: 10px; }
+.dendro-frases { margin: 10px 18px 6px; padding-left: 18px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.dendro-frases li { margin-bottom: 4px; }
+
 /* ------------------------------------------------------------------ modais */
 
 .overlay {
@@ -1786,6 +1797,16 @@ body.modo-avancado .parametros .campos + .nota-auto { margin-top: 12px; }
 .bib-nota { font-size: 12px; color: var(--tinta-fraca); margin-top: 10px; line-height: 1.5; }
 .bib-aviso { background: var(--apoio-amarelo); border-radius: 8px; padding: 8px 12px; color: #7A4B00; }
 .bib-rolagem { overflow-x: auto; }
+
+/* Fluxo Autor – País – IES: o SVG lê estas variáveis (valor de reserva claro no arquivo baixado). */
+:root { --sk-fundo: var(--branco); --sk-texto: var(--tinta); --sk-fraco: var(--tinta-fraca); --sk-contorno: var(--branco); }
+:root[data-tema="escuro"] { --sk-fundo: #121826; --sk-texto: #E6EAF5; --sk-fraco: #9AA6BD; --sk-contorno: #121826; }
+.bib-fluxo .bib-saida svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+.bib-fluxo .botao-mini { text-decoration: none; display: inline-flex; align-items: center; }
+.bib-fluxo .botao-mini[hidden] { display: none; }
+.bib-detalhes { margin-top: 10px; font-size: 12.5px; }
+.bib-detalhes summary { cursor: pointer; font-weight: 600; color: var(--azul); }
+.bib-detalhes table { margin-top: 8px; }
 
 /* Revisar grafias */
 .grafia-lista { margin: 8px 0; font-size: 12.5px; }
