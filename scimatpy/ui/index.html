@@ -20,11 +20,8 @@
     </a>
 
     <nav class="nav-analises" aria-label="Análises">
-      <button type="button" class="nav-analise" data-analise="visao" title="Visão geral">
-        <span class="ponto"></span><span class="nav-texto">Visão geral</span>
-      </button>
-      <button type="button" class="nav-analise" data-analise="bibliometria" title="Produção, autores, fontes, países e leis bibliométricas">
-        <span class="ponto"></span><span class="nav-texto">Bibliometria</span>
+      <button type="button" class="nav-analise" data-analise="visao" title="Visão geral descritiva">
+        <span class="ponto"></span><span class="nav-texto">Visão geral descritiva</span>
       </button>
       <div class="grupo">
         <p class="grupo-titulo">Fontes</p>
@@ -257,20 +254,20 @@
         </div>
       </section>
 
-      <section class="visao-geral oculta" id="visaoBibliometria" hidden></section>
-
       <section class="visao-geral" id="visaoGeral">
         <div class="visao-geral-cab">
           <div class="sobre">Corpus</div>
-          <h2>Visão geral</h2>
-          <p>Resumo do projeto e da análise executada.</p>
+          <h2>Visão geral descritiva</h2>
+          <p>Produção, impacto e distribuição de autores, fontes, países e palavras-chave do corpus.</p>
         </div>
-        <div class="info-geral">
+        <div id="visaoBibliometria" class="bib-conteudo"><p class="bib-vazio">Abra um projeto para ver o corpus.</p></div>
+        <div class="info-geral" hidden>
           <article class="info-cartao"><span class="rotulo">Período</span><strong id="vgPeriodo">—</strong><span class="detalhe">anos cobertos</span></article>
           <article class="info-cartao"><span class="rotulo">Documentos</span><strong id="vgDocumentos">—</strong><span class="detalhe">no corpus</span></article>
           <article class="info-cartao"><span class="rotulo">Períodos</span><strong id="vgPeriodos">—</strong><span class="detalhe">recortes</span></article>
           <article class="info-cartao"><span class="rotulo">Unidades</span><strong id="vgUnidades">—</strong><span class="detalhe">disponíveis</span></article>
         </div>
+        <h3 class="bib-subtitulo">Última análise executada</h3>
         <section class="visao" aria-label="Resumo da análise">
           <article class="visao-cartao">
             <span class="ponto-visao ponto-documentos"></span>

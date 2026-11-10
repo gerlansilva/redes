@@ -1774,3 +1774,6 @@ body.modo-avancado .parametros .campos + .nota-auto { margin-top: 12px; }
 .bib-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tinta); }
 .bib-trilho { background: var(--apoio-lavanda); border-radius: 6px; height: 9px; overflow: hidden; }
 .bib-trilho span { display: block; height: 100%; border-radius: 6px; }
+
+.bib-conteudo { margin-top: 4px; }
+.bib-subtitulo { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-suave); margin: 28px 0 10px; }

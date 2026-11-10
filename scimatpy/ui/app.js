@@ -300,10 +300,6 @@ function ligarEventos() {
         mostrarVisaoGeral();
         return;
       }
-      if (chave === "bibliometria") {
-        mostrarBibliometria();
-        return;
-      }
       escolherAnalise(chave, true);
     });
   });
@@ -719,7 +715,7 @@ function descricaoPersonalizada() {
 }
 
 function mostrarVisaoGeral() {
-  esconderBibliometria();
+  if (typeof carregarBibliometria === "function") carregarBibliometria();
   for (const item of document.querySelectorAll(".nav-analise[data-analise]")) {
     item.classList.toggle("ativa", item.dataset.analise === "visao");
   }
@@ -739,13 +735,7 @@ function mostrarVisaoGeral() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function esconderBibliometria() {
-  const painel = $("visaoBibliometria");
-  if (painel) { painel.classList.add("oculta"); painel.hidden = true; }
-}
-
 function mostrarAnalise() {
-  esconderBibliometria();
   const visao = $("visaoGeral");
   if (visao) {
     visao.classList.add("oculta");
@@ -3024,6 +3014,7 @@ async function editarBase(dados) {
       body: JSON.stringify({ ...dados, caminho: estado.projeto.caminho }),
     });
     renderizarBase(base);
+    if (typeof BIB !== "undefined") BIB.cache = {};
     const projeto = await api("/api/abrir", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

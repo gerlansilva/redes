@@ -15,66 +15,98 @@ function bibPlural(n, um, varios) {
   return `${bibNum.format(n)} ${n === 1 ? um : varios}`;
 }
 
-async function mostrarBibliometria() {
-  mostrarVisaoGeral();            // esconde parâmetros, abas e a visão geral
-  esconderVisaoGeralSemPainel();
-  for (const item of document.querySelectorAll(".nav-analise[data-analise]")) {
-    item.classList.toggle("ativa", item.dataset.analise === "bibliometria");
-  }
+async function carregarBibliometria() {
   const painel = document.getElementById("visaoBibliometria");
-  painel.classList.remove("oculta");
-  painel.hidden = false;
+  if (!painel) return;
   if (!estado.projeto) {
-    painel.innerHTML = '<div class="visao-geral-cab"><div class="sobre">Bibliometria</div>' +
-      "<h2>Bibliometria</h2><p>Abra um projeto para ver a produção do corpus.</p></div>";
+    painel.innerHTML = '<p class="bib-vazio">Abra um projeto para ver o corpus.</p>';
     return;
   }
   const caminho = estado.projeto.caminho;
   if (!BIB.cache[caminho]) {
-    painel.innerHTML = '<div class="visao-geral-cab"><div class="sobre">Bibliometria</div>' +
-      "<h2>Bibliometria</h2><p>Calculando…</p></div>";
+    painel.innerHTML = '<p class="bib-vazio">Calculando…</p>';
     try {
       BIB.cache[caminho] = await api(`/api/bibliometria?caminho=${encodeURIComponent(caminho)}`);
     } catch (erro) {
-      painel.innerHTML = `<div class="visao-geral-cab"><h2>Bibliometria</h2><p>${bibEsc(erro.message)}</p></div>`;
+      painel.innerHTML = `<p class="bib-vazio">${bibEsc(erro.message)}</p>`;
       return;
     }
   }
-  if (estado.projeto.caminho === caminho) renderizarBibliometria(painel, BIB.cache[caminho]);
-}
-
-function esconderVisaoGeralSemPainel() {
-  const visao = document.getElementById("visaoGeral");
-  if (visao) { visao.classList.add("oculta"); visao.hidden = true; }
+  if (estado.projeto && estado.projeto.caminho === caminho) {
+    renderizarBibliometria(painel, BIB.cache[caminho]);
+  }
 }
 
 /* ------------------------------------------------------------ gráficos SVG */
 
+function escalaBonita(maximo, passos = 4) {
+  if (maximo <= 0) return { topo: 1, ticks: [0, 1] };
+  const bruto = maximo / passos;
+  const potencia = Math.pow(10, Math.floor(Math.log10(bruto)));
+  const fracao = bruto / potencia;
+  const passo = (fracao <= 1 ? 1 : fracao <= 2 ? 2 : fracao <= 5 ? 5 : 10) * potencia;
+  const topo = Math.ceil(maximo / passo) * passo;
+  const ticks = [];
+  for (let v = 0; v <= topo + passo / 1000; v += passo) ticks.push(Math.round(v * 1000) / 1000);
+  return { topo, ticks };
+}
+
 function graficoProducao(producao) {
-  const L = 760, A = 260, m = { e: 46, d: 46, t: 16, b: 30 };
+  const L = 1100, A = 312, m = { e: 54, d: 62, t: 28, b: 30 };
   const w = L - m.e - m.d, h = A - m.t - m.b;
-  const maxD = Math.max(1, ...producao.map((p) => p.documentos));
-  const maxA = Math.max(1, ...producao.map((p) => p.acumulado));
+  const escD = escalaBonita(Math.max(...producao.map((p) => p.documentos)));
+  const escC = escalaBonita(Math.max(...producao.map((p) => p.citacoes)));
   const passo = w / producao.length;
+  const xc = (i) => m.e + i * passo + passo / 2;
+  const yD = (v) => m.t + h - (v / escD.topo) * h;
+  const yC = (v) => m.t + h - (v / escC.topo) * h;
+  const grade = escD.ticks.map((v) =>
+    `<line x1="${m.e}" x2="${L - m.d}" y1="${yD(v).toFixed(1)}" y2="${yD(v).toFixed(1)}" stroke="#E9ECF2"/>` +
+    `<text x="${m.e - 8}" y="${(yD(v) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#2F2BFF">${bibNum.format(v)}</text>`).join("");
+  const eixoC = escC.ticks.map((v) =>
+    `<text x="${L - m.d + 8}" y="${(yC(v) + 4).toFixed(1)}" font-size="11" fill="#A16207">${bibNum.format(v)}</text>`).join("");
   const barras = producao.map((p, i) => {
-    const altura = (p.documentos / maxD) * h;
-    return `<rect x="${(m.e + i * passo + passo * 0.14).toFixed(1)}" y="${(m.t + h - altura).toFixed(1)}" ` +
-      `width="${(passo * 0.72).toFixed(1)}" height="${altura.toFixed(1)}" rx="3" fill="#2F2BFF" fill-opacity=".85">` +
+    const altura = (p.documentos / escD.topo) * h;
+    return `<rect x="${(m.e + i * passo + passo * 0.16).toFixed(1)}" y="${(m.t + h - altura).toFixed(1)}" ` +
+      `width="${(passo * 0.68).toFixed(1)}" height="${altura.toFixed(1)}" rx="3" fill="#2F2BFF" fill-opacity=".85">` +
       `<title>${p.ano}: ${bibPlural(p.documentos, "documento", "documentos")}, ${bibNum.format(p.citacoes)} citações</title></rect>`;
   }).join("");
-  const linha = producao.map((p, i) =>
-    `${i ? "L" : "M"}${(m.e + i * passo + passo / 2).toFixed(1)},${(m.t + h - (p.acumulado / maxA) * h).toFixed(1)}`).join(" ");
-  const cada = Math.max(1, Math.ceil(producao.length / 12));
+  const linha = producao.map((p, i) => `${i ? "L" : "M"}${xc(i).toFixed(1)},${yC(p.citacoes).toFixed(1)}`).join(" ");
+  const pontos = producao.map((p, i) =>
+    `<circle cx="${xc(i).toFixed(1)}" cy="${yC(p.citacoes).toFixed(1)}" r="3" fill="#FFC400" stroke="#fff" stroke-width="1">` +
+    `<title>${p.ano}: ${bibNum.format(p.citacoes)} citações</title></circle>`).join("");
+  const cada = Math.max(1, Math.ceil(producao.length / 14));
   const rotulos = producao.map((p, i) => (i % cada === 0 || i === producao.length - 1)
-    ? `<text x="${(m.e + i * passo + passo / 2).toFixed(1)}" y="${A - 10}" text-anchor="middle" font-size="11" fill="#64748B">${p.ano}</text>` : "").join("");
-  const eixo = (valor, x, anchor, cor) =>
-    `<text x="${x}" y="${m.t + 4}" text-anchor="${anchor}" font-size="11" fill="${cor}">${bibNum.format(valor)}</text>`;
-  return `<svg viewBox="0 0 ${L} ${A}" width="100%" role="img" aria-label="Produção científica anual">` +
-    `<line x1="${m.e}" y1="${m.t + h}" x2="${L - m.d}" y2="${m.t + h}" stroke="#DCE3F0"/>` +
-    barras + `<path d="${linha}" fill="none" stroke="#FFC400" stroke-width="2.5"/>` +
-    eixo(maxD, m.e - 8, "end", "#2F2BFF") + eixo(maxA, L - m.d + 8, "start", "#A16207") + rotulos + `</svg>` +
-    `<div class="bib-legenda"><span><i style="background:#2F2BFF"></i>Documentos por ano</span>` +
-    `<span><i style="background:#FFC400"></i>Acumulado</span></div>`;
+    ? `<text x="${xc(i).toFixed(1)}" y="${A - 10}" text-anchor="middle" font-size="11" fill="#64748B">${p.ano}</text>` : "").join("");
+  const titulos =
+    `<text x="${m.e - 8}" y="12" text-anchor="end" font-size="10.5" font-weight="600" fill="#2F2BFF">Docs</text>` +
+    `<text x="${L - m.d + 8}" y="12" font-size="10.5" font-weight="600" fill="#A16207">Citações</text>`;
+  return `<svg viewBox="0 0 ${L} ${A}" width="100%" role="img" aria-label="Produção e citações por ano">` +
+    grade + `<line x1="${m.e}" y1="${m.t + h}" x2="${L - m.d}" y2="${m.t + h}" stroke="#DCE3F0"/>` +
+    barras + `<path d="${linha}" fill="none" stroke="#FFC400" stroke-width="2.5" stroke-linejoin="round"/>` + pontos +
+    eixoC + titulos + rotulos + `</svg>` +
+    `<div class="bib-legenda"><span><i style="background:#2F2BFF"></i>Documentos por ano (eixo esquerdo)</span>` +
+    `<span><i style="background:#FFC400"></i>Citações recebidas por ano de publicação (eixo direito)</span></div>`;
+}
+
+function graficoAcumulado(producao) {
+  const L = 1100, A = 150, m = { e: 54, d: 62, t: 10, b: 26 };
+  const w = L - m.e - m.d, h = A - m.t - m.b;
+  const esc = escalaBonita(Math.max(...producao.map((p) => p.acumulado)), 3);
+  const passo = w / Math.max(1, producao.length - 1);
+  const x = (i) => producao.length > 1 ? m.e + i * passo : m.e + w / 2;
+  const y = (v) => m.t + h - (v / esc.topo) * h;
+  const linha = producao.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.acumulado).toFixed(1)}`).join(" ");
+  const area = `${linha} L${x(producao.length - 1).toFixed(1)},${m.t + h} L${x(0).toFixed(1)},${m.t + h} Z`;
+  const grade = esc.ticks.map((v) =>
+    `<line x1="${m.e}" x2="${L - m.d}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#E9ECF2"/>` +
+    `<text x="${m.e - 8}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#64748B">${bibNum.format(v)}</text>`).join("");
+  const cada = Math.max(1, Math.ceil(producao.length / 14));
+  const rotulos = producao.map((p, i) => (i % cada === 0 || i === producao.length - 1)
+    ? `<text x="${x(i).toFixed(1)}" y="${A - 8}" text-anchor="middle" font-size="11" fill="#64748B">${p.ano}</text>` : "").join("");
+  return `<svg viewBox="0 0 ${L} ${A}" width="100%" role="img" aria-label="Documentos acumulados">` +
+    grade + `<path d="${area}" fill="#6A3BFF" fill-opacity=".12"/>` +
+    `<path d="${linha}" fill="none" stroke="#6A3BFF" stroke-width="2.5" stroke-linejoin="round"/>` + rotulos + `</svg>`;
 }
 
 function graficoBarras(linhas, campo, cor) {
@@ -134,14 +166,17 @@ function secaoBib(titulo, descricao, conteudo, classe = "") {
 
 function renderizarBibliometria(painel, d) {
   if (d.vazio) {
-    painel.innerHTML = '<div class="visao-geral-cab"><h2>Bibliometria</h2><p>O projeto não tem documentos.</p></div>';
+    painel.innerHTML = '<p class="bib-vazio">O projeto não tem documentos.</p>';
     return;
   }
   const p = d.principal;
   const intervalo = p.primeiro_ano ? `${p.primeiro_ano}–${p.ultimo_ano}` : "—";
   const cartoes = [
     cartaoBib("Documentos", bibNum.format(p.documentos), intervalo),
-    cartaoBib("Autores", bibNum.format(p.autores), `${bibDec.format(p.autores_por_documento ?? 0)} por documento`),
+    cartaoBib("Períodos", bibNum.format(estado.projeto.periodos.length),
+      estado.projeto.periodos.map((x) => x.nome).join(" · ")),
+    cartaoBib("Autores", bibNum.format(p.autores),
+      `${bibDec.format(p.autores_por_documento ?? 0)} por documento · ${bibNum.format(p.documentos_autor_unico)} de autor único`),
     cartaoBib("Fontes", bibNum.format(p.fontes), "periódicos do corpus"),
     cartaoBib("Palavras-chave", bibNum.format(p.palavras_chave), "dos autores"),
     cartaoBib("Países", bibNum.format(p.paises), p.coautoria_internacional != null
@@ -149,7 +184,6 @@ function renderizarBibliometria(painel, d) {
     cartaoBib("Referências", bibNum.format(p.referencias), "distintas"),
     cartaoBib("Citações", bibNum.format(p.citacoes), `${bibDec.format(p.citacoes_por_documento)} por documento`),
     cartaoBib("Crescimento anual", p.crescimento_anual != null ? `${bibDec.format(p.crescimento_anual)}%` : "—", "taxa composta da produção"),
-    cartaoBib("Autor único", bibNum.format(p.documentos_autor_unico), "documentos"),
     cartaoBib("Índice de colaboração", p.indice_colaboracao != null ? bibDec.format(p.indice_colaboracao) : "—", "autores por documento em coautoria"),
   ].join("");
 
@@ -182,11 +216,11 @@ function renderizarBibliometria(painel, d) {
     { rotulo: "Docs", campo: "documentos", num: 1 }], d.coautoria.pares, "Pares de coautores");
 
   painel.innerHTML =
-    '<div class="visao-geral-cab"><div class="sobre">Corpus</div><h2>Bibliometria</h2>' +
-    "<p>Produção, impacto e distribuição de autores, fontes, países e palavras-chave.</p></div>" +
     `<div class="info-geral bib-cartoes">${cartoes}</div>` +
-    secaoBib("Produção científica anual", "Documentos por ano (barras) e total acumulado (linha).",
+    secaoBib("Produção e citações por ano", "Documentos publicados (barras) e citações que esses documentos receberam (linha).",
       graficoProducao(d.producao), "bib-larga") +
+    secaoBib("Documentos acumulados", "Total de documentos do corpus ao longo dos anos.",
+      graficoAcumulado(d.producao), "bib-larga") +
     '<div class="bib-grade">' +
     secaoBib("Autores mais produtivos", "Por número de documentos; h calculado dentro do corpus.", tabelaBib(colAutores, d.autores, "Autores")) +
     secaoBib("Fontes mais produtivas", "Periódicos que mais publicam no corpus.", tabelaBib(colFontes, d.fontes, "Fontes")) +

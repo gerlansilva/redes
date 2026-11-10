@@ -49,3 +49,11 @@ class BibliometriaTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CoresDosGruposTest(unittest.TestCase):
+    def test_nenhum_grupo_fica_cinza(self):
+        from scimatpy.viz.halo import CINZA, cor_do_grupo
+        cores = [cor_do_grupo(i) for i in range(60)]
+        self.assertNotIn(CINZA, cores)
+        self.assertEqual(len(set(cores)), 60)

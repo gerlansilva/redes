@@ -21,8 +21,29 @@ import numpy as np
 
 PALETA = ["#2F2BFF", "#00A344", "#6A3BFF", "#B45309", "#0B1F66", "#0E7490",
           "#8B5CF6", "#4D7C0F", "#9D174D", "#0369A1", "#A16207", "#7C3AED",
-          "#0F766E", "#BE185D", "#64748B"]
+          "#0F766E", "#BE185D", "#DC2626"]
 CINZA = "#8A94A6"
+
+
+def cor_do_grupo(posicao: int) -> str:
+    """Cor do agrupamento: a paleta fixa primeiro e, depois, tons distintos.
+
+    Passado o fim da paleta, o ângulo áureo espalha os matizes e alterna
+    luminosidade e saturação, para que nenhum agrupamento fique cinza.
+    """
+    if posicao < len(PALETA):
+        return PALETA[posicao]
+    extra = posicao - len(PALETA)
+    matiz = (extra * 137.508 + 20) % 360
+    luz = (0.40, 0.50, 0.33)[extra % 3]
+    sat = (0.62, 0.55, 0.70)[extra % 3]
+    c = (1 - abs(2 * luz - 1)) * sat
+    x = c * (1 - abs((matiz / 60) % 2 - 1))
+    m = luz - c / 2
+    r, g, b = [(c, x, 0), (x, c, 0), (0, c, x), (0, x, c), (x, 0, c), (c, 0, x)][int(matiz // 60) % 6]
+    return "#%02X%02X%02X" % tuple(round((v + m) * 255) for v in (r, g, b))
+
+
 CINZA_LIGACAO = "#CBD5E1"
 TINTA = "#14204A"
 TINTA_FRACA = "#64748B"
@@ -228,7 +249,7 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
     lista = [grupos[chave] for chave in ordem]
     indice = {no: i for i, membros in enumerate(lista) for no in membros}
     k = len(lista)
-    cores = [PALETA[i] if i < len(PALETA) else CINZA for i in range(k)]
+    cores = [cor_do_grupo(i) for i in range(k)]
 
     legenda = geometria_legenda(
         k + (1 if soltos else 0), altura, topo=118, base=48)
