@@ -7,10 +7,12 @@ O servidor escuta apenas em 127.0.0.1 e não expõe nada fora da máquina.
 
 from __future__ import annotations
 
+import atexit
 import csv
 import json
 import re
 import secrets
+import shutil
 import sqlite3
 import tempfile
 import threading
@@ -51,6 +53,7 @@ QUADRANTES = {
 }
 
 CACHE = Path(tempfile.mkdtemp(prefix="scimatpy-web-"))
+atexit.register(shutil.rmtree, CACHE, ignore_errors=True)
 ANALISES: "OrderedDict[str, dict]" = OrderedDict()
 FIGURAS: dict[str, Path] = {}
 ARQUIVOS: dict[str, Path] = {}
@@ -857,7 +860,8 @@ def gera_relatorio(dados: dict) -> dict:
     with TRAVA_REGISTRO:
         RELATORIOS[token] = destino
         while len(RELATORIOS) > 5:
-            RELATORIOS.popitem(last=False)
+            _, antigo = RELATORIOS.popitem(last=False)
+            _apaga_relatorio(antigo)
 
     arquivo = "index.html"
     return {"token": token, "formato": formato, "resumo": resumo,
@@ -903,6 +907,15 @@ ANALISES_COMPLETO = [
      "SELECT COUNT(*) FROM ReferenceSourceGroup WHERE COALESCE(stopGroup,0)=0", 3,
      "a base não traz referências"),
 ]
+
+
+def _apaga_relatorio(pasta: Path) -> None:
+    """Apaga o relatório expulso do registro, mas só se ele estiver no cache do servidor."""
+    try:
+        if CACHE.resolve() in Path(pasta).resolve().parents:
+            shutil.rmtree(pasta, ignore_errors=True)
+    except OSError:
+        pass
 
 
 def _escolhe_frequencia(kb, periodos, base: dict, parametros: dict, fixa=None):
@@ -965,7 +978,7 @@ def gera_relatorio_completo(dados: dict) -> dict:
                 report._VOLTAR.reset(token_voltar)
             nota = ""
             por_periodo = [len(r.grupos) for r in resumo["resultados"]]
-            if por_periodo and max(por_periodo) <= 1:
+            if por_periodo and max(por_periodo) <= 2:
                 nota = (" Poucos agrupamentos: o corpus é pequeno para este mapa; "
                         "leia como indício, não como estrutura firme.")
             elif any(n == 0 for n in por_periodo):
@@ -988,7 +1001,8 @@ def gera_relatorio_completo(dados: dict) -> dict:
     with TRAVA_REGISTRO:
         RELATORIOS[token] = destino
         while len(RELATORIOS) > 5:
-            RELATORIOS.popitem(last=False)
+            _, antigo = RELATORIOS.popitem(last=False)
+            _apaga_relatorio(antigo)
     resposta = {"token": token, "formato": formato,
                 "url": f"/relatorio/{token}/index.html",
                 "pastas": f"/relatorio/{token}/index.html",
@@ -1230,9 +1244,23 @@ def importa(workspace: Path, corpo: bytes, nome_arquivo: str,
     while destino.exists():
         destino = workspace / f"{nome}-{sufixo}"
         sufixo += 1
+    nome_limpo = Path(nome_arquivo).name
+    if nome_limpo in ("", ".", ".."):
+        raise ErroApi("Nome de arquivo inválido.")
     destino.mkdir(parents=True)
+    try:
+        return _importa_em(destino, nome_limpo, corpo, formato, texto_periodos,
+                           autores_referencia, remove_repetidos)
+    except BaseException:
+        shutil.rmtree(destino, ignore_errors=True)  # não deixa pasta órfã quando falha
+        raise
 
-    arquivo = destino / Path(nome_arquivo).name
+
+def _importa_em(destino: Path, nome_limpo: str, corpo: bytes, formato: str,
+                texto_periodos: str, autores_referencia: str, remove_repetidos: bool) -> dict:
+    from .loaders import le_corpus
+
+    arquivo = destino / nome_limpo
     arquivo.write_bytes(corpo)
     # Os formatos tabulares se confundem pelo nome das colunas; o conteúdo
     # decide. Assim, escolher "CSV SciMAT" ou "CSV da Scopus" para um arquivo

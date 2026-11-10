@@ -16,10 +16,15 @@ TINTA = "#14204A"
 TINTA_FRACA = "#64748B"
 
 
+def _ligacoes_txt(n: int) -> str:
+    return f"{n} ligação interna" if n == 1 else f"{n} ligações internas"
+
+
 def rede_agrupamento_svg(resultado, grupo, titulo: str,
                          largura: int = 720) -> str:
     nos = list(grupo.nos)
-    titulo_curto = titulo
+    limite_titulo = max(20, int((largura - 24) / 7.4))
+    titulo_curto = titulo if len(titulo) <= limite_titulo else titulo[:limite_titulo - 1].rstrip() + "…"
     if not nos:
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{largura}" height="120" '
@@ -32,7 +37,9 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
     altura = max(400, min(980, 36 * len(nos)))
     cx, cy = largura / 2, altura / 2 - 6
     raio = min(largura * 0.30, altura * 0.36)
-    rotulos = {no: resultado.dataset.itens.get(no, str(no)) for no in nos}
+    # No acoplamento os nós são documentos: o rótulo vem de `resultado.rotulos`.
+    rotulos = {no: resultado.dataset.itens.get(no) or getattr(resultado, "rotulos", {}).get(no)
+               or str(no) for no in nos}
     # Os rótulos (até 28 caracteres) ficam fora do círculo: reserva espaço
     # para o mais longo caber na lateral sem ser cortado.
     maior_rotulo = max(min(len(r), 28) for r in rotulos.values())
@@ -41,7 +48,8 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
     partes = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{largura}" height="{altura}" '
         f'viewBox="0 0 {largura} {altura}" role="img" '
-        f'aria-label="{html.escape(titulo_curto)}">',
+        f'aria-label="{html.escape(titulo)}">',
+        f'<title>{html.escape(titulo)}</title>',
         '<rect width="100%" height="100%" fill="#ffffff"/>',
         f'<text x="{largura/2}" y="24" text-anchor="middle" '
         'font-family="Inter, Arial, sans-serif" font-size="14" fill="#14204A">'
@@ -90,8 +98,8 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
         f'<text x="{largura/2}" y="{altura - 12}" text-anchor="middle" '
         'font-family="Helvetica, Arial, sans-serif" font-size="10" '
         f'fill="{TINTA_FRACA}">{len(nos)} itens · '
-        f'{sum(1 for a in nos for b in nos if a < b and resultado.rede.contem_aresta(a, b))} '
-        'ligações internas</text>')
+        f'{_ligacoes_txt(sum(1 for a in nos for b in nos if a < b and resultado.rede.contem_aresta(a, b)))}'
+        '</text>')
     partes.append("</svg>")
     return "\n".join(partes)
 

@@ -1015,6 +1015,7 @@ async function previsualizar() {
 
   estado.calculando = true;
   estado.pendente = false;
+  if (typeof atualizarMenuExportar === "function") atualizarMenuExportar();
   const botao = $("btnPreview");
   botao.dataset.calculando = "1";
   botao.disabled = true;
@@ -1036,10 +1037,14 @@ async function previsualizar() {
       renderizarResultado(resultado);
     }
   } catch (erro) {
+    // Sem resultado novo, o antigo não vale: o menu Exportar não pode servir a análise anterior.
+    estado.resultado = null;
+    estado.token = null;
     mostrarToast(erro.message, true);
     renderizarResumoVazio(erro.message);
   } finally {
     estado.calculando = false;
+    atualizarMenuExportar();
     botao.dataset.calculando = "0";
     botao.disabled = !estado.projeto || trabalhoEmAndamento();
     botao.textContent = "Pré-visualizar";
@@ -2986,14 +2991,21 @@ function itensMenuExportar() {
 
 function atualizarMenuExportar() {
   const temProjeto = Boolean(estado.projeto);
-  const temResultado = Boolean(estado.resultado && estado.token);
+  const semGrupos = Boolean(estado.resultado && estado.resultado.resumo
+    && estado.resultado.resumo.grupos === 0);
+  const temResultado = Boolean(estado.resultado && estado.token && !estado.calculando
+    && !estado.desatualizada && !semGrupos);
   const temGrade = Boolean(estado.download);
   let faltaResultado = false;
   for (const item of document.querySelectorAll("#listaExportar [data-exp]")) {
     const precisa = item.dataset.precisa || "projeto";
     let motivo = "";
     if (!temProjeto) motivo = MOTIVO_EXPORTAR.projeto;
-    else if (precisa === "resultado" && !temResultado) { motivo = MOTIVO_EXPORTAR.resultado; faltaResultado = true; }
+    else if (precisa === "resultado" && !temResultado) {
+      motivo = semGrupos ? "Esta análise não formou agrupamentos; não há dados para exportar."
+        : MOTIVO_EXPORTAR.resultado;
+      faltaResultado = true;
+    }
     else if (precisa === "grade" && !temGrade) motivo = MOTIVO_EXPORTAR.grade;
     item.setAttribute("aria-disabled", motivo ? "true" : "false");
     if (motivo) item.title = motivo; else item.removeAttribute("title");

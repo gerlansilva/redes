@@ -2009,3 +2009,10 @@ body:not(.modo-avancado) .selo-estado:not(.erro) { display: none; }
   .recolher { display: none; }
   .menu-lista { right: auto; left: 0; }
 }
+
+@media (max-width: 720px) {
+  .cartao > header { flex-wrap: wrap; row-gap: 8px; }
+  .cartao > header .cartao-titulo { flex: 1 1 100%; min-width: 0; }
+  .cartao > header .cartao-titulo .meta { white-space: normal; overflow-wrap: anywhere; }
+  .cartao > header .espaco { display: none; }
+}

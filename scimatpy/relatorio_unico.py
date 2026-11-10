@@ -52,6 +52,8 @@ figure svg { display:block; margin:0 auto; max-width:100%; height:auto; }
 figcaption { font-size:12.5px; color:#475569; margin-top:6px; text-align:left; }
 table { font-size:13px; }
 table.larga { font-size:11.5px; }
+.rolagem { overflow-x:auto; max-width:100%; }
+@media print { .rolagem { overflow:visible; } }
 table.larga th, table.larga td { padding:4px 5px; }
 .redes-grupos figure { max-width:720px; margin:12px auto; border:1px solid #E6E9F2;
                        border-radius:8px; padding:6px; }
@@ -128,7 +130,9 @@ class _Documento:
         html = _tabela(cabecalho, linhas, f"Tabela {self.tabelas} — {legenda}",
                        numericas=numericas)
         marca = f' id="{ident}"' + (f' class="{classe}"' if classe else "")
-        return html.replace("<table>", f"<table{marca}>", 1)
+        html = html.replace("<table>", f"<table{marca}>", 1)
+        # Tabelas largas rolam dentro do próprio quadro (celular) e quebram no papel.
+        return f'<div class="rolagem">{html}</div>' if classe == "larga" else html
 
     def figura(self, svg: str, legenda: str) -> str:
         self.figuras += 1

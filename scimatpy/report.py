@@ -269,8 +269,9 @@ def _configuracao_tabela(config, legenda: str | None = None) -> str:
         ["Ponto de corte", _numero(config.corte)],
         ["Mapeadores",
          ", ".join(ROTULOS_MAPEADOR.get(m, m) for m in config.mapeadores)],
-        ["Origens das palavras", ", ".join(config.palavras) or "todas"],
     ]
+    if config.unidade == "Words":
+        linhas.append(["Origens das palavras", ", ".join(config.palavras) or "todas"])
     return _tabela(["Parâmetro", "Valor"], linhas, legenda)
 
 
