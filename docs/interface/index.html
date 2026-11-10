@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>scimatpy — interface</title>
+<style>
+  :root {
+    --tinta: #1d2026;
+    --tinta-fraca: #6b7280;
+    --linha: #e6e8ec;
+    --fundo: #eef1f5;
+    --painel: #fafbfc;
+    --motor: #534AB7;
+    --nicho: #0F6E56;
+    --básico: #185FA5;
+    --emergente: #C4501F;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--fundo);
+    font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--tinta);
+    padding: 26px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    width: 1560px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 24px 70px rgba(23, 28, 40, .13), 0 2px 6px rgba(23, 28, 40, .05);
+    overflow: hidden;
+    border: 1px solid #dfe3e9;
+  }
+
+  /* topo */
+  .topo {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--linha);
+  }
+  .marca { display: flex; align-items: center; gap: 11px; }
+  .marca .simbolo {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: #242321; color: #fff;
+    display: grid; place-items: center;
+    font-size: 16px; font-weight: 700;
+    letter-spacing: -.02em;
+  }
+  .marca .nome { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .marca .sub { font-size: 10.5px; color: var(--tinta-fraca); margin-top: 1px; }
+
+  .divisor-v { width: 1px; height: 30px; background: var(--linha); }
+
+  .projeto { display: flex; align-items: center; gap: 12px; }
+  .projeto .icone {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: #f1f3f6; display: grid; place-items: center;
+    border: 1px solid #e3e6eb;
+  }
+  .projeto .linha1 { font-size: 12.5px; font-weight: 600; }
+  .projeto .linha1 span { font-weight: 400; color: var(--tinta-fraca); }
+  .projeto .linha2 { font-size: 11px; color: var(--tinta-fraca); margin-top: 2px; }
+
+  .topo .espaco { flex: 1; }
+  .selo-estado {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 11.5px; color: #0F6E56;
+    background: #EFF7F4; border: 1px solid #d8ebe4;
+    border-radius: 999px; padding: 6px 12px;
+  }
+  .ponto { width: 6px; height: 6px; border-radius: 50%; background: #0F6E56; }
+  .botao {
+    height: 34px; padding: 0 14px; border-radius: 8px;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    border: 1px solid #d9dde3; background: #fff; color: var(--tinta);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .botao.escuro { background: #242321; border-color: #242321; color: #fff; }
+  .botao.claro { background: #f6f7f9; }
+
+  /* corpo */
+  .corpo { display: flex; min-height: 1030px; }
+
+  .lateral {
+    width: 256px; flex: none;
+    background: var(--painel);
+    border-right: 1px solid var(--linha);
+    padding: 22px 14px;
+    display: flex; flex-direction: column;
+  }
+  .rotulo {
+    font-size: 10px; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: #9aa1ab;
+    padding: 0 10px; margin-bottom: 9px;
+  }
+  .etapa {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 10px; border-radius: 8px;
+    font-size: 12.5px; color: #4b515b; margin-bottom: 2px;
+  }
+  .etapa .num {
+    width: 21px; height: 21px; border-radius: 50%;
+    border: 1px solid #d3d7dd; background: #fff;
+    display: grid; place-items: center;
+    font-size: 10.5px; font-weight: 600; color: #737a84; flex: none;
+  }
+  .etapa.feita { color: #7a818b; }
+  .etapa.feita .num { background: #eef1f4; border-color: #e2e5ea; color: #8b929c; }
+  .etapa.ativa {
+    background: #fff; color: var(--tinta); font-weight: 600;
+    box-shadow: 0 1px 2px rgba(20, 24, 35, .06);
+    border: 1px solid #e4e7ec;
+  }
+  .etapa.ativa .num { background: #242321; border-color: #242321; color: #fff; }
+  .etapa.pendente .num { color: #b3b8c0; }
+
+  .execucoes { margin-top: 30px; }
+  .execucao {
+    padding: 9px 10px; border-radius: 8px; font-size: 11.5px;
+    color: #4b515b; display: flex; gap: 9px; align-items: flex-start;
+  }
+  .execucao.ativa { background: #fff; border: 1px solid #e4e7ec; box-shadow: 0 1px 2px rgba(20,24,35,.05); }
+  .execucao .id { color: #9aa1ab; font-variant-numeric: tabular-nums; font-size: 11px; }
+  .execucao .desc { line-height: 1.45; }
+  .execucao .hora { color: #9aa1ab; font-size: 10.5px; margin-top: 2px; }
+  .execucao .ok { width: 6px; height: 6px; border-radius: 50%; background: #0F6E56; margin-top: 5px; flex: none; }
+  .lateral .rodape { margin-top: auto; padding: 14px 10px 2px; border-top: 1px solid var(--linha); font-size: 10.5px; color: #9aa1ab; line-height: 1.5; }
+
+  .principal { flex: 1; padding: 26px 30px 30px; min-width: 0; }
+  .cabecalho { display: flex; align-items: flex-end; gap: 18px; }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+  .cabecalho p { font-size: 12.5px; color: var(--tinta-fraca); margin-bottom: 2px; }
+  .cabecalho .espaco { flex: 1; }
+  .chip-tempo {
+    font-size: 11px; color: #4b515b; background: #f3f5f8;
+    border: 1px solid #e6e9ee; border-radius: 7px; padding: 7px 10px;
+  }
+
+  /* parâmetros */
+  .parametros {
+    margin-top: 18px; border: 1px solid var(--linha); border-radius: 12px;
+    padding: 15px 16px 14px; background: #fff;
+  }
+  .campos { display: flex; gap: 10px; }
+  .campo { flex: 1; }
+  .campo.min { flex: 0 0 96px; }
+  .campo.rede { flex: 0 0 110px; }
+  .campo label {
+    display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: #9aa1ab; margin-bottom: 6px;
+  }
+  .controle {
+    height: 36px; border: 1px solid #dcdfe5; border-radius: 8px;
+    background: #fff; display: flex; align-items: center;
+    padding: 0 11px; font-size: 12.5px; gap: 8px;
+  }
+  .controle .valor { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .controle .chevron { color: #9aa1ab; flex: none; }
+  .controle.stepper { padding: 0 4px; }
+  .controle.stepper .passo {
+    width: 27px; height: 27px; border-radius: 6px; background: #f4f6f8;
+    display: grid; place-items: center; color: #6b7280; font-size: 14px;
+  }
+  .controle.stepper .valor { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .acoes { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 13px; border-top: 1px solid #f0f2f5; }
+  .resumo-exec { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #5b616b; }
+  .resumo-exec b { font-weight: 600; color: var(--tinta); }
+  .resumo-exec .sep { color: #c6cbd2; }
+  .acoes .espaco { flex: 1; }
+
+  /* abas */
+  .abas { display: flex; align-items: center; gap: 26px; margin-top: 22px; border-bottom: 1px solid var(--linha); }
+  .aba { font-size: 12.5px; color: #737a84; padding-bottom: 11px; position: relative; }
+  .aba.ativa { color: var(--tinta); font-weight: 600; }
+  .aba.ativa::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: #242321;
+  }
+  .abas .espaco { flex: 1; }
+  .abas .util { font-size: 11px; color: #8b929c; padding-bottom: 11px; display: flex; gap: 16px; }
+
+  /* resultados */
+  .resultados { display: grid; grid-template-columns: 1.45fr 1fr; gap: 16px; margin-top: 16px; }
+  .cartao { border: 1px solid var(--linha); border-radius: 12px; overflow: hidden; background: #fff; }
+  .cartao header { padding: 13px 15px 11px; border-bottom: 1px solid #f0f2f5; display: flex; align-items: baseline; gap: 10px; }
+  .cartao h2 { font-size: 13px; font-weight: 600; }
+  .cartao .meta { font-size: 10.5px; color: #8b929c; }
+  .cartao .corpo-fig {
+    height: 404px; display: grid; place-items: center; background: #fff; padding: 8px;
+    position: relative;
+  }
+  .cartao .corpo-fig img { max-width: 100%; max-height: 100%; display: block; }
+  .cartao .zoom {
+    position: absolute; right: 10px; bottom: 10px; display: flex; gap: 4px;
+  }
+  .cartao .zoom span {
+    width: 26px; height: 26px; border-radius: 6px; border: 1px solid #e1e5ea;
+    background: rgba(255,255,255,.94); display: grid; place-items: center;
+    font-size: 13px; color: #5b616b;
+  }
+  .estatisticas { display: flex; gap: 20px; padding: 10px 15px; border-top: 1px solid #f0f2f5; font-size: 10.5px; color: #8b929c; }
+  .estatisticas b { color: var(--tinta); font-weight: 600; }
+
+  /* tabela */
+  .tabela-bloco { margin-top: 18px; border: 1px solid var(--linha); border-radius: 12px; overflow: hidden; }
+  .tabela-bloco header { display: flex; align-items: center; padding: 13px 16px; border-bottom: 1px solid var(--linha); }
+  .tabela-bloco h2 { font-size: 13px; font-weight: 600; }
+  .tabela-bloco header .meta { font-size: 10.5px; color: #8b929c; margin-left: 9px; }
+  .tabela-bloco header .espaco { flex: 1; }
+  .tabela-bloco header .link { font-size: 11px; color: #4b515b; font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase;
+    color: #9aa1ab; font-weight: 700; padding: 9px 16px; background: #fafbfc;
+    border-bottom: 1px solid #eef0f3;
+  }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td { padding: 9px 16px; border-top: 1px solid #f2f4f6; font-size: 12px; }
+  tbody tr:first-child td { border-top: none; }
+  .selo {
+    width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 10px; font-weight: 700; border: 1px solid;
+  }
+  .selo.motor { color: var(--motor); border-color: #c9c3ea; background: #F2F0FB; }
+  .selo.nicho { color: var(--nicho); border-color: #bcded3; background: #EFF7F4; }
+  .selo.básico { color: var(--básico); border-color: #c4d9ec; background: #EDF4FA; }
+  .selo.emergente { color: var(--emergente); border-color: #ecc7b6; background: #FBF2ED; }
+  .grupo { font-weight: 550; letter-spacing: .005em; }
+  .quadrante {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px;
+    padding: 3px 8px; border-radius: 999px; border: 1px solid;
+  }
+  .quadrante.motor { color: var(--motor); background: #F2F0FB; border-color: #ded9f3; }
+  .quadrante.nicho { color: var(--nicho); background: #EFF7F4; border-color: #d3e9e2; }
+  .quadrante.básico { color: var(--básico); background: #EDF4FA; border-color: #d5e5f3; }
+  .quadrante.emergente { color: var(--emergente); background: #FBF2ED; border-color: #f0d8cc; }
+  .barra { display: inline-block; width: 54px; height: 4px; border-radius: 2px; background: #eef0f3; margin-right: 8px; vertical-align: middle; overflow: hidden; }
+  .barra i { display: block; height: 100%; border-radius: 2px; background: #a9b1bd; }
+  .valor-medida { display: inline-flex; align-items: center; justify-content: flex-end; min-width: 96px; }
+  .rodape-tabela { padding: 9px 16px; font-size: 10.5px; color: #9aa1ab; border-top: 1px solid #f0f2f5; background: #fcfcfd; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topo">
+    <div class="marca">
+      <div class="simbolo">S</div>
+      <div>
+        <div class="nome">scimatpy</div>
+        <div class="sub">análise bibliométrica</div>
+      </div>
+    </div>
+    <div class="divisor-v"></div>
+    <div class="projeto">
+      <div class="icone">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+        </svg>
+      </div>
+      <div>
+        <div class="linha1">CELII <span>· dados.redes</span></div>
+        <div class="linha2">53 documentos · 2008–2026 · 5 unidades</div>
+      </div>
+    </div>
+    <div class="espaco"></div>
+    <div class="selo-estado"><span class="ponto"></span>Base importada</div>
+    <button class="botao">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
+      </svg>
+      Exportar
+    </button>
+    <button class="botao escuro">Relatório</button>
+  </div>
+
+  <div class="corpo">
+    <aside class="lateral">
+      <div class="rotulo">Projeto</div>
+
+      <div class="etapa feita">
+        <span class="num">✓</span> Importar corpus
+      </div>
+      <div class="etapa feita">
+        <span class="num">✓</span> Períodos
+      </div>
+      <div class="etapa feita">
+        <span class="num">✓</span> Pré-processamento
+      </div>
+      <div class="etapa ativa">
+        <span class="num">4</span> Análise
+      </div>
+      <div class="etapa pendente">
+        <span class="num">5</span> Resultados
+      </div>
+      <div class="etapa pendente">
+        <span class="num">6</span> Relatório
+      </div>
+
+      <div class="execucoes">
+        <div class="rotulo">Execuções</div>
+        <div class="execucao ativa">
+          <span class="ok"></span>
+          <div>
+            <div class="desc"><span class="id">#12</span> Palavras · centros simples</div>
+            <div class="hora">14:02 · 162 configurações</div>
+          </div>
+        </div>
+        <div class="execucao">
+          <span class="ok"></span>
+          <div>
+            <div class="desc"><span class="id">#11</span> Autores · Louvain</div>
+            <div class="hora">13:40 · 162 configurações</div>
+          </div>
+        </div>
+        <div class="execucao">
+          <span class="ok"></span>
+          <div>
+            <div class="desc"><span class="id">#10</span> Referências · média</div>
+            <div class="hora">11:18 · 1 período</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rodape">
+        Base construída pelo scimatpy<br>
+        Nenhum dado sai desta máquina
+      </div>
+    </aside>
+
+    <main class="principal">
+      <div class="cabecalho">
+        <div>
+          <h1>Análise</h1>
+          <p>Escolha os parâmetros e execute uma configuração ou a grade completa.</p>
+        </div>
+        <div class="espaco"></div>
+        <div class="chip-tempo">Período completo · 2008–2026</div>
+      </div>
+
+      <section class="parametros">
+        <div class="campos">
+          <div class="campo">
+            <label>Unidade</label>
+            <div class="controle"><span class="valor">Palavras</span>
+              <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div class="campo">
+            <label>Matriz</label>
+            <div class="controle"><span class="valor">Co-ocorrência</span>
+              <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div class="campo">
+            <label>Similaridade</label>
+            <div class="controle"><span class="valor">Equivalência</span>
+              <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div class="campo">
+            <label>Algoritmo</label>
+            <div class="controle"><span class="valor">Centros simples</span>
+              <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div class="campo min">
+            <label>min-freq</label>
+            <div class="controle stepper">
+              <span class="passo">−</span><span class="valor">1</span><span class="passo">+</span>
+            </div>
+          </div>
+          <div class="campo rede">
+            <label>Rede</label>
+            <div class="controle"><span class="valor">2 – 15</span>
+              <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="acoes">
+          <div class="resumo-exec">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            <b>15</b> agrupamentos <span class="sep">·</span>
+            <b>110</b> nós <span class="sep">·</span>
+            <b>330</b> arestas <span class="sep">·</span>
+            centralidade média 28,6
+          </div>
+          <div class="espaco"></div>
+          <button class="botao claro">Pré-visualizar</button>
+          <button class="botao escuro">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+            Grade completa · 162
+          </button>
+        </div>
+      </section>
+
+      <div class="abas">
+        <div class="aba ativa">Rede</div>
+        <div class="aba">Diagrama estratégico</div>
+        <div class="aba">Agrupamentos</div>
+        <div class="aba">Índices</div>
+        <div class="aba">Documentos</div>
+        <div class="espaco"></div>
+        <div class="util"><span>Comparar períodos</span><span>Exportar TSV</span></div>
+      </div>
+
+      <div class="resultados">
+        <section class="cartao">
+          <header>
+            <h2>Rede em halos</h2>
+            <span class="meta">Palavras · 15 agrupamentos · 110 nós</span>
+          </header>
+          <div class="corpo-fig">
+            <img src="halo.svg" alt="Rede de palavras em halos">
+            <div class="zoom"><span>−</span><span>+</span><span>⤢</span></div>
+          </div>
+          <div class="estatisticas">
+            <span>Densidade média <b>71,8</b></span>
+            <span>Arestas <b>330</b></span>
+            <span>Componentes <b>1</b></span>
+            <span>Maior halo <b>15</b></span>
+          </div>
+        </section>
+
+        <section class="cartao">
+          <header>
+            <h2>Diagrama estratégico</h2>
+            <span class="meta">Callon · faixas normalizadas</span>
+          </header>
+          <div class="corpo-fig">
+            <img src="estrategico.svg" alt="Diagrama estratégico">
+            <div class="zoom"><span>−</span><span>+</span></div>
+          </div>
+          <div class="estatisticas">
+            <span>Motores <b>4</b></span>
+            <span>Nicho <b>4</b></span>
+            <span>Básicos <b>4</b></span>
+            <span>Emergentes <b>3</b></span>
+          </div>
+        </section>
+      </div>
+
+      <section class="tabela-bloco">
+        <header>
+          <h2>Agrupamentos</h2>
+          <span class="meta">ordenados por número de itens</span>
+          <div class="espaco"></div>
+          <span class="link">Ver os 15 grupos →</span>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:52px">Selo</th>
+              <th>Agrupamento</th>
+              <th class="num" style="width:70px">Itens</th>
+              <th class="num" style="width:170px">Centralidade</th>
+              <th class="num" style="width:170px">Densidade</th>
+              <th style="width:150px">Quadrante</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="selo básico">1</span></td>
+              <td class="grupo">STATISTICS-EDUCATION</td>
+              <td class="num">15</td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:100%"></i></span>163,1</span></td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:32%"></i></span>34,8</span></td>
+              <td><span class="quadrante básico">Básico</span></td>
+            </tr>
+            <tr>
+              <td><span class="selo motor">2</span></td>
+              <td class="grupo">STATISTICS-EDUCATION-RESEARCH</td>
+              <td class="num">15</td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:27%"></i></span>44,2</span></td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:100%"></i></span>107,1</span></td>
+              <td><span class="quadrante motor">Motor</span></td>
+            </tr>
+            <tr>
+              <td><span class="selo motor">3</span></td>
+              <td class="grupo">STATISTICS</td>
+              <td class="num">14</td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:30%"></i></span>49,6</span></td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:73%"></i></span>77,9</span></td>
+              <td><span class="quadrante motor">Motor</span></td>
+            </tr>
+            <tr>
+              <td><span class="selo motor">4</span></td>
+              <td class="grupo">TEACHING-STATISTICS</td>
+              <td class="num">11</td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:22%"></i></span>36,3</span></td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:84%"></i></span>90,2</span></td>
+              <td><span class="quadrante motor">Motor</span></td>
+            </tr>
+            <tr>
+              <td><span class="selo básico">5</span></td>
+              <td class="grupo">TEACHER-LEARNING</td>
+              <td class="num">7</td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:25%"></i></span>40,2</span></td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:47%"></i></span>50,0</span></td>
+              <td><span class="quadrante básico">Básico</span></td>
+            </tr>
+            <tr>
+              <td><span class="selo nicho">6</span></td>
+              <td class="grupo">HIGH-SCHOOL</td>
+              <td class="num">5</td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:1%"></i></span>0,8</span></td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:75%"></i></span>80,0</span></td>
+              <td><span class="quadrante nicho">Nicho</span></td>
+            </tr>
+            <tr>
+              <td><span class="selo nicho">7</span></td>
+              <td class="grupo">STOCHASTIC</td>
+              <td class="num">5</td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:7%"></i></span>12,1</span></td>
+              <td class="num"><span class="valor-medida"><span class="barra"><i style="width:70%"></i></span>75,0</span></td>
+              <td><span class="quadrante nicho">Nicho</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="rodape-tabela">Quadrantes pela mediana das faixas normalizadas de centralidade e densidade de Callon.</div>
+      </section>
+
+    </main>
+  </div>
+</div>
+</body>
+</html>
