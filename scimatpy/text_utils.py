@@ -105,6 +105,7 @@ _SUFIXOS_IRREGULARES = (
     ("M", "NS"),
     ("AL", "AIS"), ("EL", "EIS"), ("OL", "OIS"), ("UL", "UIS"),
     ("Z", "CES"),
+    ("IS", "ES"),  # analysis/analyses, hypothesis/hypotheses, análise não entra (termina em E)
 )
 
 

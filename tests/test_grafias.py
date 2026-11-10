@@ -109,5 +109,21 @@ class AgrupamentoTest(unittest.TestCase):
             edit.agrupa_sugestoes(caminho, "pais", [{"canonico": "X", "membros": [i]}])
 
 
+class PluralELacunasTest(unittest.TestCase):
+    def test_plural_analysis_analyses(self):
+        from scimatpy.text_utils import mesmo_termo
+        self.assertTrue(mesmo_termo("BIBLIOMETRIC-ANALYSIS", "BIBLIOMETRIC-ANALYSES"))
+        self.assertTrue(mesmo_termo("ANALYSIS", "ANALYSES"))
+        self.assertFalse(mesmo_termo("BOIS", "BOES"))  # radical curto demais
+
+    def test_lacunas_listadas(self):
+        caminho = _projeto()
+        con = sqlite3.connect(caminho)
+        d = bibliometria.calcula(con)
+        texto = " ".join(d["lacunas"])
+        self.assertIn("referências", texto)
+        self.assertNotIn("Sem países", texto)
+
+
 if __name__ == "__main__":
     unittest.main()

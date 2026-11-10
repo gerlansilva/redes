@@ -246,6 +246,26 @@ def calcula(conexao) -> dict:
         "sem_ano": sum(1 for d in documentos.values() if d["ano"] is None),
     }
 
+    lacunas = []
+    n = len(documentos)
+
+    def falta(condicao, texto):
+        if condicao:
+            lacunas.append(texto)
+
+    falta(not cont_paises, "Sem países: a rede de colaboração entre países e o mapa não podem ser feitos. "
+          "A base de origem não trouxe afiliações com país.")
+    falta(not cont_ies, "Sem afiliações: não há ranking de instituições (IES).")
+    falta(referencias == 0, "Sem referências: cocitação, acoplamento bibliográfico, fontes citadas e rajadas "
+          "de referências não podem ser feitos.")
+    falta(total_citacoes == 0, "Sem contagem de citações: o eixo de citações, o índice h e os documentos mais "
+          "citados ficam vazios.")
+    falta(not cont_palavras, "Sem palavras-chave dos autores: não há mapa nem nuvem de palavras-chave "
+          "(a nuvem de títulos continua disponível).")
+    falta(cont_palavras and sum(1 for v in palavras_doc.values() if v) < 0.5 * n,
+          "Menos da metade dos documentos tem palavras-chave: os mapas de palavras cobrem só parte do corpus.")
+    falta(not cont_fontes, "Sem periódico dos documentos: o ranking de fontes fica vazio.")
+
     pares: Counter = Counter()
     for nomes in autores_doc.values():
         for a, b in combinations(sorted(set(nomes)), 2):
@@ -256,6 +276,7 @@ def calcula(conexao) -> dict:
                           key=lambda d: (-d["citacoes"], d["titulo"]))[:15]
     return {
         "vazio": False,
+        "lacunas": lacunas,
         "principal": principal,
         "producao": producao,
         "autores": _ranking(cont_autores, cit_autores, com_h=lista_autores),

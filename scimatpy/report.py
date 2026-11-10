@@ -111,6 +111,8 @@ img.mapa-sobreposicao { display:block; margin:10px auto; }
                    text-transform:uppercase; color:#64748B; margin:0; }
 .logo-relatorio { display:block; height:32px; width:auto; flex:none; }
 .fonte { color:#64748B; font-size:12px; margin:0 0 18px; }
+.aviso { background:#FFF9E0; border:1px solid #F0D98A; border-left:4px solid #FFC400; border-radius:8px; padding:8px 14px; margin:0 0 16px; font-size:13px; color:#5C4500; }
+.aviso ul { margin:6px 0 0; padding-left:18px; }
 .num { text-align:right; }
 nav a { margin-right:14px; }
 """
@@ -439,6 +441,9 @@ def _pagina_bibliometria(destino: Path, kb) -> None:
     corpo = [
         '<p><a href="index.html">Índice</a></p>',
         "<h1>Visão geral descritiva</h1>",
+        ('<div class="aviso"><b>O que falta neste corpus</b><ul>'
+         + "".join(f"<li>{_esc(t)}</li>" for t in dados["lacunas"]) + "</ul></div>")
+        if dados.get("lacunas") else "",
         _tabela(["Indicador", "Valor", "Observação"], cartoes, "Informações principais",
                 numericas=(1,)),
         "<h2>Produção e citações por ano</h2>",

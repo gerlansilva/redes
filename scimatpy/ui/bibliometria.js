@@ -216,7 +216,12 @@ function renderizarBibliometria(painel, d) {
   const pares = tabelaBib([{ rotulo: "Par de coautores", campo: "autores" },
     { rotulo: "Docs", campo: "documentos", num: 1 }], d.coautoria.pares, "Pares de coautores");
 
+  const lacunas = (d.lacunas || []).length
+    ? `<div class="bib-lacunas"><b>O que falta neste corpus</b><ul>${
+      d.lacunas.map((t) => `<li>${bibEsc(t)}</li>`).join("")}</ul></div>` : "";
+
   painel.innerHTML =
+    lacunas +
     `<div class="info-geral bib-cartoes">${cartoes}</div>` +
     secaoBib("Produção e citações por ano", "Documentos publicados (barras) e citações que esses documentos receberam (linha).",
       graficoProducao(d.producao), "bib-larga") +
