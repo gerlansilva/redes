@@ -171,6 +171,7 @@ const estado = {
 document.addEventListener("DOMContentLoaded", iniciar);
 
 async function iniciar() {
+  prepararApresentacao();
   prepararZoomEstrategico();
   let avancado = false;
   try { avancado = localStorage.getItem("redes.avancado") === "1"; } catch (_) { /* sem armazenamento */ }
@@ -220,9 +221,9 @@ function ligarEventos() {
     });
   });
   $("fecharModal").addEventListener("click", fecharModal);
-  $("modal").addEventListener("click", (evento) => {
-    if (evento.target === $("modal")) fecharModal();
-  });
+  $("btnContinuar").addEventListener("click", continuarProjeto);
+  ligarSoltar();
+  ligarMenuExportar();
 
   $("btnProjeto").addEventListener("click", abrirModal);
   $("marcaInicio").addEventListener("click", (evento) => {
@@ -257,16 +258,6 @@ function ligarEventos() {
   $("btnPreview").addEventListener("click", previsualizar);
   $("btnGrade").addEventListener("click", rodarGrade);
   $("btnCancelar").addEventListener("click", cancelarTrabalho);
-  $("btnExportar").addEventListener("click", () => {
-    if (estado.download) window.location.href = estado.download;
-  });
-  $("exportarTipo").addEventListener("change", (evento) => {
-    const tipo = evento.target.value;
-    evento.target.value = "";
-    if (!tipo) return;
-    exportar(tipo);
-  });
-  $("btnRelatorio").addEventListener("click", () => gerarRelatorio("html"));
 
   $("freqMenos").addEventListener("click", () => mudaFrequencia(-1));
   $("freqMais").addEventListener("click", () => mudaFrequencia(1));
@@ -389,11 +380,13 @@ function ligarEventos() {
 
   document.addEventListener("keydown", (evento) => {
     if (evento.key === "Escape") {
+      fecharMenuExportar(false);
       fecharLightbox();
       fecharDrawer();
       fecharModal();
       fecharAjuda();
       fecharSobre();
+      fecharBase();
     }
   });
 }
@@ -405,20 +398,70 @@ async function carregarInicio() {
     const dados = await api("/api/projetos");
     $("workspace").textContent = `Projetos em ${dados.workspace}`;
     renderizarRecentes(dados.projetos);
-
-    const ultimo = localStorage.getItem("scimatpy.projeto");
-    let alvo = dados.projetos.find((projeto) => projeto.caminho === ultimo);
-    if (!alvo && dados.projetos.length === 1) alvo = dados.projetos[0];
-
-    if (alvo) {
-      const aberto = await abrir(alvo.caminho);
-      if (aberto) return;
-    }
-    abrirModal();
   } catch (erro) {
     mostrarToast(erro.message, true);
+  }
+}
+
+/* Apresentação: logo e frase; segue sozinha em ~2,5 s ou ao clicar/Enter/Espaço. */
+function prepararApresentacao() {
+  const tela = $("apresentacao");
+  let pular = false;
+  try { pular = new URLSearchParams(location.search).has("pular"); } catch (_) { /* sem URL */ }
+  if (pular) {
+    tela.hidden = true;
+    abrirModal();
+    return;
+  }
+  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    tela.classList.add("sem-animacao");
+  }
+  let seguiu = false;
+  let relogio = null;
+  const tecla = (evento) => {
+    if (evento.key === "Enter" || evento.key === " ") {
+      evento.preventDefault();
+      avancar();
+    }
+  };
+  function avancar() {
+    if (seguiu) return;
+    seguiu = true;
+    clearTimeout(relogio);
+    document.removeEventListener("keydown", tecla);
+    tela.hidden = true;
     abrirModal();
   }
+  tela.addEventListener("click", avancar);
+  document.addEventListener("keydown", tecla);
+  relogio = setTimeout(avancar, 2500);
+  $("btnComecar").focus({ preventScroll: true });
+}
+
+function ultimoProjeto() {
+  try { return localStorage.getItem("scimatpy.projeto"); } catch (_) { return null; }
+}
+
+function atualizarContinuar(projetos) {
+  const botao = $("btnContinuar");
+  const alvo = projetos.find((projeto) => projeto.caminho === ultimoProjeto());
+  botao.hidden = !alvo;
+  if (!alvo) { delete botao.dataset.caminho; return; }
+  botao.dataset.caminho = alvo.caminho;
+  $("continuarNome").textContent = alvo.nome;
+  const aberto = estado.projeto && estado.projeto.caminho === alvo.caminho;
+  $("continuarMeta").textContent = aberto
+    ? "projeto aberto agora" : `último projeto · ${nomeArquivo(alvo.caminho)}`;
+}
+
+function continuarProjeto() {
+  const caminho = $("btnContinuar").dataset.caminho;
+  if (!caminho) return;
+  if (estado.projeto && estado.projeto.caminho === caminho) {
+    fecharModal();
+    return;
+  }
+  abrir(caminho);
 }
 
 function renderizarRecentes(projetos) {
@@ -428,8 +471,7 @@ function renderizarRecentes(projetos) {
   if (!projetos.length) {
     const vazio = document.createElement("div");
     vazio.className = "dica";
-    vazio.style.cssText = "font-size:11.5px;color:#8A94A6";
-    vazio.textContent = "Nenhum projeto ainda. Importe um corpus abaixo.";
+    vazio.textContent = "Nenhum projeto ainda. Importe um corpus acima.";
     caixa.append(vazio);
     return;
   }
@@ -447,12 +489,14 @@ function renderizarRecentes(projetos) {
     caminho.className = "caminho";
     caminho.textContent = projeto.caminho;
     bloco.append(nome, caminho);
+    botao.title = projeto.caminho;
 
     const espaco = document.createElement("div");
     espaco.className = "espaco";
     const seta = document.createElement("span");
     seta.textContent = "→";
-    seta.style.color = "#8A94A6";
+    seta.style.color = "#64748B";
+    seta.setAttribute("aria-hidden", "true");
 
     botao.append(bloco, espaco, seta);
     botao.addEventListener("click", () => abrir(projeto.caminho));
@@ -472,9 +516,10 @@ async function abrir(caminho) {
       body: JSON.stringify({ caminho }),
     });
     aplicarProjeto(projeto);
-    fecharModal();
+    fecharModal(false);
     await previsualizar();
     mostrarVisaoGeral();
+    focarVisaoGeral();
     return true;
   } catch (erro) {
     mostrarToast(erro.message, true);
@@ -520,9 +565,7 @@ function aplicarProjeto(projeto) {
 
   $("btnPreview").disabled = false;
   $("btnGrade").disabled = false;
-  $("exportarTipo").disabled = true;
-  $("btnRelatorio").disabled = true;
-  $("btnExportar").disabled = true;
+  atualizarMenuExportar();
   $("rotuloGrade").textContent =
     `Grade completa · ${TOTAL_POR_PERIODO * periodos}`;
 
@@ -851,6 +894,9 @@ function aplicarModo(avancado) {
   estado.avancado = avancado;
   document.body.classList.toggle("modo-avancado", avancado);
   $("modoAvancado").checked = avancado;
+  const mais = $("maisOpcoes");
+  if (mais) mais.open = avancado;
+  if (typeof atualizarMenuExportar === "function" && $("listaExportar")) atualizarMenuExportar();
 }
 
 function mudarModo(avancado) {
@@ -1142,8 +1188,7 @@ function renderizarResultado(resultado) {
 
   renderizarTabela(resultado);
   renderizarIndices(resultado);
-  $("exportarTipo").disabled = false;
-  $("btnRelatorio").disabled = false;
+  atualizarMenuExportar();
   estado.docsToken = null;
   if (abaAtual() === "documentos") carregarDocumentos();
   $("mapasLongitudinais").hidden = true;
@@ -1663,12 +1708,12 @@ function concluirTrabalho(trabalho) {
 
   if (trabalho.estado === "concluido") {
     estado.download = trabalho.resultado.download;
-    $("btnExportar").disabled = false;
+    atualizarMenuExportar();
     $("progressoTexto").textContent =
       `${trabalho.resultado.analises} análises · ${trabalho.resultado.periodos} ` +
       `${trabalho.resultado.periodos === 1 ? "período" : "períodos"}`;
     mostrarToast(`Grade concluída: ${trabalho.resultado.analises} análises. ` +
-      "Use \"Baixar grade\" para o TSV.");
+      "Use Exportar › Grade completa de análises para o TSV.");
   } else if (trabalho.estado === "cancelado") {
     $("progressoTexto").textContent = "Execução cancelada";
     mostrarToast("Execução cancelada.");
@@ -1715,6 +1760,11 @@ function trabalhoEmAndamento() {
 
 /* ------------------------------------------------------------------- importar */
 
+function tamanhoLegivel(bytes) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function escolheArquivo() {
   const arquivo = $("arquivo").files[0];
   if (!arquivo) return;
@@ -1724,11 +1774,50 @@ function escolheArquivo() {
   const nome = document.createElement("b");
   nome.textContent = arquivo.name;
   textoArquivo.append(nome, document.createElement("br"),
-    document.createTextNode(`${(arquivo.size / 1024 / 1024).toFixed(1)} MB`));
+    document.createTextNode(`${tamanhoLegivel(arquivo.size)} · clique para trocar`));
+  $("areaSoltar").classList.add("com-arquivo");
 
-  if (!$("nomeProjeto").value.trim()) {
-    $("nomeProjeto").value = nomeSemExtensao(arquivo.name);
+  const atual = $("nomeProjeto").value.trim();
+  if (!atual || atual === estado.nomeAuto) {
+    estado.nomeAuto = nomeSemExtensao(arquivo.name);
+    $("nomeProjeto").value = estado.nomeAuto;
   }
+}
+
+/* Arrastar e soltar: o arquivo cai na área e segue o mesmo caminho do seletor. */
+function ligarSoltar() {
+  const area = $("areaSoltar");
+  const impedir = (evento) => {
+    if (evento.dataTransfer && Array.from(evento.dataTransfer.types || []).includes("Files")) {
+      evento.preventDefault();
+    }
+  };
+  // Soltar fora da área não deve abrir o arquivo no navegador.
+  window.addEventListener("dragover", impedir);
+  window.addEventListener("drop", impedir);
+  for (const nome of ["dragenter", "dragover"]) {
+    area.addEventListener(nome, (evento) => {
+      impedir(evento);
+      area.classList.add("sobre");
+    });
+  }
+  area.addEventListener("dragleave", (evento) => {
+    if (!area.contains(evento.relatedTarget)) area.classList.remove("sobre");
+  });
+  area.addEventListener("drop", (evento) => {
+    impedir(evento);
+    area.classList.remove("sobre");
+    const arquivos = evento.dataTransfer && evento.dataTransfer.files;
+    if (!arquivos || !arquivos.length) return;
+    try {
+      $("arquivo").files = arquivos;
+    } catch (_) {
+      mostrarToast("Não foi possível receber o arquivo; use o seletor.", true);
+      return;
+    }
+    escolheArquivo();
+    $("btnImportar").focus({ preventScroll: true });
+  });
 }
 
 async function importar(evento) {
@@ -1741,6 +1830,7 @@ async function importar(evento) {
   const arquivo = $("arquivo").files[0];
   if (!arquivo) {
     mostrarToast("Escolha o arquivo do corpus.", true);
+    $("arquivo").focus();
     return;
   }
 
@@ -1765,16 +1855,18 @@ async function importar(evento) {
     if (!resposta.ok) throw new Error(dados.erro || `falha ${resposta.status}`);
 
     aplicarProjeto(dados.projeto);
-    fecharModal();
+    fecharModal(false);
     const nomes = {
       csv: "CSV SciMAT", bibtex: "BibTeX", ris: "RIS",
       openalex: "OpenAlex", wos: "Web of Science", scopus: "Scopus",
+      zotero: "Zotero",
     };
     mostrarToast(
       `Base criada: ${dados.resumo.documentos} documentos ` +
       `(${nomes[dados.formato] || dados.formato}).`);
     await previsualizar();
     mostrarVisaoGeral();
+    focarVisaoGeral();
   } catch (erro) {
     mostrarToast(erro.message, true);
   } finally {
@@ -1802,23 +1894,47 @@ function mudaFrequencia(passo) {
 }
 
 async function abrirModal() {
-  $("modal").hidden = false;
+  const tela = $("modal");
+  const app = $("app");
+  const temProjeto = Boolean(estado.projeto);
+  tela.hidden = false;
+  app.hidden = !temProjeto;
+  app.inert = true;
+  document.body.classList.add("tela-aberta");
+  $("fecharModal").hidden = !temProjeto;
+  tela.scrollTop = 0;
+  $("tituloModal").focus({ preventScroll: true });
   try {
     const dados = await api("/api/projetos");
     $("workspace").textContent = `Projetos em ${dados.workspace}`;
     renderizarRecentes(dados.projetos);
+    atualizarContinuar(dados.projetos);
   } catch (erro) {
     mostrarToast(erro.message, true);
   }
-  $("caminhoProjeto").focus();
 }
 
-function fecharModal() {
+/* Sem projeto aberto a tela de importar não fecha: o app ficaria vazio. */
+function fecharModal(devolverFoco = true) {
+  if (!estado.projeto || $("modal").hidden) return;
   $("modal").hidden = true;
+  const app = $("app");
+  app.hidden = false;
+  app.inert = false;
+  document.body.classList.remove("tela-aberta");
+  window.dispatchEvent(new Event("resize"));
+  if (devolverFoco) $("btnProjeto").focus({ preventScroll: true });
+}
+
+function focarVisaoGeral() {
+  const titulo = document.querySelector("#visaoGeral .visao-geral-cab h2");
+  if (!titulo) return;
+  titulo.tabIndex = -1;
+  titulo.focus({ preventScroll: true });
 }
 
 /* Atalhos da barra lateral: cada item leva a uma parte da mesma página. */
-async function gerarRelatorioCompleto() {
+async function gerarRelatorioCompleto(formato = "unico") {
   if (!estado.projeto) {
     mostrarToast("Abra um projeto para gerar o relatório.", true);
     return;
@@ -1828,22 +1944,20 @@ async function gerarRelatorioCompleto() {
   item.disabled = true;
   texto.textContent = "Gerando…";
   try {
-    const dados = { projeto: estado.projeto.caminho, ignorar: estado.ignorar };
+    const dados = { projeto: estado.projeto.caminho, ignorar: estado.ignorar, formato };
     const relatorio = await api("/api/relatorio-completo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dados),
     });
-    const link = document.createElement("a");
-    link.href = relatorio.url;
-    link.target = "_blank";
-    link.rel = "noopener";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    const falta = relatorio.ignoradas.length
-      ? ` ${relatorio.ignoradas.length} análise(s) não couberam nesta base; o relatório explica o motivo.` : "";
-    mostrarToast(`Relatório completo aberto: ${relatorio.secoes.length} análise(s).${falta}`);
+    abrirLink(relatorio.url);
+    if (relatorio.download) baixarLink(relatorio.download);
+    const secoes = (relatorio.secoes || []).length;
+    const ignoradas = (relatorio.ignoradas || []).length;
+    const falta = ignoradas
+      ? ` ${ignoradas} análise(s) não couberam nesta base; o relatório explica o motivo.` : "";
+    mostrarToast(`Relatório completo aberto${relatorio.download ? " e baixado" : ""}: ` +
+      `${secoes} análise(s).${falta}`);
   } catch (erro) {
     mostrarToast(erro.message, true);
   } finally {
@@ -1852,10 +1966,32 @@ async function gerarRelatorioCompleto() {
   }
 }
 
+function abrirLink(url) {
+  if (!url) return;
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener";
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+function baixarLink(url) {
+  if (!url) return;
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "";
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
 function navegar(destino) {
   const rolar = (alvo) => alvo && alvo.scrollIntoView({ behavior: "smooth", block: "start" });
   if (destino === "relatorio") {
-    gerarRelatorioCompleto();
+    gerarRelatorioCompleto("unico");
   } else if (destino === "analise") {
     window.scrollTo({ top: 0, behavior: "smooth" });
   } else if (destino === "projeto") {
@@ -2835,6 +2971,110 @@ async function compararPeriodos() {
   }
 }
 
+/* ------------------------------------------------------------ menu Exportar */
+
+const MOTIVO_EXPORTAR = {
+  projeto: "Abra um projeto para liberar este item.",
+  resultado: "Escolha uma análise no menu lateral para liberar este item.",
+  grade: "Rode a grade completa (modo avançado) para liberar este item.",
+};
+
+function itensMenuExportar() {
+  return Array.from(document.querySelectorAll("#listaExportar [data-exp]"))
+    .filter((item) => item.offsetParent !== null);
+}
+
+function atualizarMenuExportar() {
+  const temProjeto = Boolean(estado.projeto);
+  const temResultado = Boolean(estado.resultado && estado.token);
+  const temGrade = Boolean(estado.download);
+  let faltaResultado = false;
+  for (const item of document.querySelectorAll("#listaExportar [data-exp]")) {
+    const precisa = item.dataset.precisa || "projeto";
+    let motivo = "";
+    if (!temProjeto) motivo = MOTIVO_EXPORTAR.projeto;
+    else if (precisa === "resultado" && !temResultado) { motivo = MOTIVO_EXPORTAR.resultado; faltaResultado = true; }
+    else if (precisa === "grade" && !temGrade) motivo = MOTIVO_EXPORTAR.grade;
+    item.setAttribute("aria-disabled", motivo ? "true" : "false");
+    if (motivo) item.title = motivo; else item.removeAttribute("title");
+  }
+  const aviso = $("avisoExportar");
+  if (aviso) aviso.hidden = !faltaResultado;
+  $("btnExportarMenu").disabled = !temProjeto;
+}
+
+function abrirMenuExportar(foco) {
+  const lista = $("listaExportar");
+  lista.hidden = false;
+  $("btnExportarMenu").setAttribute("aria-expanded", "true");
+  atualizarMenuExportar();
+  const itens = itensMenuExportar();
+  if (!itens.length) return;
+  const habilitados = itens.filter((i) => i.getAttribute("aria-disabled") !== "true");
+  const alvo = foco === "ultimo" ? itens[itens.length - 1] : (habilitados[0] || itens[0]);
+  alvo.focus();
+}
+
+function fecharMenuExportar(devolverFoco) {
+  const lista = $("listaExportar");
+  if (lista.hidden) return;
+  lista.hidden = true;
+  $("btnExportarMenu").setAttribute("aria-expanded", "false");
+  if (devolverFoco) $("btnExportarMenu").focus();
+}
+
+function executarExportacao(tipo) {
+  if (tipo === "relatorio-unico") gerarRelatorioCompleto("unico");
+  else if (tipo === "relatorio-pastas") gerarRelatorioCompleto("pastas");
+  else if (tipo === "relatorio-analise") gerarRelatorio("html");
+  else if (tipo === "grade") { if (estado.download) window.location.href = estado.download; }
+  else exportar(tipo);
+}
+
+function ligarMenuExportar() {
+  const botao = $("btnExportarMenu");
+  const lista = $("listaExportar");
+  botao.addEventListener("click", () => {
+    if (lista.hidden) abrirMenuExportar("primeiro"); else fecharMenuExportar(false);
+  });
+  botao.addEventListener("keydown", (evento) => {
+    if (evento.key === "ArrowDown" || evento.key === "ArrowUp") {
+      evento.preventDefault();
+      abrirMenuExportar(evento.key === "ArrowUp" ? "ultimo" : "primeiro");
+    }
+  });
+  lista.addEventListener("keydown", (evento) => {
+    const itens = itensMenuExportar();
+    const indice = itens.indexOf(document.activeElement);
+    const ir = (i) => { evento.preventDefault(); itens[(i + itens.length) % itens.length].focus(); };
+    if (evento.key === "ArrowDown") ir(indice + 1);
+    else if (evento.key === "ArrowUp") ir(indice - 1);
+    else if (evento.key === "Home") ir(0);
+    else if (evento.key === "End") ir(itens.length - 1);
+    else if (evento.key === "Escape") {
+      evento.preventDefault();
+      evento.stopPropagation();
+      fecharMenuExportar(true);
+    } else if (evento.key === "Tab") {
+      fecharMenuExportar(false);
+    }
+  });
+  lista.addEventListener("click", (evento) => {
+    const item = evento.target.closest("[data-exp]");
+    if (!item) return;
+    if (item.getAttribute("aria-disabled") === "true") {
+      mostrarToast(item.title || "Item indisponível.", true);
+      return;
+    }
+    fecharMenuExportar(true);
+    executarExportacao(item.dataset.exp);
+  });
+  document.addEventListener("click", (evento) => {
+    if (!lista.hidden && !$("menuExportar").contains(evento.target)) fecharMenuExportar(false);
+  });
+  atualizarMenuExportar();
+}
+
 function exportar(tipo) {
   if (!estado.token) {
     mostrarToast("Execute uma prévia antes de exportar.", true);
@@ -2850,28 +3090,22 @@ async function gerarRelatorio(formato) {
   delete dados.periodo;
   dados.formato = formato;
   dados.estendido = true;
-  const botao = $("btnRelatorio");
-  botao.disabled = true;
-  botao.textContent = "Gerando…";
+  estado.gerandoRelatorio = true;
+  atualizarMenuExportar();
+  mostrarToast("Gerando o relatório…");
   try {
     const relatorio = await api("/api/relatorio", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dados),
     });
-    const link = document.createElement("a");
-    link.href = relatorio.url;
-    link.target = "_blank";
-    link.rel = "noopener";
-    document.body.append(link);
-    link.click();
-    link.remove();
+    abrirLink(relatorio.url);
     mostrarToast("Relatório aberto em nova aba.");
   } catch (erro) {
     mostrarToast(erro.message, true);
   } finally {
-    botao.disabled = false;
-    botao.textContent = "Relatório";
+    estado.gerandoRelatorio = false;
+    atualizarMenuExportar();
   }
 }
 

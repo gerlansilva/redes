@@ -33,6 +33,10 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
     cx, cy = largura / 2, altura / 2 - 6
     raio = min(largura * 0.30, altura * 0.36)
     rotulos = {no: resultado.dataset.itens.get(no, str(no)) for no in nos}
+    # Os rótulos (até 28 caracteres) ficam fora do círculo: reserva espaço
+    # para o mais longo caber na lateral sem ser cortado.
+    maior_rotulo = max(min(len(r), 28) for r in rotulos.values())
+    raio = max(40.0, min(raio, cx - (maior_rotulo * 6.0 + 14 + 10)))
 
     partes = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{largura}" height="{altura}" '

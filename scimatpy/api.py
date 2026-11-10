@@ -905,6 +905,27 @@ ANALISES_COMPLETO = [
 ]
 
 
+def _escolhe_frequencia(kb, periodos, base: dict, parametros: dict, fixa=None):
+    """Maior frequência mínima (3, 2, 1) que ainda dá agrupamentos em todos os períodos.
+
+    Se nenhuma serve a todos, vale a que forma mais agrupamentos. Com `fixa`
+    (pedido pelo usuário) só ela é tentada.
+    """
+    candidatas = (int(fixa),) if fixa else (3, 2, 1)
+    melhor = None
+    for frequencia in candidatas:
+        config = _config({**base, **parametros, "minimo_frequencia": frequencia})
+        resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
+        grupos = [len(r.grupos) for r in resultados]
+        if sum(grupos) == 0:
+            continue
+        if all(n >= 1 for n in grupos) and sum(grupos) >= 3:
+            return config, frequencia, resultados
+        if melhor is None or sum(grupos) > melhor[0]:
+            melhor = (sum(grupos), config, frequencia, resultados)
+    return (melhor[1], melhor[2], melhor[3]) if melhor else None
+
+
 def gera_relatorio_completo(dados: dict) -> dict:
     """Uma análise por seção (as que a base permite), num relatório só."""
     from . import report
@@ -928,18 +949,13 @@ def gera_relatorio_completo(dados: dict) -> dict:
             if disponivel < minimo:
                 ignoradas.append({"rotulo": rotulo, "motivo": motivo + "."})
                 continue
-            escolhida = None
-            for frequencia in (2, 1):
-                config = _config({**base, **parametros, "minimo_frequencia": frequencia})
-                resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
-                if sum(len(r.grupos) for r in resultados) > 0:
-                    escolhida = (config, frequencia)
-                    break
+            escolhida = _escolhe_frequencia(kb, periodos, base, parametros,
+                                            (dados.get("frequencias") or {}).get(chave))
             if escolhida is None:
                 ignoradas.append({"rotulo": rotulo,
                                   "motivo": "nenhum agrupamento se formou com os dados disponíveis."})
                 continue
-            config, frequencia = escolhida
+            config, frequencia, resultados_previos = escolhida
             pasta = f"{chave}"
             token_voltar = report._VOLTAR.set("../index.html")
             try:
@@ -947,19 +963,40 @@ def gera_relatorio_completo(dados: dict) -> dict:
                                           com_bibliometria=False, devolve_resultados=True)
             finally:
                 report._VOLTAR.reset(token_voltar)
-            secoes.append({"rotulo": rotulo, "descricao": descricao + f" Frequência mínima {frequencia}.",
+            nota = ""
+            por_periodo = [len(r.grupos) for r in resumo["resultados"]]
+            if por_periodo and max(por_periodo) <= 1:
+                nota = (" Poucos agrupamentos: o corpus é pequeno para este mapa; "
+                        "leia como indício, não como estrutura firme.")
+            elif any(n == 0 for n in por_periodo):
+                nota = " Há período sem agrupamentos (poucos documentos nele)."
+            secoes.append({"rotulo": rotulo,
+                           "descricao": descricao + f" Frequência mínima {frequencia}." + nota,
                            "pasta": pasta, "config": config, "resultados": resumo["resultados"]})
         if not secoes:
             raise ErroApi("Nenhuma análise de mapeamento pôde ser gerada com esta base.")
         report._pagina_bibliometria(destino, kb)
         report.gera_pagina_completa(destino, kb, secoes, ignoradas)
+        formato = dados.get("formato") or "unico"
+        if formato not in ("unico", "pastas"):
+            raise ErroApi("formato do relatório completo: unico ou pastas")
+        if formato == "unico":
+            from . import relatorio_unico
+            relatorio_unico.gera_arquivo_unico(destino / "relatorio-completo.html", kb,
+                                               periodos, secoes, ignoradas, medida)
 
     with TRAVA_REGISTRO:
         RELATORIOS[token] = destino
         while len(RELATORIOS) > 5:
             RELATORIOS.popitem(last=False)
-    return {"token": token, "url": f"/relatorio/{token}/index.html",
-            "secoes": [s["rotulo"] for s in secoes], "ignoradas": ignoradas}
+    resposta = {"token": token, "formato": formato,
+                "url": f"/relatorio/{token}/index.html",
+                "pastas": f"/relatorio/{token}/index.html",
+                "secoes": [s["rotulo"] for s in secoes], "ignoradas": ignoradas}
+    if formato == "unico":
+        resposta["url"] = f"/relatorio/{token}/relatorio-completo.html"
+        resposta["download"] = f"/relatorio/{token}/relatorio-completo.html?download=1"
+    return resposta
 
 
 def gera_longitudinal(dados: dict) -> dict:
@@ -1473,7 +1510,8 @@ class Manipulador(BaseHTTPRequestHandler):
                          ".net": "text/plain",
                          ".png": "image/png", ".csv": "text/csv"}
                 tipo = tipos.get(arquivo.suffix.lower(), "application/octet-stream")
-                self._arquivo(arquivo.read_bytes(), arquivo.name, tipo, False)
+                baixar = (parametros.get("download") or ["0"])[0] == "1"
+                self._arquivo(arquivo.read_bytes(), arquivo.name, tipo, baixar)
             elif rota.startswith("/api/trabalho/"):
                 self._json(200, estado_trabalho(rota[len("/api/trabalho/"):]))
             elif rota == "/favicon.ico":

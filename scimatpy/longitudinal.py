@@ -83,12 +83,16 @@ def mede_conjuntos(medida: str, origem: set[int], destino: set[int]) -> float:
 
 
 def constroi(kb, config: Configuracao, periodos, medida: str = "EquivalenceIndex",
-             limite_elos: int = 3) -> Evolucao:
-    """Executa a análise de cada período e monta evolução e sobreposição."""
+             limite_elos: int = 3, resultados=None) -> Evolucao:
+    """Executa a análise de cada período e monta evolução e sobreposição.
+
+    `resultados` (um por período) evita refazer a análise quando já existe.
+    """
     if medida not in MEDIDAS:
         raise ValueError(f"medida temporal inválida: {medida}")
 
-    resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
+    if resultados is None:
+        resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
     mapa = Evolucao(periodos=[p.nome for p in periodos], medida=medida)
 
     for indice, resultado in enumerate(resultados):

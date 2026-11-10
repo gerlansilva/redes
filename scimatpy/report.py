@@ -254,7 +254,7 @@ def _tabela(cabecalho: list[str], linhas: list[list[str]],
     return "\n".join(partes)
 
 
-def _configuracao_tabela(config) -> str:
+def _configuracao_tabela(config, legenda: str | None = None) -> str:
     linhas = [
         ["Unidade de análise", ROTULOS_UNIDADE.get(config.unidade, config.unidade)],
         ["Tipo de rede", ROTULOS_MATRIZ.get(config.matriz, config.matriz)],
@@ -271,7 +271,7 @@ def _configuracao_tabela(config) -> str:
          ", ".join(ROTULOS_MAPEADOR.get(m, m) for m in config.mapeadores)],
         ["Origens das palavras", ", ".join(config.palavras) or "todas"],
     ]
-    return _tabela(["Parâmetro", "Valor"], linhas)
+    return _tabela(["Parâmetro", "Valor"], linhas, legenda)
 
 
 def _quadrante(grupo) -> str:
@@ -420,17 +420,42 @@ def _pagina_indice(destino, resultados, mapa, config, estendido,
         _pagina("Relatório — Redes", "\n".join(corpo)), encoding="utf-8")
 
 
-def _pagina_bibliometria(destino: Path, kb) -> None:
-    """Página da visão geral descritiva: o que a tela mostra, em HTML estático."""
-    (destino / "images").mkdir(parents=True, exist_ok=True)
+class _EstiloPasta:
+    """Apresentação da visão geral nos relatórios em pasta (h1/h2, imagens em arquivo)."""
+
+    def __init__(self, imagens: Path | None = None):
+        self.imagens = imagens
+
+    def titulo(self, nivel: int, texto: str) -> str:
+        return f"<h{nivel + 1}>{_esc(texto)}</h{nivel + 1}>"
+
+    def tabela(self, cabecalho, linhas, legenda=None, numericas=()) -> str:
+        return _tabela(cabecalho, linhas, legenda, numericas=numericas)
+
+    def figura(self, svg: str, legenda: str, arquivo: str | None = None) -> str:
+        if arquivo and self.imagens is not None:
+            (self.imagens / arquivo).write_text(svg, encoding="utf-8")
+            return (f'<p><img src="images/{arquivo}" alt="{_esc(legenda)}" '
+                    'style="max-width:100%"></p>')
+        return svg
+
+
+def corpo_bibliometria(kb, estilo=None) -> str | None:
+    """Corpo HTML da visão geral descritiva do corpus, com os SVG embutidos.
+
+    Devolve None quando o corpus está vazio. O `estilo` define cabeçalhos
+    (`titulo(nivel, texto)`: 0 = título da visão geral, 1 = seções, 2 =
+    subseções), tabelas (`tabela`) e figuras (`figura(svg, legenda, arquivo)`);
+    o padrão reproduz a página dos relatórios em pasta.
+    """
     from . import bibliometria, rajadas, termos
     from .viz import descritiva
 
+    estilo = estilo or _EstiloPasta()
     conexao = kb.conexao
     dados = bibliometria.calcula(conexao)
     if dados.get("vazio"):
-        return
-    imagens = destino / "images"
+        return None
     p = dados["principal"]
 
     def num(valor, casas=0):
@@ -459,21 +484,21 @@ def _pagina_bibliometria(destino: Path, kb) -> None:
         corpo = [[_esc(l.get(c[1], "")) if not c[2] else num(l.get(c[1], 0)) for c in colunas]
                  for l in linhas]
         numericas = tuple(i for i, c in enumerate(colunas) if c[2])
-        return _tabela(cab, corpo, titulo, numericas=numericas)
+        return estilo.tabela(cab, corpo, titulo, numericas=numericas)
 
     corpo = [
-        '<p><a href="index.html">Índice</a></p>',
-        "<h1>Visão geral descritiva</h1>",
+        estilo.titulo(0, "Visão geral descritiva"),
         ('<div class="aviso"><b>O que falta neste corpus</b><ul>'
          + "".join(f"<li>{_esc(t)}</li>" for t in dados["lacunas"]) + "</ul></div>")
         if dados.get("lacunas") else "",
-        _tabela(["Indicador", "Valor", "Observação"], cartoes, "Informações principais",
-                numericas=(1,)),
-        "<h2>Produção e citações por ano</h2>",
-        descritiva.producao_svg(dados["producao"]),
+        estilo.tabela(["Indicador", "Valor", "Observação"], cartoes, "Informações principais",
+                      numericas=(1,)),
+        estilo.titulo(1, "Produção e citações por ano"),
+        estilo.figura(descritiva.producao_svg(dados["producao"]),
+                      "Produção e citações por ano"),
         '<p class="fonte">Barras: documentos por ano (eixo esquerdo). Linha: citações '
         "recebidas pelos documentos publicados em cada ano (eixo direito).</p>",
-        "<h2>Autores, fontes e países</h2>",
+        estilo.titulo(1, "Autores, fontes e países"),
         ranking("Autores mais produtivos", dados["autores"],
                 [("Autor", "nome", 0), ("Documentos", "documentos", 1),
                  ("Citações", "citacoes", 1), ("h", "h", 1)]),
@@ -487,8 +512,8 @@ def _pagina_bibliometria(destino: Path, kb) -> None:
                 [("Fonte citada", "nome", 0), ("Documentos que citam", "documentos", 1)]),
         ranking("Documentos mais citados", dados["mais_citados"],
                 [("Documento", "titulo", 0), ("Ano", "ano", 0), ("Citações", "citacoes", 1)]),
-        "<h2>Leis bibliométricas</h2>",
-        _tabela(["Lei", "Resultado"], [
+        estilo.titulo(1, "Leis bibliométricas"),
+        estilo.tabela(["Lei", "Resultado"], [
             ["Lotka", f'expoente estimado β = {num(dados["lotka"]["beta"], 2)} '
                       f'(clássico: 2), {num(dados["lotka"]["autores"])} autores'],
             ["Bradford", f'{num(dados["bradford"]["fontes"])} '
@@ -501,13 +526,13 @@ def _pagina_bibliometria(destino: Path, kb) -> None:
     ]
 
     # Nuvens de palavras
-    corpo.append("<h2>Nuvens de palavras</h2>")
+    corpo.append(estilo.titulo(1, "Nuvens de palavras"))
     for fonte, titulo in (("palavras", "Palavras-chave dos autores"), ("titulos", "Títulos dos documentos")):
         nuvem = termos.nuvem_dados(conexao, fonte, limite=70)
         svg = descritiva.nuvem_svg([(t["termo"], t["documentos"]) for t in nuvem["termos"]], titulo)
         if svg:
-            corpo.append(f"<h3>{_esc(titulo)}</h3>")
-            corpo.append(svg)
+            corpo.append(estilo.titulo(2, titulo))
+            corpo.append(estilo.figura(svg, f"Nuvem de palavras — {titulo.lower()}"))
         if nuvem["expressoes"]:
             corpo.append('<p class="fonte">Expressões frequentes: ' + " · ".join(
                 f'{_esc(e["termo"])} ({e["documentos"]})' for e in nuvem["expressoes"]) + ".</p>")
@@ -516,21 +541,29 @@ def _pagina_bibliometria(destino: Path, kb) -> None:
                  "acento foram unidos.</p>")
 
     # Rajadas
-    corpo.append("<h2>Rajadas (bursts)</h2>")
+    corpo.append(estilo.titulo(1, "Rajadas (bursts)"))
     for tipo, titulo, rotulo in (("palavras", "Palavras-chave com as rajadas mais fortes", "Palavras-chave"),
                                  ("referencias", "Referências com as rajadas mais fortes", "Referência")):
         resultado = rajadas.calcula(conexao, tipo)
         svg = descritiva.rajadas_svg(resultado, titulo, rotulo)
         corpo.extend(f'<p class="fonte">{_esc(a)}</p>' for a in resultado["avisos"])
         if svg:
-            nome = f"bursts-{tipo}.svg"
-            (imagens / nome).write_text(svg, encoding="utf-8")
-            corpo.append(f'<p><img src="images/{nome}" alt="{_esc(titulo)}" style="max-width:100%"></p>')
+            corpo.append(estilo.figura(svg, titulo, f"bursts-{tipo}.svg"))
     corpo.append('<p class="fonte">Rajadas pelo algoritmo de Kleinberg (s = 2, γ = 1). A contagem é de '
                  "documentos do corpus que usam o termo ou citam a referência, não de citações recebidas.</p>")
+    return "\n".join(c for c in corpo if c)
 
+
+def _pagina_bibliometria(destino: Path, kb) -> None:
+    """Página da visão geral descritiva: o que a tela mostra, em HTML estático."""
+    (destino / "images").mkdir(parents=True, exist_ok=True)
+    corpo = corpo_bibliometria(kb, _EstiloPasta(destino / "images"))
+    if corpo is None:
+        return
     (destino / "bibliometria.html").write_text(
-        _pagina("Visão geral descritiva — Redes", "\n".join(corpo)), encoding="utf-8")
+        _pagina("Visão geral descritiva — Redes",
+                '<p><a href="index.html">Índice</a></p>\n' + corpo),
+        encoding="utf-8")
 
 
 def _pagina_periodo(destino, resultado, grupos, indice) -> None:

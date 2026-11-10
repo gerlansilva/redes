@@ -8,7 +8,17 @@
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div class="app">
+<section class="tela apresentacao" id="apresentacao" aria-labelledby="apresentacaoTitulo">
+  <div class="apresentacao-miolo">
+    <img class="apresentacao-logo" src="/static/logo-mark.svg" alt="" width="132" height="132">
+    <h1 id="apresentacaoTitulo">Redes</h1>
+    <p class="apresentacao-frase">Mapeie a produção científica de um campo: temas, autores, países e referências, a partir do arquivo exportado da sua base.</p>
+    <button type="button" class="botao escuro grande" id="btnComecar">Começar</button>
+    <p class="apresentacao-local">Versão local · nenhum dado sai desta máquina</p>
+  </div>
+</section>
+
+<div class="app" id="app" hidden>
 
   <aside class="sidebar">
     <a class="marca" href="#" id="marcaInicio" title="Voltar ao início">
@@ -132,42 +142,46 @@
 
         <p class="analise-fixa so-avancado" id="analiseFixa" hidden></p>
 
-        <div class="campos">
-          <div class="campo fixo">
-            <label for="unidade">Unidade</label>
-            <div class="controle"><select id="unidade">
-              <option value="Words">Palavras</option>
-              <option value="Authors">Autores</option>
-              <option value="References">Referências</option>
-              <option value="AuthorsReference">Autores de referência</option>
-              <option value="ReferenceSources">Fontes de referência</option>
-              <option value="Countries">Países</option>
-            </select>
-              <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+        <details class="mais-opcoes" id="maisOpcoes">
+          <summary>Mais opções</summary>
+          <div class="campos">
+            <div class="campo fixo">
+              <label for="unidade">Unidade</label>
+              <div class="controle"><select id="unidade">
+                <option value="Words">Palavras</option>
+                <option value="Authors">Autores</option>
+                <option value="References">Referências</option>
+                <option value="AuthorsReference">Autores de referência</option>
+                <option value="ReferenceSources">Fontes de referência</option>
+                <option value="Countries">Países</option>
+              </select>
+                <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+            <div class="campo fixo">
+              <label for="matriz">Matriz</label>
+              <div class="controle"><select id="matriz">
+                <option value="CoOccurrence">Co-ocorrência</option>
+                <option value="BasicCoupling">Acoplamento</option>
+                <option value="AggregatedCouplingBasedOnAuthor">Acoplamento agregado (autor)</option>
+                <option value="AggregatedCouplingBasedOnJournal">Acoplamento agregado (periódico)</option>
+              </select>
+                <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+            <div class="campo min">
+              <label title="Número mínimo de vezes que um item precisa aparecer no corpus para entrar na análise.">Frequência mínima</label>
+              <div class="controle stepper">
+                <button class="passo" id="freqMenos" aria-label="Diminuir frequência">−</button>
+                <span class="valor" id="freqValor">1</span>
+                <button class="passo" id="freqMais" aria-label="Aumentar frequência">+</button>
+              </div>
             </div>
           </div>
-          <div class="campo fixo">
-            <label for="matriz">Matriz</label>
-            <div class="controle"><select id="matriz">
-              <option value="CoOccurrence">Co-ocorrência</option>
-              <option value="BasicCoupling">Acoplamento</option>
-              <option value="AggregatedCouplingBasedOnAuthor">Acoplamento agregado (autor)</option>
-              <option value="AggregatedCouplingBasedOnJournal">Acoplamento agregado (periódico)</option>
-            </select>
-              <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-            </div>
-          </div>
-          <div class="campo min">
-            <label title="Número mínimo de vezes que um item precisa aparecer no corpus para entrar na análise.">Frequência mínima</label>
-            <div class="controle stepper">
-              <button class="passo" id="freqMenos" aria-label="Diminuir frequência">−</button>
-              <span class="valor" id="freqValor">1</span>
-              <button class="passo" id="freqMais" aria-label="Aumentar frequência">+</button>
-            </div>
-          </div>
-        </div>
 
-        <p class="nota-auto" id="notaAuto" role="status" hidden></p>
+          <p class="nota-auto" id="notaAuto" role="status" hidden></p>
+
+        </details>
 
         <details class="avancado so-avancado" id="avancado">
           <summary>Parâmetros avançados</summary>
@@ -580,29 +594,40 @@
       <section class="acoes-finais">
         <div>
           <div class="rotulo-secao">Exportar e compartilhar</div>
-          <p class="dica">Índices, rede, grupos, documentos ou o relatório completo do período.</p>
+          <p class="dica">Relatórios em HTML e os dados desta análise.</p>
         </div>
         <div class="espaco"></div>
-        <button class="botao so-avancado" id="btnExportar" disabled>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
-          </svg>
-          Baixar grade
-        </button>
-        <select class="botao" id="exportarTipo" disabled title="Exportar resultados">
-          <option value="">Exportar resultados…</option>
-          <option value="indices-tsv">Índices (TSV)</option>
-          <option value="rede-pajek">Rede (Pajek)</option>
-          <option value="rede-graphml">Rede (GraphML)</option>
-          <option value="grupos-xml">Grupos da base (XML)</option>
-          <option value="documentos-tsv">Documentos do período (TSV)</option>
-        </select>
-        <button class="botao" id="btnRelatorio" disabled>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/>
-          </svg>
-          Relatório
-        </button>
+        <div class="menu-exportar" id="menuExportar">
+          <button type="button" class="botao escuro" id="btnExportarMenu"
+                  aria-haspopup="menu" aria-expanded="false" aria-controls="listaExportar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
+            </svg>
+            Exportar
+            <svg class="chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="menu-lista" id="listaExportar" role="menu" aria-label="Exportar" hidden>
+            <div class="menu-grupo" role="group" aria-labelledby="mgRelatorio">
+              <div class="menu-titulo" id="mgRelatorio" role="presentation">Relatório</div>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="relatorio-unico">Relatório completo (arquivo único)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="relatorio-pastas">Relatório completo (pasta de páginas)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="relatorio-analise" data-precisa="resultado">Relatório desta análise (HTML)</button>
+            </div>
+            <div class="menu-grupo" role="group" aria-labelledby="mgDados">
+              <div class="menu-titulo" id="mgDados" role="presentation">Dados</div>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="indices-tsv" data-precisa="resultado">Índices (TSV)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="rede-pajek" data-precisa="resultado">Rede (Pajek)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="rede-graphml" data-precisa="resultado">Rede (GraphML)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="grupos-xml" data-precisa="resultado">Grupos da base (XML)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="documentos-tsv" data-precisa="resultado">Documentos do período (TSV)</button>
+            </div>
+            <p class="menu-aviso" id="avisoExportar" hidden>Escolha uma análise no menu lateral para liberar os dados.</p>
+            <div class="menu-grupo so-avancado" role="group" aria-labelledby="mgGrade">
+              <div class="menu-titulo" id="mgGrade" role="presentation">Avançado</div>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="grade" data-precisa="grade">Grade completa de análises</button>
+            </div>
+          </div>
+        </div>
       </section>
 
     </main>
@@ -715,79 +740,91 @@
   </div>
 </div>
 
-<div class="overlay" id="modal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloModal">
-    <header>
-      <div>
-        <h2 id="tituloModal">Abrir projeto</h2>
-        <p>Escolha um projeto recente ou importe um corpus novo.</p>
-      </div>
+<section class="tela tela-importar" id="modal" aria-labelledby="tituloModal" hidden>
+  <div class="tela-miolo">
+    <header class="tela-topo">
+      <img src="/static/logo-mark.svg" alt="" width="36" height="36">
+      <span class="tela-marca">Redes</span>
       <div class="espaco"></div>
-      <button class="fechar" id="fecharModal" aria-label="Fechar">×</button>
+      <button type="button" class="botao" id="fecharModal" hidden>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        Voltar ao projeto
+      </button>
     </header>
 
-    <div class="secao">
-      <div class="rotulo-secao">Projetos recentes</div>
+    <h1 id="tituloModal" tabindex="-1">Importe um corpus para começar</h1>
+    <p class="tela-sub">Escolha o arquivo exportado da sua base bibliográfica. O formato é reconhecido pelo conteúdo.</p>
+
+    <button type="button" class="continuar" id="btnContinuar" hidden>
+      <span class="continuar-texto">
+        <span class="continuar-rotulo">Continuar com <b id="continuarNome"></b></span>
+        <span class="continuar-meta" id="continuarMeta">último projeto aberto</span>
+      </span>
+      <span class="continuar-seta" aria-hidden="true">→</span>
+    </button>
+
+    <form id="formImportar" class="form-importar">
+      <label class="soltar" id="areaSoltar" for="arquivo">
+        <svg class="soltar-icone" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        <span class="texto" id="textoArquivo"><b>Arraste o arquivo para cá</b><br>ou clique para escolher</span>
+        <span class="soltar-formatos">Scopus · Web of Science · OpenAlex · Zotero · BibTeX · RIS · CSV</span>
+      </label>
+      <input type="file" id="arquivo" class="so-leitor" accept=".csv,.bib,.bibtex,.ris,.txt">
+
+      <details class="opcoes-importar" id="opcoesImportar">
+        <summary>Opções</summary>
+        <div class="form-grade">
+          <div class="campo-form">
+            <label for="formato">Formato</label>
+            <select id="formato">
+              <option value="auto">Detectar automaticamente</option>
+              <option value="csv">CSV SciMAT</option>
+              <option value="bibtex">BibTeX</option>
+              <option value="ris">RIS</option>
+              <option value="openalex">CSV do OpenAlex</option>
+              <option value="wos">Web of Science (texto)</option>
+              <option value="scopus">CSV da Scopus</option>
+              <option value="zotero">CSV do Zotero</option>
+            </select>
+          </div>
+          <div class="campo-form">
+            <label for="nomeProjeto">Nome do projeto</label>
+            <input id="nomeProjeto" placeholder="Por exemplo: celii">
+          </div>
+          <div class="campo-form largo">
+            <label for="periodos">Períodos</label>
+            <input id="periodos" placeholder="Vazio: divisão automática. Ou: 2008-2014, 2015-2020, 2021-2026">
+            <div class="dica">Vazio: a ferramenta escolhe de 1 a 4 períodos com volume parecido de documentos. Para um período só, escreva “unico”; ou liste as faixas, separadas por vírgula.</div>
+          </div>
+        </div>
+      </details>
+
+      <div class="acoes-form">
+        <span class="dica" id="importando" role="status" hidden>Importando e construindo a base…</span>
+        <div class="espaco"></div>
+        <button type="submit" class="botao escuro grande" id="btnImportar">Importar e abrir</button>
+      </div>
+    </form>
+
+    <section class="recentes-bloco" aria-labelledby="rotuloRecentes">
+      <h2 class="rotulo-secao" id="rotuloRecentes">Projetos recentes</h2>
       <div class="recentes" id="recentes">
-        <div class="dica" style="font-size:11.5px;color:#8A94A6">Nenhum projeto ainda.</div>
+        <div class="dica">Nenhum projeto ainda.</div>
       </div>
-    </div>
+    </section>
 
-    <div class="secao">
-      <div class="rotulo-secao">Abrir por caminho</div>
+    <details class="existente" id="abrirExistente">
+      <summary>Abrir projeto existente</summary>
       <div class="caminho-linha">
-        <input id="caminhoProjeto" placeholder="/caminho/para/dados.redes" spellcheck="false">
-        <button class="botao escuro" id="btnAbrirCaminho" style="flex:none">Abrir</button>
+        <input id="caminhoProjeto" placeholder="/caminho/para/dados.redes" spellcheck="false" aria-label="Caminho de um projeto .redes">
+        <button type="button" class="botao escuro" id="btnAbrirCaminho" style="flex:none">Abrir</button>
       </div>
-    </div>
+      <div class="dica" id="workspace"></div>
+    </details>
 
-    <div class="secao" id="secaoImportar">
-      <div class="rotulo-secao">Importar corpus</div>
-      <form class="form-grade" id="formImportar">
-        <div class="largo arquivo-caixa">
-          <div class="texto" id="textoArquivo"><b>Nenhum arquivo escolhido</b><br>CSV SciMAT, BibTeX, RIS, OpenAlex, Web of Science ou Scopus</div>
-          <div class="espaco"></div>
-          <label class="botao" for="arquivo" style="cursor:pointer">Escolher arquivo</label>
-          <input type="file" id="arquivo" accept=".csv,.bib,.bibtex,.ris,.txt" hidden>
-        </div>
-
-        <div class="campo-form">
-          <label for="formato">Formato</label>
-          <select id="formato">
-            <option value="auto">Detectar automaticamente</option>
-            <option value="csv">CSV SciMAT</option>
-            <option value="bibtex">BibTeX</option>
-            <option value="ris">RIS</option>
-            <option value="openalex">CSV do OpenAlex</option>
-            <option value="wos">Web of Science (texto)</option>
-            <option value="scopus">CSV da Scopus</option>
-          </select>
-        </div>
-
-        <div class="campo-form">
-          <label for="nomeProjeto">Nome do projeto</label>
-          <input id="nomeProjeto" placeholder="Por exemplo: celii">
-        </div>
-
-        <div class="campo-form largo">
-          <label for="periodos">Períodos</label>
-          <input id="periodos" placeholder="Vazio: a ferramenta divide os anos em períodos. Ou: 2008-2014, 2015-2020, 2021-2026">
-          <div class="dica">Vazio: a ferramenta escolhe de 1 a 4 períodos com volume parecido de documentos, a partir dos anos encontrados. Para forçar um período só, escreva “unico”; ou liste as faixas, separadas por vírgula.</div>
-        </div>
-
-        <div class="acoes-form">
-          <span class="dica" id="importando" hidden>Importando e construindo a base…</span>
-          <div class="espaco"></div>
-          <button type="submit" class="botao escuro" id="btnImportar">Importar e abrir</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="secao">
-      <div class="dica" id="workspace" style="font-size:10.5px;color:#8A94A6"></div>
-    </div>
+    <p class="tela-rodape">Redes · versão local. Nenhum dado sai desta máquina.</p>
   </div>
-</div>
+</section>
 
 <div class="overlay" id="modalSobre" hidden>
   <div class="modal sobre-modal" role="dialog" aria-modal="true" aria-labelledby="tituloSobre">
