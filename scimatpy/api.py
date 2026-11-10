@@ -784,6 +784,10 @@ def edita_base(dados: dict) -> dict:
             return edit.cria_periodo(projeto, dados.get("nome", "Período"),
                                      int(dados.get("inicio", 0)),
                                      int(dados.get("fim", 9999)))
+        if acao == "sugerir-periodos":
+            quantidade = dados.get("quantidade")
+            return edit.sugere_periodos(
+                projeto, int(quantidade) if quantidade else None)
         if acao == "renomear-periodo":
             return edit.renomeia_periodo(projeto, int(dados["id"]),
                                          dados.get("nome", ""))
@@ -1041,13 +1045,16 @@ def _faixas(texto: str):
     return faixas
 
 
-def _periodo_automatico(documentos) -> tuple[int, int]:
+def _periodo_automatico(documentos, texto: str = ""):
     anos = []
     for documento in documentos:
         achado = re.match(r"\d{4}", (documento.ano or "").strip())
         if achado:
             anos.append(int(achado.group(0)))
-    return (min(anos), max(anos)) if anos else (0, 9999)
+    if (texto or "").strip().lower() in ("unico", "único"):
+        return [(f"{min(anos)}\u2013{max(anos)}", min(anos), max(anos))] if anos \
+            else [("0\u20139999", 0, 9999)]
+    return build.sugere_periodos(anos)
 
 
 def importa(workspace: Path, corpo: bytes, nome_arquivo: str,
@@ -1090,7 +1097,10 @@ def importa(workspace: Path, corpo: bytes, nome_arquivo: str,
             "Nenhum registro com título foi encontrado no arquivo. Confira se "
             f"o formato escolhido ({formato}) é o do arquivo exportado.")
 
-    faixas = _faixas(texto_periodos) or _periodo_automatico(documentos)
+    if (texto_periodos or "").strip().lower() in ("unico", "único"):
+        faixas = _periodo_automatico(documentos, texto_periodos)
+    else:
+        faixas = _faixas(texto_periodos) or _periodo_automatico(documentos)
     arquivo = destino / NOME_PADRAO
     resumo = build.constroi(documentos, arquivo, faixas,
                             remove_repetidos=remove_repetidos,

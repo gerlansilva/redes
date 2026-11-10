@@ -23,9 +23,13 @@
       <button type="button" class="nav-analise" data-analise="visao" title="Visão geral">
         <span class="ponto"></span><span class="nav-texto">Visão geral</span>
       </button>
-      <div class="grupo grupo-unico">
+      <div class="grupo">
+        <p class="grupo-titulo">Fontes</p>
+        <button type="button" class="nav-analise" data-analise="veiculos"><span class="ponto"></span><span class="nav-texto">Periódicos citados</span></button>
+      </div>
+      <div class="grupo">
         <p class="grupo-titulo">Estrutura conceitual</p>
-        <button type="button" class="nav-analise" data-analise="conceitual"><span class="ponto"></span><span class="nav-texto">Estrutura conceitual</span></button>
+        <button type="button" class="nav-analise" data-analise="conceitual"><span class="ponto"></span><span class="nav-texto">Temas das palavras-chave</span></button>
       </div>
       <div class="grupo">
         <p class="grupo-titulo">Estrutura intelectual</p>
@@ -37,10 +41,6 @@
         <p class="grupo-titulo">Estrutura social</p>
         <button type="button" class="nav-analise" data-analise="autores"><span class="ponto"></span><span class="nav-texto">Colaboração entre autores</span></button>
         <button type="button" class="nav-analise" data-analise="paises"><span class="ponto"></span><span class="nav-texto">Colaboração entre países</span></button>
-      </div>
-      <div class="grupo">
-        <p class="grupo-titulo">Fontes</p>
-        <button type="button" class="nav-analise" data-analise="veiculos"><span class="ponto"></span><span class="nav-texto">Periódicos citados</span></button>
       </div>
     </nav>
 
@@ -618,6 +618,16 @@
     <div class="secao">
       <div class="rotulo-secao">Períodos</div>
       <div id="basePeriodos" class="lista-base"></div>
+      <div class="linha-base" style="margin:10px 0">
+        <label class="campo-mini"><span>Quantos períodos</span>
+          <select id="sugestaoQuantidade">
+            <option value="">Automático</option>
+            <option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option>
+          </select></label>
+        <button class="botao" type="button" id="btnSugerirPeriodos">Sugerir períodos pelos anos dos documentos</button>
+      </div>
       <form class="form-periodo" id="formPeriodo">
         <div class="campo-form"><label for="periodoNome">Novo período</label>
           <input id="periodoNome" placeholder="2027–2030" required></div>
@@ -728,8 +738,8 @@
 
         <div class="campo-form largo">
           <label for="periodos">Períodos</label>
-          <input id="periodos" placeholder="2008-2014, 2015-2020, 2021-2026 — vazio usa a faixa dos dados">
-          <div class="dica">Uma faixa por período, separadas por vírgula. Vazio cria um período único com o intervalo dos anos encontrados.</div>
+          <input id="periodos" placeholder="Vazio: a ferramenta divide os anos em períodos. Ou: 2008-2014, 2015-2020, 2021-2026">
+          <div class="dica">Vazio: a ferramenta escolhe de 1 a 4 períodos com volume parecido de documentos, a partir dos anos encontrados. Para forçar um período só, escreva “unico”; ou liste as faixas, separadas por vírgula.</div>
         </div>
 
         <div class="acoes-form">

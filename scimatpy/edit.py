@@ -140,6 +140,38 @@ def cria_periodo(caminho, nome: str, inicio: int, fim: int) -> dict:
     return resume(arquivo)
 
 
+def sugere_periodos(caminho, quantidade: int | None = None) -> dict:
+    """Refaz os períodos do projeto a partir dos anos dos documentos."""
+    from .build import sugere_periodos as divide
+
+    conexao, arquivo = _abre(caminho)
+    try:
+        anos = []
+        for (ano,) in conexao.execute(
+                "SELECT p.year FROM Document d, PublishDate p "
+                "WHERE p.idPublishDate = d.PublishDate_idPublishDate"):
+            try:
+                anos.append(int(str(ano)[:4]))
+            except (TypeError, ValueError):
+                pass
+        if not anos:
+            raise ValueError("os documentos não têm ano de publicação")
+        faixas = divide(anos, quantidade)
+        _copia_de_seguranca(arquivo)
+        conexao.execute("DELETE FROM PublishDate_Period")
+        conexao.execute("DELETE FROM Period")
+        for posicao, (nome, inicio, fim) in enumerate(faixas, start=1):
+            periodo_id = conexao.execute(
+                "INSERT INTO Period(name, position) VALUES (?, ?)",
+                (nome, posicao)).lastrowid
+            _liga_datas(conexao, periodo_id, inicio, fim)
+            _recalcula_periodo(conexao, periodo_id)
+        conexao.commit()
+    finally:
+        conexao.close()
+    return resume(arquivo)
+
+
 def renomeia_periodo(caminho, periodo_id: int, nome: str) -> dict:
     conexao, arquivo = _abre(caminho)
     try:

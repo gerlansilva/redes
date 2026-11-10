@@ -24,7 +24,9 @@ from pathlib import Path
 
 from . import longitudinal
 from .pipeline import executa_periodo
-from .viz.cluster import rede_agrupamento_svg
+from . import exports
+from .viz.cluster import rede_agrupamento_svg, rede_de_agrupamentos_svg
+from .viz.halo import halo_svg
 from .viz.strategic import diagrama_svg
 
 ROTULOS_MAPEADOR = {
@@ -307,6 +309,28 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
                  f"strategicDiagram-period{indice}-{mapeador}-{medida}.svg"
                  ).write_text(diagrama, encoding="utf-8")
 
+        # Rede completa do período (halo) e rede entre os agrupamentos, como a
+        # seção "Whole network" do SciMAT, mais o arquivo Pajek correspondente.
+        try:
+            (destino / "images" / f"wholeNetwork-period{indice}.svg").write_text(
+                halo_svg(resultado, f"Rede completa — {resultado.periodo}"),
+                encoding="utf-8")
+        except Exception:
+            pass
+        try:
+            (destino / "images" / f"clusterGraph-period{indice}.svg").write_text(
+                rede_de_agrupamentos_svg(
+                    resultado, f"Rede de agrupamentos — {resultado.periodo}"),
+                encoding="utf-8")
+        except Exception:
+            pass
+        rotulos_rede = resultado.dataset.itens
+        try:
+            (destino / "misc" / f"wholeNetwork-period{indice}.net").write_text(
+                exports.pajek(resultado.rede, rotulos_rede), encoding="utf-8")
+        except Exception:
+            pass
+
         grupos = sorted(resultado.grupos,
                         key=lambda g: (-len(g.nos), g.rotulo or ""))
         for posicao, grupo in enumerate(grupos, start=1):
@@ -382,8 +406,8 @@ def _pagina_periodo(destino, resultado, grupos, indice) -> None:
             ["Itens", str(resultado.dataset_original.quantidade_itens())],
             ["Agrupamentos", str(len(grupos))],
         ]),
-        "<h2>Diagramas estratégicos</h2>",
     ]
+    diagramas = ["<h2>Diagramas estratégicos</h2>"]
     for mapeador in resultado.configuracao.mapeadores:
         rotulo_mapeador = ROTULOS_MAPEADOR.get(mapeador, mapeador)
         linhas_diagramas = []
@@ -395,15 +419,31 @@ def _pagina_periodo(destino, resultado, grupos, indice) -> None:
                 f'{_esc(rotulo_mapeador)} — {_esc(ROTULOS_MEDIDA[medida])}" '
                 'width="760">',
             ])
-        corpo.append(_tabela(["Medida de desempenho", "Diagrama estratégico"],
+        diagramas.append(_tabela(["Medida de desempenho", "Diagrama estratégico"],
                              linhas_diagramas,
                              f"Diagramas estratégicos — {rotulo_mapeador}",
                              larguras=["26%", "74%"]))
 
-    corpo.append(
+    diagramas.append(
         '<p class="fonte">O tamanho das esferas segue a medida de desempenho '
         'indicada em cada diagrama; o quadrante usa a centralidade e a '
         'densidade de Callon.</p>')
+
+    # Rede completa e rede de agrupamentos, antes do quadro de métricas.
+    imagens = destino / "images"
+    if (imagens / f"wholeNetwork-period{indice}.svg").exists():
+        corpo.append("<h2>Rede completa</h2>")
+        corpo.append(
+            f'<p><img src="images/wholeNetwork-period{indice}.svg" '
+            f'alt="Rede completa — {_esc(resultado.periodo)}" width="100%"></p>')
+        corpo.append(
+            f'<p class="fonte"><a href="misc/wholeNetwork-period{indice}.net">'
+            "Rede completa — arquivo Pajek</a></p>")
+    if (imagens / f"clusterGraph-period{indice}.svg").exists():
+        corpo.append("<h2>Rede de agrupamentos</h2>")
+        corpo.append(
+            f'<p><img src="images/clusterGraph-period{indice}.svg" '
+            f'alt="Rede de agrupamentos — {_esc(resultado.periodo)}" width="100%"></p>')
 
     linhas = []
     for posicao, grupo in enumerate(grupos, start=1):
@@ -419,12 +459,37 @@ def _pagina_periodo(destino, resultado, grupos, indice) -> None:
             _numero(grupo.centralidade),
             _quadrante(grupo),
         ] + valores)
+    # Quadro único: métricas de cada agrupamento ao lado da sua rede.
+    cartoes = []
+    for posicao, grupo in enumerate(grupos, start=1):
+        medidas = grupo.medidas
+        prefixo = f"{resultado.configuracao.mapeadores[0]}:"
+        metricas = "<br>".join([
+            f"Itens: {len(grupo.nos)}",
+            f"Centralidade: {_numero(grupo.centralidade)}",
+            f"Densidade: {_numero(grupo.densidade)}",
+            f"Quadrante: {_quadrante(grupo)}",
+        ] + [f"{ROTULOS_MEDIDA[nome]}: {_numero(medidas.get(prefixo + nome, 0))}"
+             for nome in ("documentos", "h", "g", "hg")])
+        cartoes.append([
+            f'<a href="period{indice}-cluster{posicao - 1}.html">'
+            f'{_esc(grupo.rotulo)}</a>',
+            metricas,
+            f'<img src="images/clusterNetwork-period{indice}-cluster{posicao - 1}.svg" '
+            f'alt="Rede de {_esc(grupo.rotulo)}" width="320">',
+        ])
+    corpo.append("<h2>Métricas e rede de cada agrupamento</h2>")
+    corpo.append(_tabela(["Agrupamento", "Métricas", "Rede do agrupamento"],
+                         cartoes, "Quadro de métricas com a rede de cada agrupamento",
+                         larguras=["24%", "26%", "50%"]))
+
     corpo.append("<h2>Agrupamentos</h2>")
     corpo.append(_tabela(
         ["Selo", "Agrupamento", "Itens", "Densidade", "Centralidade", "Quadrante"]
         + [ROTULOS_MEDIDA[nome] for nome in ORDEM_MEDIDAS],
         linhas, "Agrupamentos do período", numericas=tuple(range(2, 15))))
 
+    corpo.extend(diagramas)
     (destino / f"period{indice}.html").write_text(
         _pagina(f"Relatório — Redes — {resultado.periodo}", "\n".join(corpo)),
         encoding="utf-8")

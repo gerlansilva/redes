@@ -197,6 +197,10 @@ function ligarEventos() {
   });
   $("btnJuntar").addEventListener("click", juntarGruposBase);
   $("btnDesfazerBase").addEventListener("click", () => editarBase({ acao: "desfazer" }));
+  $("btnSugerirPeriodos").addEventListener("click", () => {
+    const quantidade = $("sugestaoQuantidade").value;
+    editarBase({ acao: "sugerir-periodos", quantidade: quantidade ? Number(quantidade) : null });
+  });
   $("formPeriodo").addEventListener("submit", (evento) => {
     evento.preventDefault();
     editarBase({

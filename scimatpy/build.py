@@ -566,6 +566,35 @@ class Construtor:
                                     (data_id, posicao))
 
 
+def sugere_periodos(anos: list[int], quantidade: int | None = None,
+                    minimo_por_periodo: int = 40) -> list[tuple[str, int, int]]:
+    """Divide o intervalo de anos do corpus em períodos com volume parecido.
+
+    Sem ``quantidade``, escolhe de 1 a 4 períodos: cada um precisa de pelo
+    menos ``minimo_por_periodo`` documentos e de 3 anos. Os cortes ficam nos
+    quantis da produção por ano, para que nenhum período fique vazio ou raso.
+    """
+    anos = sorted(a for a in anos if a)
+    if not anos:
+        return [("0\u20139999", 0, 9999)]
+    primeiro, ultimo = anos[0], anos[-1]
+    extensao = ultimo - primeiro + 1
+    if quantidade is None:
+        quantidade = min(4, len(anos) // minimo_por_periodo, extensao // 3)
+    quantidade = max(1, min(int(quantidade), extensao))
+    fins = []
+    for i in range(1, quantidade):
+        corte = anos[max(0, round(i * len(anos) / quantidade) - 1)]
+        if primeiro <= corte < ultimo and (not fins or corte > fins[-1]):
+            fins.append(corte)
+    fins.append(ultimo)
+    faixas, inicio = [], primeiro
+    for fim in fins:
+        faixas.append((f"{inicio}\u2013{fim}", inicio, fim))
+        inicio = fim + 1
+    return faixas
+
+
 def constroi(documentos: list[DocumentoFonte], destino: str | Path,
              periodos: list[tuple[str, int, int]] | tuple[int, int] | None = None,
              remove_repetidos: bool = True,
@@ -588,10 +617,7 @@ def constroi(documentos: list[DocumentoFonte], destino: str | Path,
         # Sem faixas informadas: usa o intervalo real de anos do corpus.
         anos = [int(documento.ano) for documento in documentos
                 if (documento.ano or "").isdigit()]
-        if anos:
-            periodos = [(f"{min(anos)}\u2013{max(anos)}", min(anos), max(anos))]
-        else:
-            periodos = [("0\u20139999", 0, 9999)]
+        periodos = sugere_periodos(anos)
 
     construtor = Construtor(documentos, autores_referencia)
     construtor.importa()

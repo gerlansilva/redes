@@ -126,3 +126,23 @@ class QaTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PeriodosAutomaticosTest(unittest.TestCase):
+    def test_divide_por_volume(self):
+        from scimatpy.build import sugere_periodos
+        anos = list(range(2011, 2026)) * 12
+        faixas = sugere_periodos(anos)
+        self.assertGreaterEqual(len(faixas), 2)
+        self.assertEqual(faixas[0][1], 2011)
+        self.assertEqual(faixas[-1][2], 2025)
+        for (_, _, fim), (_, inicio, _) in zip(faixas, faixas[1:]):
+            self.assertEqual(inicio, fim + 1)
+
+    def test_corpus_pequeno_fica_em_um_periodo(self):
+        from scimatpy.build import sugere_periodos
+        self.assertEqual(len(sugere_periodos([2020, 2021, 2021, 2023])), 1)
+
+    def test_quantidade_pedida(self):
+        from scimatpy.build import sugere_periodos
+        self.assertEqual(len(sugere_periodos(list(range(2005, 2026)) * 10, 3)), 3)
