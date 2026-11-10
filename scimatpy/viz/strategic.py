@@ -9,6 +9,7 @@ sobreponha.
 
 from __future__ import annotations
 
+import html
 import math
 
 from .halo import (CINZA, FONTE, LARGURA_COLUNA_LEGENDA, PALETA, TINTA,
@@ -228,7 +229,7 @@ def diagrama_svg(resultado, titulo: str, largura: int = 1120, altura: int = 820,
                         f'<text x="{x}" y="{y + 1}" text-anchor="middle" font-size="11" '
                         f'font-weight="700" fill="{cor}" font-family="{FONTE}">{posicao + 1}</text>'
                         f'<text x="{x + 20}" y="{y + 1}" font-size="12" fill="{TINTA}" '
-                        f'font-family="{FONTE}">{nome} '
+                        f'font-family="{FONTE}">{html.escape(nome)} '
                         f'<tspan fill="{TINTA_FRACA}">({len(grupo.nos)})</tspan></text>')
 
     if legenda["restantes"]:
@@ -238,14 +239,14 @@ def diagrama_svg(resultado, titulo: str, largura: int = 1120, altura: int = 820,
             f'+ {legenda["restantes"]} agrupamentos (ver tabela)</text>')
 
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{titulo}" '
+        f'<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{html.escape(titulo, quote=True)}" '
         f'viewBox="0 0 {largura} {altura}" width="{largura}" height="{altura}">'
         f'<rect width="{largura}" height="{altura}" fill="#ffffff"/>'
         f'<text x="40" y="40" font-size="18" font-weight="600" fill="{TINTA}" '
-        f'font-family="{FONTE}">{titulo}</text>'
+        f'font-family="{FONTE}">{html.escape(titulo)}</text>'
         f'<text x="40" y="62" font-size="12" fill="{TINTA_FRACA}" '
         f'font-family="{FONTE}">{len(grupos)} agrupamentos · '
-        f'{resultado.rede.quantidade_nos()} nós; {legenda_area}</text>'
+        f'{resultado.rede.quantidade_nos()} nós; {html.escape(legenda_area)}</text>'
         f'{quadrantes}{eixos}{marcas}{titulos_eixos}'
         f'{esferas}{legenda_svg}{blocos}'
         f'<text x="40" y="{altura - 8}" font-size="10" fill="{TINTA_FRACA}" '

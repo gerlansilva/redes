@@ -220,6 +220,46 @@ _PAISES = {
 }
 
 
+# Nomes em português e espanhol que as bases e os autores usam nas afiliações
+# ("Universidade Federal de Pernambuco, Brasil"; "Universidad de Granada, España").
+_ALIAS = {
+    "espana": "Espanha", "alemania": "Alemanha", "francia": "França",
+    "italia": "Itália", "suiza": "Suíça", "suecia": "Suécia",
+    "paises bajos": "Países Baixos", "holanda": "Países Baixos",
+    "holland": "Países Baixos", "the netherlands": "Países Baixos",
+    "belgica": "Bélgica", "dinamarca": "Dinamarca", "noruega": "Noruega",
+    "finlandia": "Finlândia", "irlanda": "Irlanda", "grecia": "Grécia",
+    "turquia": "Turquia", "rusia": "Rússia", "japon": "Japão",
+    "corea del sur": "Coreia do Sul", "korea": "Coreia do Sul",
+    "reino unido": "Reino Unido", "gran bretana": "Reino Unido",
+    "great britain": "Reino Unido", "uk": "Reino Unido",
+    "u.k.": "Reino Unido", "u.s.a.": "Estados Unidos", "u.s.": "Estados Unidos",
+    "estados unidos de america": "Estados Unidos",
+    "estados unidos da america": "Estados Unidos",
+    "ee.uu": "Estados Unidos", "eeuu": "Estados Unidos",
+    "republica checa": "República Tcheca", "peoples republic of china": "China",
+    "people's republic of china": "China", "pr china": "China",
+    "p.r. china": "China", "mainland china": "China",
+    "republica dominicana": "República Dominicana",
+    "emiratos arabes unidos": "Emirados Árabes Unidos",
+    "nueva zelanda": "Nova Zelândia", "sudafrica": "África do Sul",
+    "brasil": "Brasil", "brazil": "Brasil", "brasilien": "Brasil",
+    "mexico": "México", "peru": "Peru", "perú": "Peru",
+    "palestinian territory": "Palestina", "state of palestine": "Palestina",
+    "occupied palestinian territory": "Palestina",
+    "iran, islamic republic of": "Irã", "islamic republic of iran": "Irã",
+    "syrian arab republic": "Síria", "russian": "Rússia",
+    "lao pdr": "Laos", "myanmar (burma)": "Mianmar", "burma": "Mianmar",
+    "republic of china": "Taiwan", "roc": "Taiwan",
+}
+
+_ESTADO_EUA = re.compile(r"^[A-Z]{2}\s+\d{5}(?:-\d{4})?$")
+_SIGLAS_EUA = frozenset((
+    "AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO "
+    "MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY "
+    "DC").split())
+
+
 def _chave(texto: str) -> str:
     texto = unicodedata.normalize("NFKD", texto or "")
     texto = "".join(c for c in texto if not unicodedata.combining(c))
@@ -227,9 +267,22 @@ def _chave(texto: str) -> str:
     return texto
 
 
+def _indice_de_nomes() -> dict[str, str]:
+    indice = {_chave(nome): canonico for nome, canonico in _PAISES.items()}
+    for nome, canonico in _ALIAS.items():
+        indice.setdefault(_chave(nome), canonico)
+    # O nome canônico em português também vale como entrada.
+    for canonico in set(_PAISES.values()):
+        indice.setdefault(_chave(canonico), canonico)
+    return indice
+
+
+_INDICE = _indice_de_nomes()
+
+
 def pais(texto: str) -> str:
     """Nome canônico do país, ou vazio quando o texto não é um país."""
-    return _PAISES.get(_chave(texto), "")
+    return _INDICE.get(_chave(texto), "")
 
 
 def _partes(afiliacao: str) -> list[str]:
@@ -247,6 +300,13 @@ def pais_da_afiliacao(afiliacao: str) -> str:
         achado = pais(parte)
         if achado:
             return achado
+    # Endereço dos EUA sem o nome do país: "Davis, CA 95616". A sigla sozinha
+    # é ambígua ("IN", "CA", "DE" também são siglas de país), por isso só vale
+    # com o CEP.
+    for parte in reversed(partes[-2:]):
+        achado = _ESTADO_EUA.match(parte)
+        if achado and parte[:2] in _SIGLAS_EUA:
+            return "Estados Unidos"
     return ""
 
 

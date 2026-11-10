@@ -541,7 +541,7 @@ def gera_latex(destino: Path, kb, periodos, config, estendido: bool = False,
         r"\fancyhf{}",
         r"\fancyhead[L]{\footnotesize\color{redescinza}Redes · mapeamento e "
         r"análise da produção científica}",
-        r"\fancyhead[R]{\includegraphics[height=12mm]{logo.png}}",
+        r"\fancyhead[R]{\IfFileExists{logo.png}{\includegraphics[height=12mm]{logo.png}}{}}",
         r"\fancyfoot[C]{\footnotesize\color{redescinza}Gerado por Redes.}",
         r"\setlength{\headheight}{38pt}",
         r"\setlength{\headsep}{12pt}",
@@ -550,7 +550,7 @@ def gera_latex(destino: Path, kb, periodos, config, estendido: bool = False,
         r"\fancypagestyle{plain}{\fancyhf{}"
         r"\fancyhead[L]{\footnotesize\color{redescinza}Redes · mapeamento e "
         r"análise da produção científica}"
-        r"\fancyhead[R]{\includegraphics[height=12mm]{logo.png}}"
+        r"\fancyhead[R]{\IfFileExists{logo.png}{\includegraphics[height=12mm]{logo.png}}{}}"
         r"\fancyfoot[C]{\footnotesize\color{redescinza}Gerado por Redes.}"
         r"\renewcommand{\headrulewidth}{0.4pt}}",
         r"\title{Relatório — Redes}",

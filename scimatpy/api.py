@@ -33,7 +33,7 @@ from .viz.mapa import (colaboracao_do_periodo, dados_mapa as mapa_interativo,
 from .viz.strategic import dados_diagrama, diagrama_svg
 from .viz.cluster import rede_de_agrupamentos_svg
 
-FORMATOS = ("csv", "bibtex", "ris", "openalex", "wos", "scopus")
+FORMATOS = ("csv", "bibtex", "ris", "openalex", "wos", "scopus", "zotero")
 UNIDADES = ("Words", "Authors", "References", "AuthorsReference",
             "ReferenceSources", "Countries")
 MATRIZES = ("CoOccurrence", "BasicCoupling", "AggregatedCouplingBasedOnAuthor",
@@ -54,7 +54,7 @@ CACHE = Path(tempfile.mkdtemp(prefix="scimatpy-web-"))
 ANALISES: "OrderedDict[str, dict]" = OrderedDict()
 FIGURAS: dict[str, Path] = {}
 ARQUIVOS: dict[str, Path] = {}
-RELATORIOS: dict[str, Path] = {}
+RELATORIOS: "OrderedDict[str, Path]" = OrderedDict()
 TRAVA_REGISTRO = threading.Lock()
 TRABALHOS: dict[str, "Trabalho"] = {}
 TRAVA_TRABALHOS = threading.Lock()
@@ -64,11 +64,99 @@ class ErroApi(Exception):
     """Erro previsto, devolvido ao cliente com mensagem legível."""
 
 
-def _registra(destino: Path, registro: dict[str, Path]) -> str:
+class ErroExpirado(ErroApi):
+    """A análise pedida não está mais na memória do servidor (HTTP 410)."""
+
+
+MENSAGEM_EXPIRADA = (
+    "Esta análise não está mais na memória do servidor (ele foi reiniciado ou "
+    "ela foi substituída por análises mais recentes). Clique em "
+    "Pré-visualizar para gerar de novo.")
+MENSAGEM_SEM_TOKEN = (
+    "Falta o identificador da análise. Clique em Pré-visualizar para gerar a "
+    "análise antes de abrir este recurso.")
+# Quantas análises mantêm a rede e o resultado completos em memória; as demais
+# são recalculadas sob demanda a partir dos parâmetros guardados.
+ANALISES_PESADAS = 3
+MAXIMO_ANALISES = 40
+TRAVA_RECALCULO = threading.RLock()
+
+
+def _token(valor) -> str:
+    """Normaliza o token vindo da URL; ``null``/``undefined`` contam como vazio."""
+    texto = str(valor or "").strip()
+    return "" if texto.lower() in ("null", "undefined", "none") else texto
+
+
+def _param(parametros: dict, nome: str) -> str:
+    """Primeiro valor de um parâmetro da URL ou texto vazio."""
+    return (parametros.get(nome) or [""])[0]
+
+
+def _analise(token) -> dict:
+    """Registro da análise pelo token, com mensagem clara se não existir."""
+    token = _token(token)
+    if not token:
+        raise ErroApi(MENSAGEM_SEM_TOKEN)
+    with TRAVA_REGISTRO:
+        analise = ANALISES.get(token)
+        if analise is not None:
+            ANALISES.move_to_end(token)
+    if analise is None:
+        raise ErroExpirado(MENSAGEM_EXPIRADA)
+    return analise
+
+
+def _poda_pesados() -> None:
+    """Libera rede e resultado de tudo, menos das análises mais recentes."""
+    with TRAVA_REGISTRO:
+        recentes = list(ANALISES.values())[-ANALISES_PESADAS:]
+        for analise in ANALISES.values():
+            if not any(analise is r for r in recentes):
+                analise["rede"] = None
+                analise["resultado"] = None
+
+
+def _recalcula(analise: dict) -> None:
+    """Refaz resultado e rede de uma análise cujos dados pesados foram liberados."""
+    with TRAVA_RECALCULO:
+        if analise.get("resultado") is None:
+            caminho = Path(analise["projeto"])
+            if not caminho.exists():
+                raise ErroExpirado(
+                    f"O projeto desta análise não existe mais: {caminho}")
+            with ProjetoScimat(caminho) as kb:
+                analise["resultado"] = executa_periodo(
+                    kb, analise["periodo_id"], analise["periodo"],
+                    analise["config"])
+            analise["rede"] = None
+        if analise.get("rede") is None:
+            # O layout é a etapa mais cara: só roda quando a tela pede a rede
+            # ou a figura, não na própria prévia.
+            analise["rede"] = layout_halo(analise["resultado"])
+    _poda_pesados()
+
+
+PREGUICOSAS: dict[str, object] = {}
+
+
+def _registra(destino: Path, registro: dict[str, Path], gerador=None) -> str:
+    """Registra um arquivo servido por token; ``gerador`` o cria sob demanda."""
     token = secrets.token_urlsafe(12)
     with TRAVA_REGISTRO:
         registro[token] = destino
+        if gerador is not None:
+            PREGUICOSAS[token] = gerador
     return token
+
+
+def _materializa(token: str, arquivo: Path) -> None:
+    """Gera a figura preguiçosa na primeira requisição."""
+    with TRAVA_RECALCULO:
+        gerador = PREGUICOSAS.get(token)
+        if gerador is not None and not arquivo.exists():
+            gerador()
+        PREGUICOSAS.pop(token, None)
 
 
 def _medidas(grupo) -> dict:
@@ -110,21 +198,36 @@ def _config(dados: dict) -> Configuracao:
     algoritmo = dados.get("algoritmo", "CentersSimples")
 
     if unidade not in UNIDADES:
-        raise ErroApi(f"unidade inválida: {unidade}")
+        raise ErroApi(f"Unidade de análise inválida: {unidade!r}. "
+                      f"Use uma destas: {', '.join(UNIDADES)}.")
     if matriz not in MATRIZES:
-        raise ErroApi(f"matriz inválida: {matriz}")
+        raise ErroApi(f"Matriz inválida: {matriz!r}. "
+                      f"Use uma destas: {', '.join(MATRIZES)}.")
     if similaridade not in SIMILARIDADES:
-        raise ErroApi(f"similaridade inválida: {similaridade}")
+        raise ErroApi(f"Medida de similaridade inválida: {similaridade!r}. "
+                      f"Use uma destas: {', '.join(SIMILARIDADES)}.")
     if algoritmo not in ALGORITMOS:
-        raise ErroApi(f"algoritmo inválido: {algoritmo}")
+        raise ErroApi(f"Algoritmo de agrupamento inválido: {algoritmo!r}. "
+                      f"Use um destes: {', '.join(ALGORITMOS)}.")
 
     def inteiro(nome: str, padrao: int, minimo: int = 0) -> int:
+        bruto = dados.get(nome)
+        # Campo vazio na tela chega como "" ou null: vale o padrão.
+        if bruto is None or (isinstance(bruto, str) and not bruto.strip()):
+            return padrao
         try:
-            valor = int(dados.get(nome, padrao))
-        except (TypeError, ValueError):
-            raise ErroApi(f"{nome} precisa ser inteiro") from None
+            numero = float(str(bruto).replace(",", ".")) if isinstance(
+                bruto, str) else float(bruto)
+            if numero != int(numero):
+                raise ValueError
+            valor = int(numero)
+        except (TypeError, ValueError, OverflowError):
+            raise ErroApi(
+                f"\"{nome}\" precisa ser um número inteiro (recebido: "
+                f"{bruto!r})") from None
         if valor < minimo:
-            raise ErroApi(f"{nome} precisa ser pelo menos {minimo}")
+            raise ErroApi(f"\"{nome}\" precisa ser pelo menos {minimo} "
+                          f"(recebido: {valor})")
         return valor
 
     minimo = inteiro("minimo_frequencia", 1, 1)
@@ -133,7 +236,7 @@ def _config(dados: dict) -> Configuracao:
     if tamanho_minimo > maximo:
         raise ErroApi("o tamanho mínimo da rede não pode passar do máximo")
 
-    mapeadores = dados["mapeadores"] if "mapeadores" in dados else [
+    mapeadores = dados["mapeadores"] if dados.get("mapeadores") is not None else [
         "nucleo", "interseccao"]
     if isinstance(mapeadores, str):
         mapeadores = [mapeadores]
@@ -141,7 +244,8 @@ def _config(dados: dict) -> Configuracao:
     if desconhecidos:
         raise ErroApi(f"mapeador inválido: {desconhecidos[0]}")
 
-    palavras = dados["palavras"] if "palavras" in dados else ["autor", "fonte"]
+    palavras = dados["palavras"] if dados.get("palavras") is not None else [
+        "autor", "fonte"]
     if isinstance(palavras, str):
         palavras = [palavras]
     invalidas = [p for p in palavras if p not in ("autor", "fonte", "adicionada")]
@@ -157,14 +261,28 @@ def _config(dados: dict) -> Configuracao:
     if invalidos:
         raise ErroApi(f"índice inválido: {invalidos[0]}")
 
-    try:
-        corte = float(dados.get("corte", 0.0))
-    except (TypeError, ValueError):
-        raise ErroApi("corte precisa ser numérico") from None
+    bruto_corte = dados.get("corte")
+    if bruto_corte is None or (isinstance(bruto_corte, str)
+                               and not bruto_corte.strip()):
+        corte = 0.0
+    else:
+        try:
+            corte = float(str(bruto_corte).replace(",", "."))
+        except (TypeError, ValueError):
+            raise ErroApi(
+                f"\"corte\" precisa ser numérico (recebido: {bruto_corte!r})"
+            ) from None
     if corte < 0:
-        raise ErroApi("corte não pode ser negativo")
+        raise ErroApi("\"corte\" não pode ser negativo")
+
+    ignorar = dados.get("ignorar") or []
+    if isinstance(ignorar, str):
+        ignorar = [t for t in re.split(r"[;\n]", ignorar) if t.strip()]
+    if not isinstance(ignorar, (list, tuple)):
+        raise ErroApi("\"ignorar\" precisa ser uma lista de termos")
 
     return Configuracao(
+        ignorar=tuple(str(t).strip() for t in ignorar if str(t).strip()),
         unidade=unidade,
         matriz=matriz,
         similaridade=similaridade,
@@ -183,36 +301,45 @@ def _config(dados: dict) -> Configuracao:
 
 def _valida_projeto(caminho: str) -> Path:
     if not caminho:
-        raise ErroApi(f"informe o caminho do projeto {EXTENSAO}")
+        raise ErroApi(f"Informe o caminho do projeto ({EXTENSAO}). Abra um "
+                      "projeto na lista ou importe um corpus.")
     destino = Path(caminho).expanduser().resolve()
     if not destino.exists() or not destino.is_file():
-        raise ErroApi(f"projeto não encontrado: {destino}")
+        raise ErroApi(f"Projeto não encontrado: {destino}. Ele pode ter sido "
+                      "movido ou apagado; abra-o de novo na lista.")
     if not e_projeto(destino):
-        raise ErroApi(f"o projeto precisa ser um arquivo {EXTENSAO} "
-                      "(projetos antigos .scimat também abrem)")
+        raise ErroApi(f"O projeto precisa ser um arquivo {EXTENSAO} "
+                      "(projetos antigos .scimat também abrem).")
     return destino
 
 
 def _periodo(kb: ProjetoScimat, identificador):
+    """Período pelo id, pelo nome ou por ``{"id": ..., "nome": ...}``.
+
+    Um período chamado "2020" (nome numérico) não pode ser confundido com o
+    período de id 2020: o id vence só quando existe; senão vale o nome.
+    """
     periodos = kb.periodos()
     if not periodos:
-        raise ErroApi("o projeto não tem períodos")
+        raise ErroApi("O projeto não tem períodos. Crie um na aba Base.")
 
+    if isinstance(identificador, dict):
+        identificador = identificador.get("id", identificador.get("nome"))
+    if isinstance(identificador, str):
+        identificador = identificador.strip()
     if identificador in (None, "", "todos"):
         return periodos[0]
 
-    try:
-        numero = int(identificador)
-    except (TypeError, ValueError):
-        for periodo in periodos:
-            if periodo.nome == identificador:
-                return periodo
-        raise ErroApi(f"período desconhecido: {identificador}") from None
-
+    texto = str(identificador)
     for periodo in periodos:
-        if periodo.id == numero:
+        if texto == str(periodo.id):
             return periodo
-    raise ErroApi(f"período desconhecido: {identificador}")
+    for periodo in periodos:
+        if texto == periodo.nome or texto.casefold() == periodo.nome.casefold():
+            return periodo
+    nomes = ", ".join(f"{p.nome} (id {p.id})" for p in periodos)
+    raise ErroApi(f"Período desconhecido: {identificador!r}. "
+                  f"Períodos do projeto: {nomes}.")
 
 
 def descreve_projeto(caminho: Path) -> dict:
@@ -297,22 +424,21 @@ def analisa(dados: dict) -> dict:
                                   destaque=paises["mais_conectado"])
                   if paises and paises["documentos"] else None)
     diagrama_dados = dados_diagrama(saida_grupos, config.unidade)
-    rede_dados = layout_halo(resultado)
     token = secrets.token_urlsafe(10)
     with TRAVA_REGISTRO:
-        # Só a análise corrente mantém o layout da rede em memória: ele é
-        # grande (dezenas de milhares de arestas) e as anteriores continuam
-        # disponíveis pelo detalhe dos grupos e pela figura SVG.
-        for anterior in ANALISES.values():
-            anterior["rede"] = None
-            anterior["resultado"] = None
-        ANALISES[token] = {"projeto": str(caminho), "grupos": detalhes,
-                           "rede": rede_dados, "mapa": mapa_dados,
+        # Só as análises mais recentes mantêm a rede e o resultado completos em
+        # memória (são grandes: dezenas de milhares de arestas). As demais
+        # guardam os parâmetros e são recalculadas sob demanda quando a tela
+        # volta a elas, em vez de responder "expirada".
+        registro = ANALISES[token] = {"projeto": str(caminho), "grupos": detalhes,
+                           "rede": None, "mapa": mapa_dados,
                            "diagrama": diagrama_dados,
                            "periodo_id": periodo.id,
-                           "periodo": periodo.nome, "resultado": resultado}
-        while len(ANALISES) > 20:
+                           "periodo": periodo.nome, "resultado": resultado,
+                           "config": config}
+        while len(ANALISES) > MAXIMO_ANALISES:
             ANALISES.popitem(last=False)
+    _poda_pesados()
 
     figuras = {}
     pasta = None
@@ -321,12 +447,17 @@ def analisa(dados: dict) -> dict:
         pasta.mkdir(parents=True, exist_ok=True)
 
         halo = pasta / "halo.svg"
-        halo.write_text(
-            halo_svg(resultado,
-                     f"Rede de {UNIDADE_TITULO.get(config.unidade, 'itens')} — "
-                     f"{periodo.nome}", layout=rede_dados),
-            encoding="utf-8")
-        figuras["halo"] = f"/figura/{_registra(halo, FIGURAS)}"
+
+        def gera_halo(registro=registro, halo=halo, periodo_nome=periodo.nome,
+                      unidade=config.unidade):
+            _recalcula(registro)
+            halo.write_text(
+                halo_svg(registro["resultado"],
+                         f"Rede de {UNIDADE_TITULO.get(unidade, 'itens')} — "
+                         f"{periodo_nome}", layout=registro["rede"]),
+                encoding="utf-8")
+
+        figuras["halo"] = f"/figura/{_registra(halo, FIGURAS, gera_halo)}"
 
         estrategico = pasta / "estrategico.svg"
         estrategico.write_text(
@@ -335,12 +466,18 @@ def analisa(dados: dict) -> dict:
         figuras["estrategico"] = f"/figura/{_registra(estrategico, FIGURAS)}"
 
         agrupamentos = pasta / "agrupamentos.svg"
-        agrupamentos.write_text(
-            rede_de_agrupamentos_svg(
-                resultado,
-                f"Rede de agrupamentos — {periodo.nome}"),
-            encoding="utf-8")
-        figuras["agrupamentos"] = f"/figura/{_registra(agrupamentos, FIGURAS)}"
+
+        def gera_agrupamentos(registro=registro, agrupamentos=agrupamentos,
+                              periodo_nome=periodo.nome):
+            _recalcula(registro)
+            agrupamentos.write_text(
+                rede_de_agrupamentos_svg(
+                    registro["resultado"],
+                    f"Rede de agrupamentos — {periodo_nome}"),
+                encoding="utf-8")
+
+        figuras["agrupamentos"] = (
+            f"/figura/{_registra(agrupamentos, FIGURAS, gera_agrupamentos)}")
 
     if paises and paises["documentos"]:
         if pasta is None:
@@ -364,6 +501,7 @@ def analisa(dados: dict) -> dict:
         figuras["mapa"] = f"/figura/{_registra(mapa, FIGURAS)}"
 
     total = len(grupos)
+    avisos, genericos = _avisos(resultado, config, saida_grupos)
     return {
         "token": token,
         "projeto": str(caminho),
@@ -382,7 +520,10 @@ def analisa(dados: dict) -> dict:
             "k_core": config.k_core,
             "palavras": list(config.palavras),
             "indices": list(config.indices),
+            "ignorar": list(config.ignorar),
         },
+        "avisos": avisos,
+        "termos_genericos": genericos,
         "resumo": {
             "documentos": resultado.dataset_original.quantidade_documentos(),
             "itens": resultado.dataset_original.quantidade_itens(),
@@ -413,6 +554,62 @@ def analisa(dados: dict) -> dict:
     }
 
 
+LIMITE_GENERICO = 0.35
+LIMITE_GRUPOS_FRACOS = 0.5
+
+
+def _avisos(resultado, config, saida_grupos) -> tuple[list[dict], list[dict]]:
+    """Alertas de leitura: frequência mínima baixa e termo genérico dominante."""
+    avisos: list[dict] = []
+    total_docs = resultado.dataset_original.quantidade_documentos()
+
+    if (saida_grupos and "nucleo" in config.mapeadores
+            and config.matriz == "CoOccurrence"):
+        fracos = sum(1 for g in saida_grupos if g["documentos"] <= 1)
+        if fracos / len(saida_grupos) > LIMITE_GRUPOS_FRACOS:
+            sugerida = 2
+            avisos.append({
+                "codigo": "grupos_fracos",
+                "mensagem": (
+                    f"{fracos} de {len(saida_grupos)} agrupamentos "
+                    f"({fracos / len(saida_grupos):.0%}) têm no máximo um "
+                    "documento. Com frequência mínima "
+                    f"{config.minimo_frequencia}, itens raros formam grupos "
+                    f"sem sustentação; experimente frequência mínima "
+                    f"{sugerida} ou maior."),
+                "frequencia_sugerida": sugerida,
+            })
+
+    genericos = []
+    if total_docs >= 10:
+        original = resultado.dataset_original
+        for item_id in original.lista_itens():
+            frequencia = original.frequencia_item(item_id)
+            if frequencia / total_docs >= LIMITE_GENERICO:
+                genericos.append({
+                    "rotulo": original.rotulo_item(item_id),
+                    "documentos": frequencia,
+                    "proporcao": round(frequencia / total_docs, 3),
+                })
+        genericos.sort(key=lambda g: -g["documentos"])
+        genericos = genericos[:10]
+        from .text_utils import chave
+        ignorados = {chave(t) for t in config.ignorar}
+        pendentes = [g for g in genericos if chave(g["rotulo"]) not in ignorados]
+        if pendentes:
+            nomes = ", ".join(f"{g['rotulo']} ({g['proporcao']:.0%})"
+                              for g in pendentes[:5])
+            avisos.append({
+                "codigo": "termo_generico",
+                "mensagem": (
+                    f"Termo(s) presente(s) em pelo menos "
+                    f"{LIMITE_GENERICO:.0%} dos documentos: {nomes}. Eles "
+                    "dominam a rede e escondem a estrutura; considere "
+                    "ignorá-los (parâmetro \"ignorar\")."),
+            })
+    return avisos, genericos
+
+
 def _documentos_do_projeto(projeto: str, ids: list[int]) -> list[dict]:
     if not ids:
         return []
@@ -439,26 +636,30 @@ def _documentos_do_projeto(projeto: str, ids: list[int]) -> list[dict]:
 
 
 def dados_do_diagrama(token: str) -> dict:
-    with TRAVA_REGISTRO:
-        analise = ANALISES.get(token)
-    if analise is None or analise.get("diagrama") is None:
-        raise ErroApi("diagrama expirado; execute a prévia novamente")
+    analise = _analise(token)
+    if analise.get("diagrama") is None:
+        raise ErroApi("Esta análise não gerou diagrama estratégico (não há "
+                      "agrupamentos). Ajuste os parâmetros e pré-visualize.")
     return analise["diagrama"]
 
 
 def dados_do_mapa(token: str) -> dict:
-    with TRAVA_REGISTRO:
-        analise = ANALISES.get(token)
-    if analise is None or analise.get("mapa") is None:
-        raise ErroApi("mapa expirado; execute a prévia novamente")
+    analise = _analise(token)
+    if analise.get("mapa") is None:
+        unidade = analise["config"].unidade if analise.get("config") else ""
+        if unidade != "Countries":
+            raise ErroApi("O mapa-múndi só existe para a unidade Países. Esta "
+                          "análise usa outra unidade; escolha Países "
+                          "(colaboração entre países) e pré-visualize.")
+        raise ErroApi("Nenhum documento deste período tem país identificado "
+                      "nas afiliações, então não há o que desenhar no mapa.")
     return analise["mapa"]
 
 
 def dados_rede(token: str) -> dict:
-    with TRAVA_REGISTRO:
-        analise = ANALISES.get(token)
-    if analise is None or analise.get("rede") is None:
-        raise ErroApi("rede expirada; execute a prévia novamente")
+    analise = _analise(token)
+    if analise.get("rede") is None:
+        _recalcula(analise)
     return analise["rede"]
 
 
@@ -471,15 +672,10 @@ def exportar(token: str, tipo: str) -> tuple[bytes, str, str]:
     """
     from . import exports
 
-    with TRAVA_REGISTRO:
-        analise = ANALISES.get(token)
-    if analise is None:
-        raise ErroApi("análise expirada; execute a prévia novamente")
-
-    resultado = analise.get("resultado")
-    if resultado is None:
-        raise ErroApi("exportação disponível só para a última prévia; "
-                      "execute-a novamente")
+    analise = _analise(token)
+    if analise.get("resultado") is None:
+        _recalcula(analise)
+    resultado = analise["resultado"]
 
     if tipo == "grupos-xml":
         with ProjetoScimat(analise["projeto"]) as kb:
@@ -506,15 +702,13 @@ def exportar(token: str, tipo: str) -> tuple[bytes, str, str]:
         return ("\n".join(linhas) + "\n").encode("utf-8"), "documentos.tsv", \
             "text/tab-separated-values"
 
-    raise ErroApi(f"tipo de exportação desconhecido: {tipo}")
+    raise ErroApi(f"Tipo de exportação desconhecido: {tipo!r}. Use: grupos-xml, "
+                  "rede-pajek, rede-graphml, indices-tsv ou documentos-tsv.")
 
 
 def lista_documentos(token: str, busca: str = "") -> dict:
     """Documentos do período da análise, com busca por título, autor ou fonte."""
-    with TRAVA_REGISTRO:
-        analise = ANALISES.get(token)
-    if analise is None:
-        raise ErroApi("análise expirada; execute a prévia novamente")
+    analise = _analise(token)
 
     termo = (busca or "").strip().lower()
     with ProjetoScimat(analise["projeto"]) as kb:
@@ -546,19 +740,17 @@ def lista_documentos(token: str, busca: str = "") -> dict:
 
 
 def detalhe_grupo(token: str, selo) -> dict:
-    with TRAVA_REGISTRO:
-        analise = ANALISES.get(token)
-    if analise is None:
-        raise ErroApi("análise expirada; execute a prévia novamente")
+    analise = _analise(token)
 
     try:
-        indice = int(selo)
+        indice = int(str(selo).strip())
     except (TypeError, ValueError):
-        raise ErroApi("selo inválido") from None
+        raise ErroApi(f"Número do agrupamento inválido: {selo!r}.") from None
 
     grupo = analise["grupos"].get(indice)
     if grupo is None:
-        raise ErroApi("agrupamento não encontrado")
+        raise ErroApi(f"Não há agrupamento {indice} nesta análise "
+                      f"(vão de 1 a {len(analise['grupos'])}).")
 
     return {
         "grupo": grupo["grupo"],
@@ -859,16 +1051,20 @@ def _periodo_automatico(documentos) -> tuple[int, int]:
 
 
 def importa(workspace: Path, corpo: bytes, nome_arquivo: str,
-            formato: str, texto_periodos: str, nome_projeto: str) -> dict:
-    from .loaders import (bibtex, csv as csv_loader, detecta_formato,
-                          openalex, ris, scopus, wos)
+            formato: str, texto_periodos: str, nome_projeto: str,
+            autores_referencia: str = "primeiro",
+            remove_repetidos: bool = True) -> dict:
+    from .loaders import le_corpus
 
     if formato not in FORMATOS and formato != "auto":
-        raise ErroApi(f"formato desconhecido: {formato}")
+        raise ErroApi(f"Formato desconhecido: {formato!r}. Use um destes: "
+                      f"auto, {', '.join(FORMATOS)}.")
+    if autores_referencia not in ("primeiro", "todos", "lista"):
+        raise ErroApi("autores_referencia precisa ser primeiro, todos ou lista")
     if not corpo:
-        raise ErroApi("arquivo vazio")
+        raise ErroApi("O arquivo está vazio.")
     if not nome_arquivo:
-        raise ErroApi("nome do arquivo ausente")
+        raise ErroApi("O nome do arquivo não chegou ao servidor.")
 
     nome = _nome_seguro(nome_projeto or Path(nome_arquivo).stem)
     destino = workspace / nome
@@ -880,32 +1076,25 @@ def importa(workspace: Path, corpo: bytes, nome_arquivo: str,
 
     arquivo = destino / Path(nome_arquivo).name
     arquivo.write_bytes(corpo)
-    detectado = detecta_formato(arquivo)
-    # Os três formatos tabulares se confundem pelo nome das colunas; o conteúdo
+    # Os formatos tabulares se confundem pelo nome das colunas; o conteúdo
     # decide. Assim, escolher "CSV SciMAT" ou "CSV da Scopus" para um arquivo
-    # OpenAlex não estraga autores e referências.
-    if formato == "auto" or (formato in ("csv", "scopus", "openalex")
-                             and detectado in ("csv", "scopus", "openalex")):
-        formato = detectado
-    if formato not in FORMATOS:
-        raise ErroApi(f"formato não reconhecido no arquivo: {detectado}")
-
-    carregadores = {
-        "csv": csv_loader.le,
-        "bibtex": bibtex.le,
-        "ris": ris.le,
-        "openalex": openalex.le,
-        "wos": wos.le,
-        "scopus": scopus.le,
-    }
-    documentos = carregadores[formato](arquivo)
+    # OpenAlex ou Zotero não estraga autores e referências.
+    try:
+        documentos, formato = le_corpus(arquivo, formato)
+    except (UnicodeError, ValueError, KeyError, csv.Error) as erro:
+        raise ErroApi(f"Não foi possível ler o arquivo como {formato}: "
+                      f"{erro}") from None
 
     if not documentos:
-        raise ErroApi("nenhum registro encontrado no arquivo")
+        raise ErroApi(
+            "Nenhum registro com título foi encontrado no arquivo. Confira se "
+            f"o formato escolhido ({formato}) é o do arquivo exportado.")
 
     faixas = _faixas(texto_periodos) or _periodo_automatico(documentos)
     arquivo = destino / NOME_PADRAO
-    resumo = build.constroi(documentos, arquivo, faixas)
+    resumo = build.constroi(documentos, arquivo, faixas,
+                            remove_repetidos=remove_repetidos,
+                            autores_referencia=autores_referencia)
     projeto = descreve_projeto(arquivo)
     return {"projeto": projeto, "resumo": resumo, "formato": formato}
 
@@ -915,16 +1104,25 @@ def lista_projetos(workspace: Path) -> list[dict]:
     if not workspace.exists():
         return projetos
 
-    for pasta in workspace.iterdir():
-        if not pasta.is_dir():
+    for entrada in workspace.iterdir():
+        if entrada.is_file():
+            # Projeto solto na pasta, sem subpasta própria.
+            if entrada.suffix.lower() in (EXTENSAO, ".scimat") and e_projeto(entrada):
+                projetos.append({
+                    "nome": entrada.stem,
+                    "caminho": str(entrada),
+                    "modificado": entrada.stat().st_mtime,
+                })
             continue
-        dados = pasta / NOME_PADRAO
+        if not entrada.is_dir():
+            continue
+        dados = entrada / NOME_PADRAO
         if not dados.exists():
-            dados = pasta / "dados.scimat"
+            dados = entrada / "dados.scimat"
         if not dados.exists():
             continue
         projetos.append({
-            "nome": pasta.name,
+            "nome": entrada.name,
             "caminho": str(dados),
             "modificado": dados.stat().st_mtime,
         })
@@ -1040,8 +1238,10 @@ class Manipulador(BaseHTTPRequestHandler):
                 token = rota[len("/figura/"):]
                 with TRAVA_REGISTRO:
                     arquivo = FIGURAS.get(token)
+                if arquivo is not None and not arquivo.exists():
+                    _materializa(token, arquivo)
                 if arquivo is None or not arquivo.exists():
-                    raise ErroApi("figura não encontrada")
+                    raise ErroApi("Figura não encontrada. Pré-visualize de novo.")
                 baixar = (parametros.get("download") or ["0"])[0] == "1"
                 dados = arquivo.read_text(encoding="utf-8").encode("utf-8")
                 self._arquivo(dados, arquivo.name, "image/svg+xml", baixar)
@@ -1050,11 +1250,11 @@ class Manipulador(BaseHTTPRequestHandler):
                     (parametros.get("caminho") or [""])[0]))
             elif rota == "/api/documentos":
                 self._json(200, lista_documentos(
-                    (parametros.get("token") or [""])[0],
+                    _param(parametros, "token"),
                     (parametros.get("busca") or [""])[0]))
             elif rota == "/api/exportar":
                 dados, nome, tipo = exportar(
-                    (parametros.get("token") or [""])[0],
+                    _param(parametros, "token"),
                     (parametros.get("tipo") or [""])[0])
                 self._arquivo(dados, nome, tipo, True)
             elif rota.startswith("/download/"):
@@ -1074,15 +1274,15 @@ class Manipulador(BaseHTTPRequestHandler):
                 self.wfile.write(dados)
             elif rota == "/api/estrategico":
                 self._json(200, dados_do_diagrama(
-                    (parametros.get("token") or [""])[0]))
+                    _param(parametros, "token")))
             elif rota == "/api/mapa":
                 self._json(200, dados_do_mapa(
-                    (parametros.get("token") or [""])[0]))
+                    _param(parametros, "token")))
             elif rota == "/api/rede":
-                self._json(200, dados_rede((parametros.get("token") or [""])[0]))
+                self._json(200, dados_rede(_param(parametros, "token")))
             elif rota == "/api/grupo":
                 self._json(200, detalhe_grupo(
-                    (parametros.get("token") or [""])[0],
+                    _param(parametros, "token"),
                     (parametros.get("selo") or [""])[0]))
             elif rota.startswith("/relatorio/"):
                 partes = rota[len("/relatorio/"):].split("/", 1)
@@ -1110,6 +1310,8 @@ class Manipulador(BaseHTTPRequestHandler):
                 self.end_headers()
             else:
                 self.send_error(404)
+        except ErroExpirado as erro:
+            self._json(410, {"erro": str(erro), "expirada": True})
         except ErroApi as erro:
             self._json(400, {"erro": str(erro)})
         except Exception as erro:  # noqa: BLE001
@@ -1143,13 +1345,20 @@ class Manipulador(BaseHTTPRequestHandler):
                 formato = (parametros.get("formato") or ["csv"])[0]
                 periodos = (parametros.get("periodos") or [""])[0]
                 nome = (parametros.get("nome") or [""])[0]
+                autores_ref = (parametros.get("autores_referencia")
+                               or ["primeiro"])[0]
+                repetidos = (parametros.get("manter_repetidos")
+                             or ["0"])[0] not in ("1", "true", "sim")
                 nome_arquivo = unquote(
                     self.headers.get("X-Nome-Arquivo") or "corpus")
                 corpo = self._corpo(400 * 1024 * 1024)
                 self._json(200, importa(self.server.workspace, corpo,
-                                        nome_arquivo, formato, periodos, nome))
+                                        nome_arquivo, formato, periodos, nome,
+                                        autores_ref, repetidos))
             else:
                 self.send_error(404)
+        except ErroExpirado as erro:
+            self._json(410, {"erro": str(erro), "expirada": True})
         except ErroApi as erro:
             self._json(400, {"erro": str(erro)})
         except Exception as erro:  # noqa: BLE001

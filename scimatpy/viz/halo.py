@@ -12,6 +12,7 @@ interativo da interface web (zoom, rótulos e filtro de nós no navegador).
 from __future__ import annotations
 
 import collections
+import html
 import itertools
 import math
 
@@ -110,20 +111,103 @@ def _separar(pos: np.ndarray, raios: np.ndarray, largura: float, altura: float,
     """Empurra halos sobrepostos em paralelo (versão vetorizada).
 
     A troca do laço em Python por operações NumPy não altera o resultado
-    final, mas evita dezenas de segundos com muitos agrupamentos.
+    final, mas evita dezenas de segundos com muitos agrupamentos. A soma dos
+    raios não muda entre as iterações e é calculada uma vez; a ordem das somas
+    foi mantida, porque o layout é sensível a diferenças de arredondamento.
     """
     if len(pos) < 2:
         return pos
+    precisa = raios[:, None] + raios[None, :] + folga
     for _ in range(iteracoes):
         delta = pos[:, None, :] - pos[None, :, :]
-        dist = np.linalg.norm(delta, axis=2) + 1e-6
-        precisa = raios[:, None] + raios[None, :] + folga
+        # mesma conta de np.linalg.norm(delta, axis=2), sem a sobrecarga da chamada
+        dist = np.sqrt(np.add.reduce(delta * delta, axis=2)) + 1e-6
         falta = np.maximum(precisa - dist, 0.0) / dist
         np.fill_diagonal(falta, 0.0)
+        anterior = pos
         pos = pos + 0.5 * np.einsum("ij,ijk->ik", falta, delta)
         pos[:, 0] = np.clip(pos[:, 0], raios + 8, largura - raios - 8)
         pos[:, 1] = np.clip(pos[:, 1], raios + topo, altura - raios - base)
+        # Sem sobreposição e sem nada a recortar, as iterações seguintes
+        # repetiriam exatamente este estado: pode parar sem mudar o resultado.
+        if not falta.any() and np.array_equal(pos, anterior):
+            break
     return pos
+
+
+def _separados(pos: np.ndarray, raios: np.ndarray, folga: float) -> bool:
+    """Todos os pares de halos mantêm a distância mínima (versão vetorizada)."""
+    if len(pos) < 2:
+        return True
+    x = pos[:, 0]
+    y = pos[:, 1]
+    dx = x[:, None] - x[None, :]
+    dy = y[:, None] - y[None, :]
+    dist = np.sqrt(dx * dx + dy * dy)
+    minimo = raios[:, None] + raios[None, :] + folga
+    ok = dist >= minimo
+    np.fill_diagonal(ok, True)
+    return bool(ok.all())
+
+
+def _relaxa_soltos(nodepos: dict, soltos: list[int], centros: np.ndarray,
+                   raios: np.ndarray, dentro, iteracoes: int = 300) -> None:
+    """Afasta os nós sem agrupamento uns dos outros e dos halos.
+
+    É o mesmo relaxamento sequencial de sempre (cada empurrão já vale para o
+    teste seguinte), com a diferença de que a busca do próximo par ou halo em
+    conflito é vetorizada: o laço Python só roda nos conflitos, o que reduz o
+    custo de O(iterações × nós × agrupamentos) chamadas de `norm` para algumas
+    operações NumPy por nó. O resultado é o mesmo.
+    """
+    m = len(soltos)
+    k = len(centros)
+    if not m:
+        return
+    pontos = np.array([nodepos[no] for no in soltos], dtype=float)
+    extras = np.array([abs(hash(no)) % 12 for no in soltos], dtype=float)
+    limites_base = raios + 8 if k else raios
+
+    for _ in range(iteracoes):
+        # Pares de nós soltos: (a, b) em ordem lexicográfica, a < b.
+        for a in range(m - 1):
+            b = a + 1
+            while b < m:
+                dv = pontos[a] - pontos[b:]
+                dist = np.sqrt((dv * dv).sum(axis=1)) + 1e-6
+                perto = np.nonzero(dist < 16)[0]
+                if not len(perto):
+                    break
+                b += int(perto[0])
+                dvp = pontos[a] - pontos[b]
+                distancia = np.linalg.norm(dvp) + 1e-6
+                if distancia < 16:
+                    passo = (16 - distancia) / 2 * dvp / distancia
+                    pontos[a] += passo
+                    pontos[b] -= passo
+                b += 1
+
+        # Cada nó solto contra os centros dos halos, na ordem dos halos.
+        for j in range(m):
+            if k:
+                limites = limites_base + extras[j]
+                i = 0
+                while i < k:
+                    dv = pontos[j] - centros[i:]
+                    dist = np.sqrt((dv * dv).sum(axis=1)) + 1e-6
+                    perto = np.nonzero(dist < limites[i:])[0]
+                    if not len(perto):
+                        break
+                    i += int(perto[0])
+                    dvi = pontos[j] - centros[i]
+                    distancia = np.linalg.norm(dvi) + 1e-6
+                    if distancia < limites[i]:
+                        pontos[j] += (limites[i] - distancia) * dvi / distancia
+                    i += 1
+            pontos[j] = dentro(pontos[j])
+
+    for j, no in enumerate(soltos):
+        nodepos[no] = pontos[j]
 
 
 def layout_halo(resultado, largura: int = 1280, altura: int = 780,
@@ -188,24 +272,39 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
     iteracoes = 600 if k <= 50 else (350 if k <= 150 else 120)
     refinos = 8 if k <= 150 else 2
 
+    # O desenho interno de cada agrupamento não depende da escala: só o
+    # diâmetro muda entre as tentativas. Calcula uma vez e reaproveita.
+    internos: dict[int, tuple] = {}
+    # Com centenas de agrupamentos o desenho interno de cada um não é legível;
+    # menos iterações da mola mantêm o aspecto e cortam a maior parte do tempo.
+    # Até 300 agrupamentos o resultado é o de sempre.
+    iter_mola = 300 if k <= 300 else 120
+
+    def desenho_interno(i: int) -> tuple:
+        if i not in internos:
+            membros = lista[i]
+            sub = rede.subgrafo(membros)
+            n = len(sub)
+            if n == 1:
+                q = {membros[0]: np.zeros(2)}
+            elif n == 2:
+                q = {membros[0]: np.array([-1.0, 0.0]),
+                     membros[1]: np.array([1.0, 0.0])}
+            else:
+                bruto = nx.spring_layout(sub, seed=5, iterations=iter_mola,
+                                         k=1.3 / math.sqrt(n), weight="weight")
+                q = {no: np.array(v) for no, v in bruto.items()}
+            pontos = np.array([q[no] for no in q])
+            centro = pontos.mean(0)
+            escala = max(1e-6, np.abs(pontos - centro).max())
+            internos[i] = (sub, n, q, centro, escala)
+        return internos[i]
+
     if k:
         for _ in range(tentativas):
             info = {}
-            for i, membros in enumerate(lista):
-                sub = rede.subgrafo(membros)
-                n = len(sub)
-                if n == 1:
-                    q = {membros[0]: np.zeros(2)}
-                elif n == 2:
-                    q = {membros[0]: np.array([-1.0, 0.0]),
-                         membros[1]: np.array([1.0, 0.0])}
-                else:
-                    bruto = nx.spring_layout(sub, seed=5, iterations=300,
-                                             k=1.3 / math.sqrt(n), weight="weight")
-                    q = {no: np.array(v) for no, v in bruto.items()}
-                pontos = np.array([q[no] for no in q])
-                centro = pontos.mean(0)
-                escala = max(1e-6, np.abs(pontos - centro).max())
+            for i in range(len(lista)):
+                sub, n, q, centro, escala = desenho_interno(i)
                 diametro = unit * math.sqrt(n) + unit * 0.7
                 info[i] = (sub, {no: (np.array(v) - centro) / escala * diametro / 2
                                  for no, v in q.items()}, diametro / 2 + 10)
@@ -215,8 +314,7 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
             raios = np.array([info[i][2] for i in range(k)])
             pos = _separar(pos, raios, pw, ph, iteracoes=iteracoes)
 
-            separados = all(np.linalg.norm(pos[a] - pos[b]) >= info[a][2] + info[b][2] + 2
-                            for a, b in itertools.combinations(range(k), 2))
+            separados = _separados(pos, raios, 2.0)
             if k == 1 or separados:
                 break
             unit *= 0.9
@@ -228,8 +326,7 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
             pos = _separar(pos, raios, pw, ph,
                            iteracoes=min(400, iteracoes))
 
-            separados = all(np.linalg.norm(pos[a] - pos[b]) >= info[a][2] + info[b][2] + 6
-                            for a, b in itertools.combinations(range(k), 2))
+            separados = _separados(pos, raios, 6.0)
             if separados or k < 2:
                 break
 
@@ -282,22 +379,8 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
             except Exception:  # noqa: BLE001 - layout é opcional
                 pass
 
-        for _ in range(300):
-            for a, b in itertools.combinations(soltos, 2):
-                dv = nodepos[a] - nodepos[b]
-                dist = np.linalg.norm(dv) + 1e-6
-                if dist < 16:
-                    passo = (16 - dist) / 2 * dv / dist
-                    nodepos[a] += passo
-                    nodepos[b] -= passo
-            for no in soltos:
-                for i in range(k):
-                    dv = nodepos[no] - pos[i]
-                    dist = np.linalg.norm(dv) + 1e-6
-                    limite = info[i][2] + 8 + (abs(hash(no)) % 12)
-                    if dist < limite:
-                        nodepos[no] += (limite - dist) * dv / dist
-                nodepos[no] = _dentro(nodepos[no])
+        _relaxa_soltos(nodepos, soltos, pos,
+                       np.array([info[i][2] for i in range(k)]), _dentro)
 
     selos = []
     for i in range(k):
@@ -503,7 +586,7 @@ def halo_svg(resultado, titulo: str, subtitulo: str = "", largura: int = 1280,
                 f'font-weight="700" fill="{grupo["cor"]}" '
                 f'font-family="{FONTE}">{grupo["indice"]}</text>'
                 f'<text x="{x + 18}" y="{y + 1}" font-size="12" fill="{TINTA}" '
-                f'font-family="{FONTE}">{_rotulo_curto(grupo["rotulo"], unidade)} '
+                f'font-family="{FONTE}">{html.escape(_rotulo_curto(grupo["rotulo"], unidade))} '
                 f'<tspan fill="{TINTA_FRACA}">({grupo["nos"]})</tspan></text>')
         elif tipo == "soltos":
             legenda_svg += (
@@ -526,13 +609,13 @@ def halo_svg(resultado, titulo: str, subtitulo: str = "", largura: int = 1280,
     titulo = titulo.replace("{unidade}", UNIDADE_TITULO.get(unidade, unidade))
 
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{titulo}" '
+        f'<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{html.escape(titulo, quote=True)}" '
         f'viewBox="0 0 {largura} {altura}" width="{largura}" height="{altura}">'
         f'<rect width="{largura}" height="{altura}" fill="#ffffff"/>'
         f'<text x="40" y="38" font-size="17" font-weight="600" fill="{TINTA}" '
-        f'font-family="{FONTE}">{titulo}</text>'
+        f'font-family="{FONTE}">{html.escape(titulo)}</text>'
         f'<text x="40" y="60" font-size="12" fill="{TINTA_FRACA}" '
-        f'font-family="{FONTE}">{subtitulo}</text>'
+        f'font-family="{FONTE}">{html.escape(subtitulo)}</text>'
         f'<text x="{pw + 16}" y="86" font-size="11" font-weight="700" '
         f'fill="{TINTA_FRACA}" font-family="{FONTE}">AGRUPAMENTOS</text>'
         f'<g fill="none" stroke="{CINZA_LIGACAO}" stroke-linecap="round" '

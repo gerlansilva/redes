@@ -122,22 +122,39 @@ def rede_de_agrupamentos_svg(resultado, titulo: str,
     for i in ordem:
         internos.append(sum(v for _, _, v in rede.pares_internos(grupos[i].nos)))
 
-    pesos = {}
-    for a in range(k):
-        ca = internos[a]
-        if ca <= 0:
+    # Soma das arestas entre cada par de agrupamentos, numa passada só pelas
+    # arestas da rede (antes: um teste de aresta por par de nós de cada par de
+    # agrupamentos, o que levava minutos com centenas de agrupamentos).
+    posicao_do_no = {}
+    for posicao, i in enumerate(ordem):
+        for dentro, no in enumerate(grupos[i].nos):
+            posicao_do_no[no] = (posicao, dentro)
+    brutas: dict[tuple[int, int], list[tuple[int, int, float]]] = {}
+    for a, vizinhos in rede.adjacencia.items():
+        origem = posicao_do_no.get(a)
+        if origem is None:
             continue
-        for b in range(a + 1, k):
-            cb = internos[b]
-            if cb <= 0:
-                continue
-            c_ab = sum(v for _, _, v in rede.pares_entre(
-                grupos[ordem[a]].nos, grupos[ordem[b]].nos))
-            if c_ab <= 0:
-                continue
-            equivalencia = c_ab * c_ab / (ca * cb)
-            if equivalencia >= 0.015:
-                pesos[(a, b)] = equivalencia
+        for b, valor in vizinhos.items():
+            destino = posicao_do_no.get(b)
+            if destino is not None and origem[0] < destino[0]:
+                brutas.setdefault((origem[0], destino[0]), []).append(
+                    (origem[1], destino[1], valor))
+    # A soma segue a ordem original (nó de A, depois nó de B): a ordem das
+    # parcelas muda o último dígito e o layout de mola é sensível a isso.
+    entre = {par: sum(valor for _, _, valor in sorted(itens))
+             for par, itens in brutas.items()}
+
+    pesos = {}
+    for (a, b) in sorted(entre):
+        ca, cb = internos[a], internos[b]
+        if ca <= 0 or cb <= 0:
+            continue
+        c_ab = entre[(a, b)]
+        if c_ab <= 0:
+            continue
+        equivalencia = c_ab * c_ab / (ca * cb)
+        if equivalencia >= 0.015:
+            pesos[(a, b)] = equivalencia
 
     grafo = nx.Graph()
     grafo.add_nodes_from(range(k))
@@ -145,8 +162,10 @@ def rede_de_agrupamentos_svg(resultado, titulo: str,
         grafo.add_edge(a, b, weight=peso)
 
     if grafo.number_of_edges():
+        # Com mais de 300 agrupamentos o ganho de 400 iterações é invisível e
+        # o custo passa de segundos; até 300 o layout é o de sempre.
         pos = nx.spring_layout(grafo, seed=4, weight="weight", k=1.7,
-                               iterations=400)
+                               iterations=400 if k <= 300 else 150)
     else:
         pos = nx.circular_layout(grafo)
 

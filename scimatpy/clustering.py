@@ -64,71 +64,79 @@ def centros_simples(rede: Rede, tamanho_minimo: int, tamanho_maximo: int,
     Percorre os pares em ordem decrescente de valor; quando um nó acumula
     `tamanho_atual - 1` pares vira semente e leva consigo os vizinhos de maior
     peso. Os pares usados são retirados da lista e a varredura recomeça.
+
+    A varredura é incremental: depois de uma extração, os pares que sobram antes
+    da posição da semente nunca atingem o limite (a varredura anterior já os
+    percorreu sem acerto), então a contagem é ajustada em vez de recomeçar do
+    zero. O resultado é idêntico ao da formulação literal (reler a lista
+    inteira a cada extração), mas o custo cai de O(grupos x pares) para O(pares).
     """
     resultado = ConjuntoDeAgrupamentos(rede)
     pares = [list(par) for par in rede.arestas()]
     pares.sort(key=lambda par: -par[2])
 
+    total = len(pares)
+    origem = [par[0] for par in pares]
+    destino = [par[1] for par in pares]
+    vivo = [True] * total
+    pares_do_no: dict[int, list[int]] = {}
+    for indice in range(total):
+        pares_do_no.setdefault(origem[indice], []).append(indice)
+        pares_do_no.setdefault(destino[indice], []).append(indice)
+
     contagem: dict[int, int] = {}
     tamanho_atual = tamanho_maximo - 1
+    restantes = total
     i = 0
 
-    def incrementa(no: int) -> None:
-        contagem[no] = contagem.get(no, 0) + 1
-
-    while i < len(pares):
-        encontrou = False
-        a, b, _ = pares[i]
-        incrementa(a)
-        incrementa(b)
-
-        if contagem[a] == tamanho_atual:
-            resultado.adiciona(_extrai_tema(pares, i, a, tamanho_atual), a)
-            encontrou = True
-        elif contagem[b] == tamanho_atual:
-            resultado.adiciona(_extrai_tema(pares, i, b, tamanho_atual), b)
-            encontrou = True
-
-        if encontrou:
-            contagem.clear()
-            i = 0
-        else:
+    while restantes > 0 and tamanho_atual >= 1:
+        # Varredura a partir de i, sobre os pares ainda vivos.
+        semente = -1
+        posicao = -1
+        while i < total:
+            if vivo[i]:
+                a = origem[i]
+                b = destino[i]
+                contagem[a] = contagem.get(a, 0) + 1
+                contagem[b] = contagem.get(b, 0) + 1
+                if contagem[a] == tamanho_atual:
+                    semente, posicao = a, i
+                    break
+                if contagem[b] == tamanho_atual:
+                    semente, posicao = b, i
+                    break
             i += 1
-            if i == len(pares) and tamanho_atual > tamanho_minimo - 1:
+
+        if semente < 0:
+            # Chegou ao fim sem acerto: reduz o tamanho e recomeça do zero.
+            if tamanho_atual > tamanho_minimo - 1:
                 contagem.clear()
                 i = 0
                 tamanho_atual -= 1
-
-        if tamanho_atual < 1:
+                continue
             break
 
+        tema = [semente]
+        for indice in reversed(pares_do_no[semente]):
+            if indice > posicao or not vivo[indice]:
+                continue
+            tema.append(destino[indice] if origem[indice] == semente
+                        else origem[indice])
+        resultado.adiciona(tema, semente)
+
+        # Retira todo par que toca o tema e ajusta a contagem do trecho já lido.
+        for no in tema:
+            for indice in pares_do_no.get(no, ()):
+                if not vivo[indice]:
+                    continue
+                vivo[indice] = False
+                restantes -= 1
+                if indice <= posicao:
+                    contagem[origem[indice]] -= 1
+                    contagem[destino[indice]] -= 1
+        i = posicao + 1
+
     return resultado
-
-
-def _extrai_tema(pares: list[list], posicao: int, principal: int,
-                 tamanho_atual: int) -> list[int]:
-    """Sobe a lista a partir de `posicao` colhendo vizinhos do nó principal."""
-    tema = [principal]
-    adicionados = 0
-    i = posicao
-
-    while adicionados < tamanho_atual and i >= 0:
-        a, b, _ = pares[i]
-        if a == principal:
-            tema.append(b)
-            adicionados += 1
-        elif b == principal:
-            tema.append(a)
-            adicionados += 1
-        i -= 1
-
-    _remove_pares_com(pares, tema)
-    return tema
-
-
-def _remove_pares_com(pares: list[list], nos) -> None:
-    conjunto = set(nos)
-    pares[:] = [par for par in pares if par[0] not in conjunto and par[1] not in conjunto]
 
 
 # ---------------------------------------------------------------- ligação hierárquica

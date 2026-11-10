@@ -346,7 +346,7 @@ ER  -
         self.assertEqual(["STATISTICS-EDUCATION"],
                          documentos[0].palavras_autor)
         self.assertEqual(
-            "Sem autor, 2019, Bolema, V33, P1-10, Lopes, C. E., "
+            "Lopes C. E., 2019, Bolema, V33, P1-10, "
             "Formação de professores", documentos[0].referencias[0])
 
 

@@ -38,7 +38,7 @@ def grupos_xml(conexao) -> str:
 
     def grupo(nome: str, parada: bool, itens, tag_item: str, campos) -> None:
         partes.append(
-            f'    <group name="{sax.escape(str(nome))}" '
+            f'    <group name={sax.quoteattr(str(nome))} '
             f'stop="{str(bool(parada)).lower()}">')
         for item in itens:
             partes.append(f"      <{tag_item}>")

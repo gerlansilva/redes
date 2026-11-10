@@ -51,6 +51,8 @@ class Configuracao:
     k_core: int = 2
     palavras: tuple[str, ...] = ("autor", "fonte")
     indices: tuple[str, ...] = ("h", "g", "hg", "q2", "media", "soma", "minimo", "maximo")
+    # Itens a descartar antes da rede (termos genéricos como "ESTATISTICA").
+    ignorar: tuple[str, ...] = ()
 
     def valida(self) -> None:
         if self.unidade not in ("Words", "Authors", "References",
@@ -125,6 +127,8 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
     elif config.matriz == "AggregatedCouplingBasedOnJournal":
         agregado = Agregado.por_periodico(projeto.conexao, dataset)
 
+    if config.ignorar:
+        _remove_ignorados(dataset, config.ignorar)
     dataset.filtra_itens_por_frequencia(config.minimo_frequencia)
 
     if config.matriz == "CoOccurrence":
@@ -187,6 +191,16 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
         agregado=agregado,
         rotulos=rotulos,
     )
+
+
+def _remove_ignorados(dataset: Dataset, ignorar) -> None:
+    """Remove os itens cujo rótulo está na lista (sem caixa nem acento)."""
+    from .text_utils import chave
+
+    alvos = {chave(nome) for nome in ignorar if chave(nome)}
+    for item_id in dataset.lista_itens():
+        if chave(dataset.itens[item_id]) in alvos:
+            dataset.remove_item(item_id)
 
 
 def _rotulo(dataset: Dataset, principal: int | None,

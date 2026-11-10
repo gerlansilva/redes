@@ -79,7 +79,7 @@ const FREQUENCIA_MAXIMA_AUTO = 6;
 // Resumo: temas com menos documentos que isto vão para "Outros".
 const DOCS_MINIMOS_RESUMO = 3;
 const MAXIMO_TEMAS_RESUMO = 12;
-const FRACAO_TEMA_GENERICO = 0.4;
+const FRACAO_TEMA_GENERICO = 0.35;
 
 const SUBSTANTIVO_GRUPO = {
   Words: ["tema", "temas"],
@@ -146,6 +146,7 @@ const ANALISES = [
 ];
 
 const estado = {
+  ignorar: [],
   projeto: null,
   freq: 1,
   resultado: null,
@@ -479,6 +480,7 @@ async function abrir(caminho) {
 
 function aplicarProjeto(projeto) {
   estado.projeto = projeto;
+  estado.ignorar = [];
   estado.resultado = null;
   estado.download = null;
   estado.execucoes = [];
@@ -598,6 +600,7 @@ function parametros() {
     mapeadores,
     palavras,
     periodo: Number($("periodo").value),
+    ignorar: estado.ignorar || [],
   };
 }
 
@@ -1274,10 +1277,13 @@ function renderizarResumo(resultado) {
     const texto = elemento("span", "",
       `"${nomeLegivel(generico.rotulo, unidade)}" cobre ${pct}% dos documentos ` +
       `(${generico.documentos} de ${totalDocs}). Etiquetas genéricas, como o nome do ` +
-      "periódico ou da área, escondem os demais temas: considere ignorá-la na Base.");
-    const botao = elemento("button", "botao-mini", "Abrir Base");
+      "periódico ou da área, escondem os demais temas: ignore-a para ver os demais temas.");
+    const botao = elemento("button", "botao-mini", "Ignorar e reanalisar");
     botao.type = "button";
-    botao.addEventListener("click", abrirBase);
+    botao.addEventListener("click", () => {
+      estado.ignorar = [...new Set([...(estado.ignorar || []), generico.rotulo])];
+      previsualizar();
+    });
     aviso.append(texto, botao);
     blocos.push(aviso);
   }

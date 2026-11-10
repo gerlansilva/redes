@@ -18,11 +18,14 @@ SEM_FONTE = "Sem fonte"
 
 SEPARADOR_REFERENCIA = re.compile(r"(?<=\));\s*")
 ANO_FIM = re.compile(r"[,\s]*\(\s*(\d{4}[a-z]?)\s*\)\s*$", re.IGNORECASE)
+# O número de página precisa ter pelo menos um dígito (ou ser algarismo romano
+# com hífen, como "vii-viii"): sem isso, as iniciais "P.L." de "Harris P.L." e
+# "P.-S." de "Laplace P.-S." seriam lidas como "p." seguido de páginas.
+_PAGINA = r"(?=[^\s,]*\d|[ivxlc]+\s*[-–—])[^\s,]+(?:\s*[-–—]\s*[^\s,]+)?"
 PAGINAS_FIM = re.compile(
-    r",\s*p{1,2}\.\s*([^\s,]+(?:\s*[-–—]\s*[^\s,]+)?)\s*$", re.IGNORECASE)
+    r",\s*p{1,2}\.\s*(" + _PAGINA + r")\s*$", re.IGNORECASE)
 PAGINAS_INTERNA = re.compile(
-    r"(?:^|\s)p{1,2}\.\s*([^\s,]+(?:\s*[-–—]\s*[^\s,]+)?)\s*$",
-    re.IGNORECASE)
+    r"(?:^|\s)p{1,2}\.\s*(" + _PAGINA + r")\s*$", re.IGNORECASE)
 DOI_FIM = re.compile(
     r",\s*(?:doi:\s*|https?://(?:dx\.)?doi\.org/)?10\.\d{4,9}/\S+\s*$", re.IGNORECASE)
 INICIAIS_FIM = re.compile(r"^[^\W\d_][^,;]*\s(?:[A-Z]\.?-?)+$", re.UNICODE)
@@ -50,6 +53,13 @@ INICIO_DE_FONTE_ABREVIADO = frozenset((
     "publisher", "psychol", "psychol.", "monogr", "monogr.", "rev", "rev.",
     "revista",
 ))
+# Partículas de sobrenome composto que aparecem em minúscula antes do nome:
+# "van der Meij H.", "von Hippel W.", "de la Cruz M.".
+PARTICULAS = frozenset((
+    "van", "von", "der", "den", "ter", "ten", "te", "del", "della", "di", "du",
+    "la", "le", "al", "el", "bin", "ibn", "af", "av", "zu",
+))
+CAMELCASE = re.compile(r"^[a-z]{2,4}[A-Z]")  # "delMas", "vanDijk", "deVeaux"
 CONECTORES = frozenset((
     "and", "of", "for", "in", "on", "with", "by", "at", "as", "to", "from",
     "de", "da", "do", "das", "dos", "e", "y", "und", "et",
@@ -65,12 +75,14 @@ def limpa_texto(valor: str) -> str:
 
 def parece_autor(segmento: str) -> bool:
     segmento = segmento.strip()
-    if not segmento or len(segmento) > 160:
+    # Listas com ";" podem ser longas (artigos de consórcio com dezenas de
+    # autores); o limite de tamanho vale só para um nome único.
+    if not segmento or (len(segmento) > 160 and ";" not in segmento):
         return False
 
     if ";" in segmento:
         partes = [p.strip() for p in segmento.split(";") if p.strip()]
-        if not partes or len(partes) > 30:
+        if not partes or len(partes) > 200:
             return False
         return all(len(p.split()) <= 5 for p in partes)
 
@@ -81,6 +93,7 @@ def parece_autor(segmento: str) -> bool:
         # "Statistical consultancy. A basis for teaching R." termina em "R.",
         # mas as palavras minúsculas mostram que é título, não nome de autor.
         if any(p[:1].islower() and p.lower() not in CONECTORES
+               and p.lower() not in PARTICULAS and not CAMELCASE.match(p)
                for p in palavras):
             return False
         return True
@@ -105,6 +118,39 @@ def _autor_com_iniciais(segmento: str) -> bool:
         return False
     ultimo = segmento.split()[-1]
     return bool(re.fullmatch(r"[A-Z]\.?(?:[A-Z]\.?)?", ultimo))
+
+
+# Palavras de título que, sozinhas antes da primeira vírgula, não são sobrenome.
+_NAO_SOBRENOME = frozenset((
+    "statistics", "mathematics", "probability", "data", "learning", "teaching",
+    "children", "report", "annual", "introduction", "education", "science",
+    "research", "handbook", "proceedings", "journal", "review", "studies",
+    "mathematik", "matematica", "estatistica", "probabilidad", "estadistica",
+))
+
+
+_SO_INICIAIS = re.compile(r"(?:[A-Z]\.?\s?-?){1,4}")
+
+
+def _sobrenome_solto(segmentos: list[str]) -> bool:
+    """Referências antigas trazem só o sobrenome: "Craik, Theory of ..., 38".
+
+    Aceita uma palavra capitalizada no início quando o resto parece título e
+    fonte (pelo menos três trechos), para não tomar título de uma palavra só
+    por autor.
+    """
+    if len(segmentos) < 3:
+        return False
+    primeiro = segmentos[0]
+    if not re.fullmatch(r"[^\W\d_][^\W\d_'’-]{1,24}(?:[-'’][^\W\d_]{1,24})?",
+                        primeiro, re.UNICODE):
+        return False
+    if not primeiro[:1].isupper() or primeiro.isupper() and len(primeiro) > 5:
+        return False
+    if primeiro.lower() in _NAO_SOBRENOME or parece_fonte(primeiro):
+        return False
+    segundo = segmentos[1]
+    return len(segundo.split()) >= 2 and segundo[:1].isupper()
 
 
 def parece_fonte(texto: str) -> bool:
@@ -254,11 +300,25 @@ def converte_referencia(bruta: str) -> str | None:
 
     segmentos, paginas = _separa_paginas(segmentos, paginas)
 
+    # Só o autor, sem título nem fonte ("Jones G.A., (1974)"): a obra é
+    # identificada por autor e ano, e o autor entra na cocitação de autores.
+    if (len(segmentos) == 1 and ano and not paginas
+            and (_autor_com_iniciais(segmentos[0])
+                 or (";" in segmentos[0] and parece_autor(segmentos[0])))):
+        return ", ".join([_limpa_campo(segmentos[0]), ano, SEM_FONTE,
+                          "", "", ""])
+
     autores = []
     while len(segmentos) > 1 and parece_autor(segmentos[0]):
         if autores and not (_autor_com_iniciais(segmentos[0])
                             or ";" in segmentos[0]):
             break
+        autores.append(segmentos.pop(0))
+    if not autores and len(segmentos) >= 3 and _SO_INICIAIS.fullmatch(
+            segmentos[1]) and re.fullmatch(r"[^\W\d_][\w'’ -]{1,40}", segmentos[0]):
+        # "Lopes, C. E., Formação ..." (sobrenome, vírgula, iniciais).
+        autores.append(segmentos.pop(0) + " " + segmentos.pop(0))
+    elif not autores and _sobrenome_solto(segmentos):
         autores.append(segmentos.pop(0))
     autor = "; ".join(autores)
 
@@ -383,9 +443,9 @@ def nome_do_grupo(referencia_completa: str, nomes_usados: set[str]) -> str:
     if fonte and fonte.lower() != SEM_FONTE.lower() and len(fonte) <= 30:
         base = base + ", " + fonte
     elif not ano and fonte and fonte.lower() != SEM_FONTE.lower():
-        base = base + ", " + _recorta(fonte, 30)
+        base = base + ", " + fonte
     elif not ano and titulo:
-        base = base + ", " + _recorta(titulo, 30)
+        base = base + ", " + titulo
 
     tentativas = [base]
     if volume:
@@ -395,11 +455,11 @@ def nome_do_grupo(referencia_completa: str, nomes_usados: set[str]) -> str:
     tentativas.append(referencia_completa)
 
     for tentativa in tentativas:
-        nome = _recorta(tentativa, 60)
+        nome = tentativa
         if nome not in nomes_usados:
             return nome
 
-    resumo = _recorta(base, 50)
+    resumo = base
     numero = 2
     while True:
         nome = f"{resumo} ({numero})"

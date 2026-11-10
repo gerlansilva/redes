@@ -19,9 +19,10 @@ from pathlib import Path
 from . import schema
 from .dataset import Dataset
 from .kb import ProjetoScimat
-from .loaders.base import DocumentoFonte
+from .loaders.base import DocumentoFonte, remove_duplicatas
 from .references import converte_referencia, nome_do_grupo
-from .text_utils import (abreviacao_de, chave, mesmo_plural, normaliza_palavra,
+from .text_utils import (abreviacao_de, chave, chave_de_bloco, mesmo_termo,
+                         normaliza_palavra, sem_acentos,
                          palavras_significativas, parece_abreviacao,
                          partes_abreviadas)
 
@@ -71,7 +72,12 @@ def _converte_referencias(documentos: list[DocumentoFonte]) -> None:
 class Construtor:
     """Recebe documentos e grava o projeto."""
 
-    def __init__(self, documentos: list[DocumentoFonte]) -> None:
+    def __init__(self, documentos: list[DocumentoFonte],
+                 autores_referencia: str = "primeiro") -> None:
+        if autores_referencia not in ("primeiro", "todos", "lista"):
+            raise ValueError(
+                "autores_referencia precisa ser 'primeiro', 'todos' ou 'lista'")
+        self.autores_referencia = autores_referencia
         self.documentos = documentos
         self.autores: "OrderedDict[str, Item]" = OrderedDict()
         self.palavras: "OrderedDict[str, Item]" = OrderedDict()
@@ -89,7 +95,7 @@ class Construtor:
         self.vinculos_afiliacao: dict[int, list[int]] = {}
         self.vinculos_palavra: dict[tuple[int, int], list[int]] = {}
         self.vinculos_referencia: dict[int, list[int]] = {}
-        self.refs_por_autor_ref: dict[int, list[int]] = {}
+        self.refs_por_autor_ref: dict[int, list[tuple[int, int]]] = {}
         self.refs_por_fonte: dict[int, list[int]] = {}
 
     # ------------------------------------------------------------- importação
@@ -99,6 +105,22 @@ class Construtor:
 
         for indice, documento in enumerate(self.documentos, start=1):
             self._documento(indice, documento)
+
+    def _autores_citados(self, autor_da_referencia: str) -> list[str]:
+        """Autores da referência que contam como "autor citado".
+
+        A Scopus lista todos os autores de uma obra citada ("A; B; C"). Tomar a
+        lista inteira como um único autor faz cada combinação de coautores virar
+        um item distinto, o que desfaz a cocitação de autores. Por padrão vale o
+        primeiro autor, como no Web of Science, no VOSviewer e no bibliometrix.
+        """
+        if self.autores_referencia == "lista" or ";" not in autor_da_referencia:
+            return [autor_da_referencia]
+        autores = list(dict.fromkeys(
+            a.strip() for a in autor_da_referencia.split(";") if a.strip()))
+        if not autores:
+            return [autor_da_referencia]
+        return autores[:1] if self.autores_referencia == "primeiro" else autores
 
     def _documento(self, doc_id: int, documento: DocumentoFonte) -> None:
         self.jornais.setdefault(documento.periodico, len(self.jornais) + 1)
@@ -164,12 +186,15 @@ class Construtor:
                                         bruta.strip())
                 self.referencias[completa] = referencia
 
-                autor = self.autores_ref.get(referencia.autor)
-                if autor is None:
-                    autor = Item(len(self.autores_ref) + 1, referencia.autor)
-                    self.autores_ref[referencia.autor] = autor
-                autor.usos += 1
-                self.refs_por_autor_ref.setdefault(autor.id, []).append(referencia.id)
+                for posicao_autor, nome_autor in enumerate(
+                        self._autores_citados(referencia.autor), start=1):
+                    autor = self.autores_ref.get(nome_autor)
+                    if autor is None:
+                        autor = Item(len(self.autores_ref) + 1, nome_autor)
+                        self.autores_ref[nome_autor] = autor
+                    autor.usos += 1
+                    self.refs_por_autor_ref.setdefault(autor.id, []).append(
+                        (referencia.id, posicao_autor))
 
                 fonte = self.fontes.get(referencia.fonte)
                 if fonte is None:
@@ -199,25 +224,42 @@ class Construtor:
     # ------------------------------------------------------------- agrupamento
 
     def agrupa_palavras(self) -> list[tuple[int, str, list[int]]]:
-        """Pares (id do grupo, nome, ids das palavras), na ordem do original."""
-        restantes = sorted(self.palavras.values(), key=lambda item: item.nome)
+        """Pares (id do grupo, nome, ids das palavras), na ordem do original.
+
+        A regra é a do SciMAT (a menor palavra restante leva as variantes de
+        plural, sem transitividade), estendida a acentos e plurais do português
+        e do espanhol. A comparação só ocorre dentro do bloco de cada palavra,
+        o que evita o laço quadrático sobre todo o vocabulário.
+        """
+        ordenadas = sorted(self.palavras.values(), key=lambda item: item.nome)
+        blocos: dict[str, list[int]] = {}
+        for posicao, item in enumerate(ordenadas):
+            blocos.setdefault(chave_de_bloco(item.nome), []).append(posicao)
+
+        usadas = [False] * len(ordenadas)
         grupos = []
 
-        while restantes:
-            base = restantes.pop(0)
+        for posicao, base in enumerate(ordenadas):
+            if usadas[posicao]:
+                continue
+            usadas[posicao] = True
             membros = [base]
-            i = 0
-            while i < len(restantes):
-                if mesmo_plural(base.nome, restantes[i].nome):
-                    membros.append(restantes.pop(i))
-                else:
-                    i += 1
+            for outra in blocos[chave_de_bloco(base.nome)]:
+                if outra > posicao and not usadas[outra] and mesmo_termo(
+                        base.nome, ordenadas[outra].nome):
+                    usadas[outra] = True
+                    membros.append(ordenadas[outra])
 
             nome = base.nome
             maximo = base.frequencia
             for membro in membros:
                 if membro.frequencia > maximo:
                     maximo = membro.frequencia
+                    nome = membro.nome
+                elif (membro.frequencia == maximo and nome == sem_acentos(nome)
+                      and membro.nome != sem_acentos(membro.nome)
+                      and sem_acentos(membro.nome) == sem_acentos(nome)):
+                    # Empate entre "EDUCACAO" e "EDUCAÇÃO": fica a acentuada.
                     nome = membro.nome
             grupos.append((len(grupos) + 1, nome, [m.id for m in membros]))
 
@@ -458,7 +500,7 @@ class Construtor:
             conexao.executemany(
                 "INSERT INTO AuthorReference_Reference(AuthorReference_idAuthorReference, "
              "Reference_idReference, position) VALUES (?, ?, ?)",
-                [(autor_id, ref_id, 1) for ref_id in refs])
+                [(autor_id, ref_id, posicao) for ref_id, posicao in refs])
 
         for nome, fonte in self.fontes.items():
             conexao.execute(
@@ -525,8 +567,19 @@ class Construtor:
 
 
 def constroi(documentos: list[DocumentoFonte], destino: str | Path,
-             periodos: list[tuple[str, int, int]] | tuple[int, int] | None = None) -> dict:
-    """Importa os documentos e grava o projeto; devolve um resumo."""
+             periodos: list[tuple[str, int, int]] | tuple[int, int] | None = None,
+             remove_repetidos: bool = True,
+             autores_referencia: str = "primeiro") -> dict:
+    """Importa os documentos e grava o projeto; devolve um resumo.
+
+    ``remove_repetidos`` junta registros com o mesmo DOI ou o mesmo título e
+    ano; ``autores_referencia`` escolhe quem conta como autor citado
+    (``primeiro``, ``todos`` ou ``lista``, o comportamento antigo).
+    """
+    total_original = len(documentos)
+    repetidos: list[tuple[str, str]] = []
+    if remove_repetidos:
+        documentos, repetidos = remove_duplicatas(documentos)
     if periodos is None:
         periodos = []
     if isinstance(periodos, tuple):
@@ -540,13 +593,20 @@ def constroi(documentos: list[DocumentoFonte], destino: str | Path,
         else:
             periodos = [("0\u20139999", 0, 9999)]
 
-    construtor = Construtor(documentos)
+    construtor = Construtor(documentos, autores_referencia)
     construtor.importa()
     construtor.grava(destino, periodos)
 
     with ProjetoScimat(destino) as projeto:
         resumo = {
             "documentos": len(documentos),
+            "documentos_lidos": total_original,
+            "duplicatas_removidas": len(repetidos),
+            "duplicatas": [{"titulo": t, "motivo": m} for t, m in repetidos[:50]],
+            "sem_palavras": sum(1 for d in documentos
+                                if not d.palavras_autor and not d.palavras_fonte),
+            "sem_pais": sum(1 for d in documentos if not d.paises),
+            "sem_referencias": sum(1 for d in documentos if not d.referencias),
             "palavras": len(construtor.palavras),
             "grupos_palavra": conectar_contagem(destino, "WordGroup", "idWordGroup"),
             "autores": len(construtor.autores),

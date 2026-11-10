@@ -154,24 +154,9 @@ def comando_grade(args) -> int:
 
 def comando_constroi(args) -> int:
     from . import build
-    from .loaders import (bibtex, csv as csv_loader, detecta_formato, openalex,
-                          ris, scopus, wos)
+    from .loaders import le_corpus
 
-    formato = args.formato
-    if formato == "auto":
-        formato = detecta_formato(args.entrada)
-    if formato == "csv":
-        documentos = csv_loader.le(args.entrada)
-    elif formato == "bibtex":
-        documentos = bibtex.le(args.entrada)
-    elif formato == "ris":
-        documentos = ris.le(args.entrada)
-    elif formato == "wos":
-        documentos = wos.le(args.entrada)
-    elif formato == "scopus":
-        documentos = scopus.le(args.entrada)
-    else:
-        documentos = openalex.le(args.entrada, args.sinonimos)
+    documentos, formato = le_corpus(args.entrada, args.formato, args.sinonimos)
 
     faixas = []
     for faixa in (args.periodos or "").split(","):
@@ -182,9 +167,16 @@ def comando_constroi(args) -> int:
         faixas.append((f"{inicio}\u2013{fim}", inicio, fim))
 
     saida = com_extensao(args.saida)
-    resumo = build.constroi(documentos, saida, faixas)
+    resumo = build.constroi(documentos, saida, faixas,
+                            remove_repetidos=not args.manter_repetidos,
+                            autores_referencia=args.autores_referencia)
 
-    print(f"{resumo['documentos']} documentos → {saida}")
+    print(f"{resumo['documentos']} documentos ({formato}) → {saida}")
+    if resumo["duplicatas_removidas"]:
+        print(f"duplicatas removidas: {resumo['duplicatas_removidas']} "
+              f"de {resumo['documentos_lidos']} registros lidos")
+    print(f"sem palavras-chave: {resumo['sem_palavras']}; sem país: "
+          f"{resumo['sem_pais']}; sem referências: {resumo['sem_referencias']}")
     print(f"palavras: {resumo['palavras']} grafias, {resumo['grupos_palavra']} grupos")
     print(f"autores: {resumo['autores']} grafias, {resumo['grupos_autor']} grupos")
     print(f"referências: {resumo['referencias']} itens, {resumo['grupos_referencia']} grupos")
@@ -257,12 +249,19 @@ def monta_parser() -> argparse.ArgumentParser:
     constroi.add_argument("entrada", help="arquivo de origem")
     constroi.add_argument("--formato", default="auto",
                           choices=["auto", "csv", "bibtex", "ris", "openalex",
-                                   "wos", "scopus"])
+                                   "wos", "scopus", "zotero"])
     constroi.add_argument("--saida", default=NOME_PADRAO)
     constroi.add_argument("--periodos", default=None,
                           help="faixas separadas por vírgula, ex.: 2008-2014,2015-2020 "
                                "(padrão: intervalo real de anos do corpus)")
     constroi.add_argument("--sinonimos", help="arquivo de sinônimos (formato OpenAlex)")
+    constroi.add_argument("--manter-repetidos", action="store_true",
+                          help="não junta registros com o mesmo DOI ou título e ano")
+    constroi.add_argument("--autores-referencia", default="primeiro",
+                          choices=["primeiro", "todos", "lista"],
+                          help="quem conta como autor citado: o primeiro autor "
+                               "da obra (padrão), todos, ou a lista inteira "
+                               "como um só item (comportamento antigo)")
     constroi.set_defaults(funcao=comando_constroi)
 
     grade = sub.add_parser("grade", help="executa a grade completa de análises")

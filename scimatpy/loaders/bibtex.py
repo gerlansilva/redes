@@ -10,7 +10,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .base import DocumentoFonte, abrevia_autor
+from .base import (DocumentoFonte, abrevia_autor, acha_doi, citacoes_em_texto,
+                   decodifica_latex)
 
 _CABECALHO = re.compile(r"@(\w+)\s*\{([^,]*),", re.IGNORECASE)
 _CAMPO = re.compile(r"(\w+)\s*=\s*", re.IGNORECASE)
@@ -85,11 +86,12 @@ def _campos(corpo: str) -> dict[str, str]:
 
 def _autores(valor: str) -> list[str]:
     nomes = [n.strip() for n in re.split(r"\s+and\s+", valor or "") if n.strip()]
-    return [abrevia_autor(n) for n in nomes]
+    return [abrevia_autor(decodifica_latex(n)) for n in nomes]
 
 
 def _palavras(valor: str) -> list[str]:
-    return [p.strip() for p in re.split(r"[;,]", valor or "") if p.strip()]
+    return [decodifica_latex(p).strip()
+            for p in re.split(r"[;,]", valor or "") if p.strip()]
 
 
 def le(caminho: str | Path) -> list[DocumentoFonte]:
@@ -108,15 +110,18 @@ def le(caminho: str | Path) -> list[DocumentoFonte]:
             ano = achado.group(0) if achado else ""
 
         documentos.append(DocumentoFonte(
-            titulo=titulo.strip("{}"),
+            titulo=decodifica_latex(titulo),
             autores=_autores(campos.get("author", "")),
             ano=ano,
-            citacoes=0,
-            periodico=(campos.get("journal") or campos.get("booktitle")
-                       or campos.get("publisher") or "").strip("{}"),
-            doi=campos.get("doi", "").strip(),
+            citacoes=citacoes_em_texto(campos.get("note", ""),
+                                       campos.get("annote", "")),
+            periodico=decodifica_latex(
+                campos.get("journal") or campos.get("journaltitle")
+                or campos.get("booktitle") or campos.get("publisher") or ""),
+            doi=campos.get("doi", "").strip() or acha_doi(campos.get("url", "")),
             tipo=tipo,
-            resumo=re.sub(r"\s+", " ", campos.get("abstract", "")).strip(),
+            resumo=decodifica_latex(
+                re.sub(r"\s+", " ", campos.get("abstract", "")).strip()),
             palavras_autor=_palavras(campos.get("keywords", "")),
             palavras_fonte=[],
             referencias=[],
