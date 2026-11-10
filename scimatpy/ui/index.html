@@ -23,6 +23,9 @@
       <button type="button" class="nav-analise" data-analise="visao" title="Visão geral">
         <span class="ponto"></span><span class="nav-texto">Visão geral</span>
       </button>
+      <button type="button" class="nav-analise" data-analise="bibliometria" title="Produção, autores, fontes, países e leis bibliométricas">
+        <span class="ponto"></span><span class="nav-texto">Bibliometria</span>
+      </button>
       <div class="grupo">
         <p class="grupo-titulo">Fontes</p>
         <button type="button" class="nav-analise" data-analise="veiculos"><span class="ponto"></span><span class="nav-texto">Periódicos citados</span></button>
@@ -253,6 +256,8 @@
           <button class="botao perigo" id="btnCancelar" style="height:28px;padding:0 10px">Cancelar</button>
         </div>
       </section>
+
+      <section class="visao-geral oculta" id="visaoBibliometria" hidden></section>
 
       <section class="visao-geral" id="visaoGeral">
         <div class="visao-geral-cab">
@@ -853,5 +858,6 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="/static/app.js"></script>
+<script src="/static/bibliometria.js"></script>
 </body>
 </html>

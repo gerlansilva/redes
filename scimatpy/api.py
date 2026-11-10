@@ -1258,6 +1258,12 @@ class Manipulador(BaseHTTPRequestHandler):
             elif rota == "/api/base":
                 self._json(200, base_conhecimento(
                     (parametros.get("caminho") or [""])[0]))
+            elif rota == "/api/bibliometria":
+                from . import bibliometria
+                caminho = _valida_projeto(
+                    (parametros.get("caminho") or [""])[0])
+                with ProjetoScimat(caminho) as kb:
+                    self._json(200, bibliometria.calcula(kb.conexao))
             elif rota == "/api/documentos":
                 self._json(200, lista_documentos(
                     _param(parametros, "token"),
