@@ -23,7 +23,7 @@
       <button type="button" class="nav-analise" data-analise="visao" title="Visão geral">
         <span class="ponto"></span><span class="nav-texto">Visão geral</span>
       </button>
-      <div class="grupo">
+      <div class="grupo grupo-unico">
         <p class="grupo-titulo">Estrutura conceitual</p>
         <button type="button" class="nav-analise" data-analise="conceitual"><span class="ponto"></span><span class="nav-texto">Estrutura conceitual</span></button>
       </div>
@@ -58,6 +58,15 @@
         <span class="nav-texto">Sobre</span>
       </button>
     </nav>
+
+    <div class="sidebar-modo">
+      <label class="alternador-modo" for="modoAvancado"
+             title="Mostra todos os parâmetros, abas e a grade completa">
+        <input type="checkbox" id="modoAvancado">
+        <span class="chave" aria-hidden="true"></span>
+        <span class="modo-texto">Modo avançado</span>
+      </label>
+    </div>
 
     <div class="rodape">
       Redes · versão local<br>
@@ -114,10 +123,10 @@
               <option value="personalizada">Personalizada</option>
             </select>
           </div>
-          <span class="etiqueta-suave" id="seloPrevia">Prévia sob demanda</span>
+          <span class="etiqueta-suave so-avancado" id="seloPrevia">Prévia sob demanda</span>
         </div>
 
-        <p class="analise-fixa" id="analiseFixa" hidden></p>
+        <p class="analise-fixa so-avancado" id="analiseFixa" hidden></p>
 
         <div class="campos">
           <div class="campo fixo">
@@ -145,7 +154,7 @@
             </div>
           </div>
           <div class="campo min">
-            <label title="Número mínimo de vezes que um item precisa aparecer no corpus para entrar na análise.">Freq. mínima</label>
+            <label title="Número mínimo de vezes que um item precisa aparecer no corpus para entrar na análise.">Frequência mínima</label>
             <div class="controle stepper">
               <button class="passo" id="freqMenos" aria-label="Diminuir frequência">−</button>
               <span class="valor" id="freqValor">1</span>
@@ -154,7 +163,9 @@
           </div>
         </div>
 
-        <details class="avancado" id="avancado">
+        <p class="nota-auto" id="notaAuto" role="status" hidden></p>
+
+        <details class="avancado so-avancado" id="avancado">
           <summary>Parâmetros avançados</summary>
           <div class="campos avancado-campos">
             <div class="campo">
@@ -227,10 +238,10 @@
           </div>
         </details>
 
-        <div class="acoes">
+        <div class="acoes so-avancado">
           <div class="espaco"></div>
-          <button class="botao escuro" id="btnPreview" disabled>Pré-visualizar</button>
-          <button class="botao" id="btnGrade" disabled>
+          <button class="botao escuro so-avancado" id="btnPreview" disabled>Pré-visualizar</button>
+          <button class="botao so-avancado" id="btnGrade" disabled>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
             <span id="rotuloGrade">Grade completa</span>
           </button>
@@ -285,7 +296,8 @@
 
       <div class="barra-resultados">
       <div class="abas" role="tablist" aria-label="Resultados">
-        <div class="aba ativa" data-aba="rede" role="tab" tabindex="0" aria-selected="true">Rede</div>
+        <div class="aba ativa" data-aba="resumo" role="tab" tabindex="0" aria-selected="true">Resumo</div>
+        <div class="aba" data-aba="rede" role="tab" tabindex="0" aria-selected="false">Rede</div>
         <div class="aba" data-aba="paises" role="tab" tabindex="0" aria-selected="false">Países</div>
         <div class="aba" data-aba="diagrama" role="tab" tabindex="0" aria-selected="false">Diagrama estratégico</div>
         <div class="aba" data-aba="agrupamentos" role="tab" tabindex="0" aria-selected="false">Rede de agrupamentos</div>
@@ -297,6 +309,18 @@
       </div>
 
       <div class="resultados" id="resultados">
+        <section class="cartao" id="blocoResumo" data-bloco="blocoResumo">
+          <header>
+            <div class="cartao-titulo">
+              <h2>Resumo</h2>
+              <span class="meta" id="metaResumo">—</span>
+            </div>
+          </header>
+          <div class="resumo-corpo" id="resumoCorpo">
+            <p class="resumo-vazio">Escolha uma análise para ver o resumo.</p>
+          </div>
+        </section>
+
         <section class="cartao" id="blocoRede" data-bloco="blocoRede">
           <header>
             <div class="cartao-titulo">
@@ -553,7 +577,7 @@
           <p class="dica">Índices, rede, grupos, documentos ou o relatório completo do período.</p>
         </div>
         <div class="espaco"></div>
-        <button class="botao" id="btnExportar" disabled>
+        <button class="botao so-avancado" id="btnExportar" disabled>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
           </svg>
@@ -776,9 +800,9 @@
     <div class="secao">
       <div class="ajuda-passos">
         <div><b>1. Abra o corpus</b><span>Use "Abrir projeto" para um <code>.redes</code> existente (ou um <code>.scimat</code> antigo) ou importe CSV, BibTeX, RIS, OpenAlex, Web of Science ou Scopus.</span></div>
-        <div><b>2. Ajuste os parâmetros</b><span>Unidade, matriz, similaridade, algoritmo, frequência mínima e mapeadores. O período fica no topo.</span></div>
-        <div><b>3. Execute</b><span>"Pré-visualizar" roda uma configuração; "Grade completa" percorre todas as combinações de unidade, matriz, algoritmo, similaridade e reduções.</span></div>
-        <div><b>4. Explore</b><span>As abas mostram a rede, os quadrantes de Callon, os agrupamentos, os índices e os documentos.</span></div>
+        <div><b>2. Ajuste, se quiser</b><span>A frequência mínima é escolhida automaticamente no modo simples, para evitar dezenas de temas minúsculos. Os demais parâmetros ficam no modo avançado. O período fica no topo.</span></div>
+        <div><b>3. Execute</b><span>No modo simples a análise roda sozinha ao escolher o tema ou o período. No modo avançado (rodapé do menu), "Pré-visualizar" roda uma configuração e "Grade completa" percorre todas as combinações.</span></div>
+        <div><b>4. Explore</b><span>O Resumo traz os temas por quadrante; clique em um tema para ver itens e documentos. Rede, diagrama estratégico e comparação de períodos ficam nas outras abas; índices, agrupamentos e documentos, no modo avançado.</span></div>
         <div><b>5. Exporte</b><span>Ao final, baixe a grade, exporte índices e redes ou gere o relatório HTML/LaTeX.</span></div>
       </div>
       <p class="dica" style="margin-top:16px">Tudo roda na sua máquina; nenhum dado é enviado para fora. Atalho: <kbd>Esc</kbd> fecha janelas abertas.</p>

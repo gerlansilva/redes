@@ -67,8 +67,41 @@ const CONFIG_ABAS = {
   veiculos: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "longitudinal"],
               padrao: "rede", redeRotulo: "Rede de periódicos" },
 };
-const ABAS_TODAS = ["rede", "paises", "diagrama", "agrupamentos", "grupos",
-                    "indices", "documentos", "longitudinal"];
+const ABAS_TODAS = ["resumo", "rede", "paises", "diagrama", "agrupamentos",
+                    "grupos", "indices", "documentos", "longitudinal"];
+// No modo simples só aparecem estas abas; as demais ficam no modo avançado.
+const ABAS_SIMPLES = ["resumo", "rede", "paises", "diagrama", "longitudinal"];
+
+// Limites da frequência mínima automática (modo simples).
+const LIMITE_TEMAS = 14;
+const MINIMO_TEMAS = 4;
+const FREQUENCIA_MAXIMA_AUTO = 6;
+// Resumo: temas com menos documentos que isto vão para "Outros".
+const DOCS_MINIMOS_RESUMO = 3;
+const MAXIMO_TEMAS_RESUMO = 12;
+const FRACAO_TEMA_GENERICO = 0.4;
+
+const SUBSTANTIVO_GRUPO = {
+  Words: ["tema", "temas"],
+  Authors: ["grupo de autores", "grupos de autores"],
+  AuthorsReference: ["grupo de autores citados", "grupos de autores citados"],
+  References: ["grupo de referências", "grupos de referências"],
+  ReferenceSources: ["grupo de periódicos", "grupos de periódicos"],
+  Countries: ["grupo de países", "grupos de países"],
+};
+const INTERPRETACAO = {
+  motor: "Centrais e bem desenvolvidos: sustentam o campo.",
+  basico: "Centrais, mas ainda pouco desenvolvidos: assuntos de base que atravessam o campo.",
+  nicho: "Bem desenvolvidos, porém isolados: assuntos especializados.",
+  emergente: "Pouco centrais e pouco desenvolvidos: temas em surgimento ou em declínio.",
+};
+const INTERPRETACAO_PAISES = {
+  motor: "Países centrais e muito conectados na colaboração.",
+  basico: "Países com muitas ligações, mas pouco coesas entre si.",
+  nicho: "Parcerias intensas, porém fechadas entre poucos países.",
+  emergente: "Países na periferia da rede de colaboração.",
+};
+const ORDEM_QUADRANTES = ["motor", "basico", "nicho", "emergente"];
 
 const ANALISES = [
   { chave: "conceitual", nome: "Estrutura conceitual",
@@ -126,12 +159,21 @@ const estado = {
   pedidoGrupo: 0,
   desatualizada: false,
   aplicandoAnalise: false,
+  avancado: false,
+  calculando: false,
+  pendente: false,
+  autoFreq: true,
+  temporizadorPrevia: null,
+  docsToken: null,
 };
 
 document.addEventListener("DOMContentLoaded", iniciar);
 
 async function iniciar() {
   prepararZoomEstrategico();
+  let avancado = false;
+  try { avancado = localStorage.getItem("redes.avancado") === "1"; } catch (_) { /* sem armazenamento */ }
+  aplicarModo(avancado);
   ligarEventos();
   aplicaMenuRecolhido(localStorage.getItem("redes.menu.recolhido") === "1");
   $("freqValor").textContent = String(estado.freq);
@@ -223,8 +265,18 @@ function ligarEventos() {
 
   $("freqMenos").addEventListener("click", () => mudaFrequencia(-1));
   $("freqMais").addEventListener("click", () => mudaFrequencia(1));
+  $("modoAvancado").addEventListener("change", (evento) => {
+    mudarModo(evento.target.checked);
+  });
   $("periodo").addEventListener("change", () => {
-    if (estado.projeto) previsualizar();
+    if (!estado.projeto) return;
+    if (estado.avancado) {
+      previsualizar();
+    } else {
+      redefinirFrequencia();
+      mostrarCarregandoResumo();
+      agendarPrevia();
+    }
   });
   for (const id of ["unidade", "matriz", "similaridade", "algoritmo",
                     "mapeadores", "palavras", "corte", "rede"]) {
@@ -432,6 +484,7 @@ function aplicarProjeto(projeto) {
   estado.execucoes = [];
   estado.contador = 0;
   estado.token = null;
+  redefinirFrequencia();
   localStorage.setItem("scimatpy.projeto", projeto.caminho);
 
   $("projetoNome").textContent = projeto.nome;
@@ -474,7 +527,9 @@ function aplicarProjeto(projeto) {
 }
 
 function limparResultado() {
+  renderizarResumoVazio("Calculando o resumo…");
   limparRedeInterativa();
+  redeUI.carregada = false;
   $("figHalo").hidden = true;
   $("figEstrategico").hidden = true;
   $("figAgrupamentos").hidden = true;
@@ -558,21 +613,35 @@ function selecionarAba(chave) {
   if (chave === "longitudinal") compararPeriodos();
 }
 
-function aplicarAbas(chave) {
+function abasDaAnalise(chave) {
   const cfg = CONFIG_ABAS[chave];
-  let abas = cfg ? cfg.abas : ABAS_TODAS;
-  const padrao = cfg ? cfg.padrao : "rede";
+  let abas = cfg ? ["resumo", ...cfg.abas] : ABAS_TODAS;
   const totalPeriodos = estado.projeto ? estado.projeto.periodos.length : 0;
   if (totalPeriodos < 2) abas = abas.filter((aba) => aba !== "longitudinal");
+  if (!estado.avancado) abas = abas.filter((aba) => ABAS_SIMPLES.includes(aba));
+  return abas;
+}
+
+// manter: preserva a aba atual quando ela continua disponível.
+function aplicarAbas(chave, manter = false) {
+  const cfg = CONFIG_ABAS[chave];
+  const abas = abasDaAnalise(chave);
   const abaRede = document.querySelector('.aba[data-aba="rede"]');
   if (abaRede) abaRede.textContent = (cfg && cfg.redeRotulo) || "Rede";
   for (const aba of document.querySelectorAll(".aba[data-aba]")) {
     aba.classList.toggle("oculta", !abas.includes(aba.dataset.aba));
   }
-  selecionarAba(padrao);
+  const atual = document.querySelector(".aba.ativa");
+  if (manter && atual && abas.includes(atual.dataset.aba)) {
+    ajustarCorteAbas();
+    return;
+  }
+  selecionarAba("resumo");
+  ajustarCorteAbas();
 }
 
 const BLOCO_POR_ABA = {
+  resumo: "blocoResumo",
   rede: "blocoRede",
   paises: "blocoPaises",
   diagrama: "blocoDiagrama",
@@ -583,9 +652,21 @@ const BLOCO_POR_ABA = {
   longitudinal: "blocoLongitudinal",
 };
 
+function abaAtual() {
+  const aba = document.querySelector(".aba.ativa");
+  return aba ? aba.dataset.aba : "";
+}
+
 function mostrarAba(chave) {
   const alvo = BLOCO_POR_ABA[chave];
   if (!alvo) return;
+  // Rede interativa e lista de documentos só são buscadas quando a aba abre.
+  if (chave === "rede" && estado.resultado && !redeUI.carregada) {
+    carregarRedeInterativa(estado.resultado);
+  }
+  if (chave === "documentos" && estado.token && estado.docsToken !== estado.token) {
+    carregarDocumentos();
+  }
   for (const bloco of document.querySelectorAll("[data-bloco]")) {
     const visivel = bloco.dataset.bloco === alvo;
     bloco.classList.toggle("oculta", !visivel);
@@ -688,7 +769,14 @@ function escolherAnalise(chave, executar) {
     return;
   }
   aplicarAnalise(chave);
-  if (executar) previsualizar();
+  if (!executar) return;
+  if (estado.avancado) {
+    previsualizar();
+  } else {
+    redefinirFrequencia();
+    mostrarCarregandoResumo();
+    agendarPrevia();
+  }
 }
 
 function aplicarAnalise(chave) {
@@ -743,37 +831,167 @@ function marcarDesatualizada() {
   selo.classList.add("alerta");
 }
 
+/* ------------------------------------------------------- modo simples/avançado */
+
+function aplicarModo(avancado) {
+  estado.avancado = avancado;
+  document.body.classList.toggle("modo-avancado", avancado);
+  $("modoAvancado").checked = avancado;
+}
+
+function mudarModo(avancado) {
+  aplicarModo(avancado);
+  try { localStorage.setItem("redes.avancado", avancado ? "1" : "0"); } catch (_) { /* sem armazenamento */ }
+  aplicarAbas($("analise").value, true);
+  if (!avancado && estado.projeto && estado.resultado) {
+    // Volta ao modo simples: recalcula com a frequência mínima automática.
+    redefinirFrequencia();
+    mostrarCarregandoResumo();
+    agendarPrevia();
+  }
+}
+
+/* ------------------------------------------------------- execução da prévia */
+
+function agendarPrevia(atraso = 350) {
+  clearTimeout(estado.temporizadorPrevia);
+  estado.temporizadorPrevia = setTimeout(previsualizar, atraso);
+}
+
+function atualizarFrequenciaTela() {
+  $("freqValor").textContent = String(estado.freq);
+  $("freqMenos").disabled = estado.freq <= 1;
+}
+
+function redefinirFrequencia() {
+  estado.freq = 1;
+  estado.autoFreq = true;
+  atualizarFrequenciaTela();
+  mostrarNotaAuto("");
+}
+
+function mostrarNotaAuto(texto) {
+  const nota = $("notaAuto");
+  nota.textContent = texto;
+  nota.hidden = !texto;
+}
+
+function plural(n, singular, pluralTexto) {
+  return `${nf.format(n)} ${n === 1 ? singular : pluralTexto}`;
+}
+
+function substantivoGrupo(resultado) {
+  if (resultado.parametros.matriz === "BasicCoupling") {
+    return ["frente de pesquisa", "frentes de pesquisa"];
+  }
+  return SUBSTANTIVO_GRUPO[resultado.parametros.unidade] || ["grupo", "grupos"];
+}
+
+function analisar() {
+  return api("/api/analisa", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(parametros()),
+  });
+}
+
+// Modo simples: sobe a frequência mínima até sobrarem poucos temas, sem
+// deixar a análise vazia, e explica o que foi feito.
+async function ajustarFrequencia(resultado) {
+  const inicial = estado.freq;
+  const temasInicial = resultado.grupos.length;
+  const [sing, plur] = substantivoGrupo(resultado);
+  let atual = resultado;
+  let recusado = null;
+  while (atual.grupos.length > LIMITE_TEMAS && estado.freq < FREQUENCIA_MAXIMA_AUTO) {
+    if (estado.pendente) return atual;
+    estado.freq += 1;
+    atualizarFrequenciaTela();
+    $("estadoTexto").textContent = `Ajustando frequência (${estado.freq})…`;
+    let proximo = null;
+    try { proximo = await analisar(); } catch (_) { proximo = null; }
+    if (!proximo || proximo.grupos.length < MINIMO_TEMAS) {
+      recusado = proximo ? proximo.grupos.length : 0;
+      estado.freq -= 1;
+      atualizarFrequenciaTela();
+      if (estado.pendente) return atual;
+      atual = await analisar();
+      break;
+    }
+    atual = proximo;
+  }
+
+  const final = atual.grupos.length;
+  const partes = [];
+  if (estado.freq > inicial) {
+    partes.push(`Frequência mínima ajustada de ${inicial} para ${estado.freq} para evitar ` +
+      `pulverização: eram ${plural(temasInicial, sing, plur)}, agora ${final}.`);
+  } else if (recusado !== null) {
+    partes.push(`Há ${plural(temasInicial, sing, plur)}, mas subir a frequência mínima ` +
+      `deixaria só ${recusado}; mantive ${estado.freq}.`);
+  }
+  if (estado.freq > inicial && recusado !== null) {
+    partes.push(`Subir mais deixaria só ${recusado}.`);
+  }
+  if (final > LIMITE_TEMAS && recusado === null && estado.freq > inicial) {
+    partes.push(`Ainda restam ${plural(final, sing, plur)}; use + e − para ajustar.`);
+  }
+  mostrarNotaAuto(partes.join(" "));
+  return atual;
+}
+
 async function previsualizar() {
   if (!estado.projeto) return;
+  clearTimeout(estado.temporizadorPrevia);
   if (trabalhoEmAndamento()) {
     mostrarToast("Aguarde a grade terminar para pré-visualizar.", true);
     return;
   }
-  const botao = $("btnPreview");
-  if (botao.disabled && botao.dataset.calculando === "1") return;
+  if (estado.calculando) {
+    // Já há um cálculo em curso: refaz com os parâmetros novos ao terminar.
+    estado.pendente = true;
+    return;
+  }
 
+  estado.calculando = true;
+  estado.pendente = false;
+  const botao = $("btnPreview");
   botao.dataset.calculando = "1";
   botao.disabled = true;
   botao.textContent = "Calculando…";
   $("carregandoHalo").hidden = false;
   $("carregandoEstrategico").hidden = false;
+  $("estadoTexto").textContent = "Calculando…";
+  if (!estado.resultado || estado.desatualizada) mostrarCarregandoResumo();
 
   try {
-    const resultado = await api("/api/analisa", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(parametros()),
-    });
-    estado.resultado = resultado;
-    renderizarResultado(resultado);
+    let resultado = await analisar();
+    if (!estado.avancado && estado.autoFreq) {
+      resultado = await ajustarFrequencia(resultado);
+    } else {
+      mostrarNotaAuto("");
+    }
+    if (!estado.pendente) {
+      estado.resultado = resultado;
+      renderizarResultado(resultado);
+    }
   } catch (erro) {
     mostrarToast(erro.message, true);
+    renderizarResumoVazio(erro.message);
   } finally {
+    estado.calculando = false;
     botao.dataset.calculando = "0";
-    botao.disabled = false;
+    botao.disabled = !estado.projeto || trabalhoEmAndamento();
     botao.textContent = "Pré-visualizar";
     $("carregandoHalo").hidden = true;
     $("carregandoEstrategico").hidden = true;
+    if (!trabalhoEmAndamento()) {
+      $("estadoTexto").textContent = estado.projeto ? "Base importada" : "Sem projeto";
+    }
+    if (estado.pendente) {
+      estado.pendente = false;
+      previsualizar();
+    }
   }
 }
 
@@ -783,6 +1001,7 @@ function renderizarResultado(resultado) {
   $("seloPrevia").textContent = "Prévia sob demanda";
   $("seloPrevia").classList.remove("alerta");
   fecharDrawer();
+  renderizarResumo(resultado);
   const resumo = resultado.resumo;
   const unidade = UNIDADES[resultado.parametros.unidade];
 
@@ -889,7 +1108,9 @@ function renderizarResultado(resultado) {
 
   prepararZoomEstrategico();
   if (zoomHalo) zoomHalo.reset();
-  carregarRedeInterativa(resultado);
+  limparRedeInterativa();
+  redeUI.carregada = false;
+  if (abaAtual() === "rede") carregarRedeInterativa(resultado);
   if (halo) $("zoomHalo").hidden = false;
 
   $("estatHalo").replaceChildren(
@@ -909,13 +1130,193 @@ function renderizarResultado(resultado) {
   renderizarIndices(resultado);
   $("exportarTipo").disabled = false;
   $("btnRelatorio").disabled = false;
-  carregarDocumentos();
+  estado.docsToken = null;
+  if (abaAtual() === "documentos") carregarDocumentos();
   $("mapasLongitudinais").hidden = true;
   $("vazioLongitudinal").hidden = false;
   $("vazioLongitudinal").textContent =
     "Abra a aba Comparar períodos para montar os mapas.";
   $("downloadEvolucao").hidden = true;
   $("linkGrupos").textContent = `${resumo.grupos} grupos`;
+}
+
+
+/* ------------------------------------------------------------------- resumo */
+
+// "STATISTICAL-REASONING" vira "Statistical reasoning"; nomes de pessoas e
+// países ficam com cada palavra capitalizada.
+function nomeLegivel(texto, unidade) {
+  const base = String(texto || "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  if (!base) return "—";
+  if (["Authors", "AuthorsReference", "Countries"].includes(unidade)) {
+    return base.replace(/(^|\s)(\p{L})/gu, (_, espaco, letra) => espaco + letra.toUpperCase());
+  }
+  return base.charAt(0).toUpperCase() + base.slice(1);
+}
+
+function itemLegivel(texto, unidade) {
+  const base = nomeLegivel(texto, unidade);
+  return ["Authors", "AuthorsReference", "Countries"].includes(unidade)
+    ? base : base.charAt(0).toLowerCase() + base.slice(1);
+}
+
+function listaComE(itens) {
+  try {
+    return new Intl.ListFormat("pt-BR", { style: "long", type: "conjunction" }).format(itens);
+  } catch (_) {
+    return itens.length > 1
+      ? `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}` : itens.join("");
+  }
+}
+
+function mostrarCarregandoResumo() {
+  const p = document.createElement("p");
+  p.className = "resumo-carregando";
+  p.textContent = "Calculando o resumo…";
+  $("resumoCorpo").replaceChildren(p);
+  $("metaResumo").textContent = "—";
+}
+
+function renderizarResumoVazio(texto) {
+  const p = document.createElement("p");
+  p.className = "resumo-vazio";
+  p.textContent = texto;
+  $("resumoCorpo").replaceChildren(p);
+  $("metaResumo").textContent = "—";
+}
+
+function elemento(tag, classe, texto) {
+  const el = document.createElement(tag);
+  if (classe) el.className = classe;
+  if (texto !== undefined) el.textContent = texto;
+  return el;
+}
+
+function linhaTema(grupo, unidade, maximo, comQuadrante) {
+  const linha = elemento("button", `tema-linha ${grupo.quadrante}`);
+  linha.type = "button";
+  linha.addEventListener("click", () => abrirGrupo(grupo.selo));
+  const nome = nomeLegivel(grupo.rotulo, unidade);
+  const docs = grupo.documentos || 0;
+  const selo = elemento("span", `selo ${grupo.quadrante}`, String(grupo.selo));
+  const titulo = elemento("span", "tema-nome", nome);
+  titulo.title = nome;
+  const contagem = elemento("span", "tema-docs", plural(docs, "doc", "docs"));
+  const barra = elemento("span", "tema-barra");
+  const preenchimento = document.createElement("i");
+  preenchimento.style.width = `${Math.max(3, Math.round((docs / maximo) * 100))}%`;
+  barra.append(preenchimento);
+  let itens = (grupo.nos || []).slice(0, 4).map((no) => itemLegivel(no, unidade)).join(" · ");
+  if (comQuadrante) {
+    itens = `${rotuloQuadrante(grupo.quadrante, unidade)} · ${itens}`;
+  }
+  const lista = elemento("span", "tema-itens", itens);
+  lista.title = (grupo.nos || []).map((no) => itemLegivel(no, unidade)).join(", ");
+  linha.append(selo, titulo, contagem, barra, lista);
+  return linha;
+}
+
+function renderizarResumo(resultado) {
+  const corpo = $("resumoCorpo");
+  const unidade = resultado.parametros.unidade;
+  const grupos = resultado.grupos || [];
+  const totalDocs = resultado.resumo.documentos;
+  const [sing, plur] = substantivoGrupo(resultado);
+  $("metaResumo").textContent =
+    `${resultado.periodo.nome} · frequência mínima ${resultado.parametros.minimo_frequencia}`;
+
+  if (!grupos.length) {
+    renderizarResumoVazio("Nenhum agrupamento nesta configuração. Reduza a frequência mínima.");
+    return;
+  }
+
+  const porDocs = [...grupos].sort((a, b) =>
+    (b.documentos - a.documentos) || (b.itens - a.itens) || (a.selo - b.selo));
+  const maximo = Math.max(1, porDocs[0].documentos || 1);
+
+  // Temas visíveis: com pelo menos 3 documentos, no máximo 12. Se sobrarem
+  // menos de 4, baixa a régua para 2 documentos e, em último caso, mostra os
+  // 6 maiores: um resumo vazio não ajuda, mas 12 temas de 1 documento também não.
+  let visiveis = porDocs.filter((g) => g.documentos >= DOCS_MINIMOS_RESUMO);
+  if (visiveis.length < MINIMO_TEMAS) visiveis = porDocs.filter((g) => g.documentos >= 2);
+  if (visiveis.length < MINIMO_TEMAS) visiveis = porDocs.slice(0, 6);
+  visiveis = visiveis.slice(0, MAXIMO_TEMAS_RESUMO);
+  const conjuntoVisiveis = new Set(visiveis.map((g) => g.selo));
+  const pequenos = porDocs.filter((g) => !conjuntoVisiveis.has(g.selo));
+
+  // Frase de leitura
+  const motores = porDocs.filter((g) => g.quadrante === "motor");
+  const nomesMotores = motores.slice(0, 3).map((g) => nomeLegivel(g.rotulo, unidade));
+  const rotuloMotor = unidade === "Words"
+    ? (motores.length === 1 ? "Tema motor" : "Temas motores")
+    : (unidade === "Countries" ? "Núcleo"
+      : (motores.length === 1 ? "Grupo motor" : "Grupos motores"));
+  const verbo = totalDocs === 1 ? "forma" : "formam";
+  const frase = `${plural(totalDocs, "documento", "documentos")} ${verbo} ` +
+    `${plural(grupos.length, sing, plur)}.`;
+  const listaMotores = listaComE(nomesMotores);
+  const fraseMotor = nomesMotores.length
+    ? `${rotuloMotor}: ${listaMotores}${listaMotores.endsWith(".") ? "" : "."}`
+    : (unidade === "Words" ? "Nenhum tema motor nesta configuração." : "Nenhum grupo motor nesta configuração.");
+
+  const leitura = elemento("div", "resumo-leitura");
+  leitura.append(elemento("div", "rotulo-secao", "Leitura rápida"),
+    elemento("p", "", frase), elemento("p", "", fraseMotor));
+
+  const blocos = [leitura];
+
+  // Etiqueta genérica: um tema que cobre quase todo o corpus.
+  const generico = unidade === "Words" && totalDocs
+    ? porDocs.find((g) => g.documentos / totalDocs >= FRACAO_TEMA_GENERICO) : null;
+  if (generico) {
+    const pct = Math.round((generico.documentos / totalDocs) * 100);
+    const aviso = elemento("div", "resumo-aviso");
+    const texto = elemento("span", "",
+      `"${nomeLegivel(generico.rotulo, unidade)}" cobre ${pct}% dos documentos ` +
+      `(${generico.documentos} de ${totalDocs}). Etiquetas genéricas, como o nome do ` +
+      "periódico ou da área, escondem os demais temas: considere ignorá-la na Base.");
+    const botao = elemento("button", "botao-mini", "Abrir Base");
+    botao.type = "button";
+    botao.addEventListener("click", abrirBase);
+    aviso.append(texto, botao);
+    blocos.push(aviso);
+  }
+
+  // Temas por quadrante
+  const interpretacao = unidade === "Countries" ? INTERPRETACAO_PAISES : INTERPRETACAO;
+  const grade = elemento("div", "resumo-quadrantes");
+  for (const chave of ORDEM_QUADRANTES) {
+    const doQuadrante = visiveis.filter((g) => g.quadrante === chave);
+    const totalQuadrante = grupos.filter((g) => g.quadrante === chave).length;
+    const bloco = elemento("section", `quadrante-bloco ${chave}`);
+    const cab = elemento("div", "quadrante-cab");
+    cab.append(elemento("h3", "", rotuloQuadrante(chave, unidade)),
+      elemento("span", "qtd", plural(totalQuadrante, sing, plur)));
+    bloco.append(cab, elemento("p", "", interpretacao[chave]));
+    if (doQuadrante.length) {
+      for (const grupo of doQuadrante) bloco.append(linhaTema(grupo, unidade, maximo, false));
+    } else {
+      bloco.append(elemento("div", "nenhum",
+        totalQuadrante ? `Só ${plur} de poucos documentos, em “Outros”.` : "Nenhum nesta análise."));
+    }
+    grade.append(bloco);
+  }
+  blocos.push(grade);
+
+  if (pequenos.length) {
+    const detalhes = elemento("details", "resumo-outros");
+    const fem = sing.startsWith("frente");
+    const nomePequenos = pequenos.length === 1
+      ? `${fem ? "Outra" : "Outro"} ${sing} ${fem ? "pequena" : "pequeno"}`
+      : `${fem ? "Outras" : "Outros"} ${pequenos.length} ${plur} ${fem ? "pequenas" : "pequenos"}`;
+    detalhes.append(elemento("summary", "", nomePequenos));
+    const lista = elemento("div", "lista");
+    for (const grupo of pequenos) lista.append(linhaTema(grupo, unidade, maximo, true));
+    detalhes.append(lista);
+    blocos.push(detalhes);
+  }
+
+  corpo.replaceChildren(...blocos);
 }
 
 function renderizarTabela(resultado) {
@@ -1079,7 +1480,7 @@ function renderizarDrawer(dados) {
       numeros.append(
         document.createTextNode("freq "), forte(item.frequencia),
         document.createTextNode("  ·  grau "), forte(nf.format(item.grau)),
-        document.createTextNode("  ·  "), forte(item.documentos), texto(" docs"),
+        document.createTextNode("  ·  "), forte(item.documentos), texto(item.documentos === 1 ? " doc" : " docs"),
       );
 
       linha.append(nome, numeros);
@@ -1372,10 +1773,14 @@ function nomeSemExtensao(nome) {
 
 function mudaFrequencia(passo) {
   estado.freq = Math.max(1, Math.min(50, estado.freq + passo));
-  $("freqValor").textContent = String(estado.freq);
-  $("freqMenos").disabled = estado.freq <= 1;
-  marcarDesatualizada();
-  marcarPersonalizada();
+  estado.autoFreq = false;
+  atualizarFrequenciaTela();
+  mostrarNotaAuto("");
+  if (estado.avancado) {
+    marcarDesatualizada();
+  } else {
+    agendarPrevia(500);
+  }
 }
 
 async function abrirModal() {
@@ -1673,6 +2078,7 @@ const redeUI = {
   porGrupo: null,
   posicao: new Map(),
   avisouTodos: false,
+  carregada: false,
 };
 
 function limparRedeInterativa() {
@@ -1699,6 +2105,7 @@ function limparRedeInterativa() {
 
 async function carregarRedeInterativa(resultado) {
   limparRedeInterativa();
+  redeUI.carregada = true;
   if (!estado.token || !resultado.resumo.grupos) return;
   const pedido = ++redeUI.pedido;
   $("carregandoHalo").hidden = false;
@@ -2293,11 +2700,14 @@ function renderizarIndices(resultado) {
 async function carregarDocumentos() {
   const corpo = $("documentosCorpo");
   if (!estado.token) return;
+  const token = estado.token;
+  estado.docsToken = token;
   const busca = $("buscaDocumentos").value.trim();
   corpo.replaceChildren(linhaVazia("lendo os documentos…", 6));
   try {
-    const dados = await api(`/api/documentos?token=${encodeURIComponent(estado.token)}` +
+    const dados = await api(`/api/documentos?token=${encodeURIComponent(token)}` +
       `&busca=${encodeURIComponent(busca)}`);
+    if (token !== estado.token) return;
     $("metaDocumentos").textContent = `${dados.total} documentos · ${dados.periodo}`;
     corpo.replaceChildren();
     if (!dados.documentos.length) {
@@ -2487,7 +2897,7 @@ function renderizarBase(base) {
     const contagem = document.createElement("span");
     contagem.className = "contagem";
     contagem.textContent =
-      `${periodo.documentos} docs · ${periodo.datas} datas`;
+      `${periodo.documentos} ${periodo.documentos === 1 ? "doc" : "docs"} · ${periodo.datas} datas`;
 
     const salvar = botaoMini("Salvar", () => editarBase({
       acao: "renomear-periodo", id: periodo.id, nome: nome.value,
@@ -2640,7 +3050,7 @@ const mapaUI = {
 };
 
 async function carregarMapa(token) {
-  if (!token) return;
+  if (!token || token !== estado.token) return;
   const pedido = ++mapaUI.pedido;
   try {
     const resposta = await fetch(
@@ -3000,7 +3410,7 @@ const diagramaUI = {
 };
 
 async function carregarDiagrama(token) {
-  if (!token) return;
+  if (!token || token !== estado.token) return;
   $("legendaDiagrama").hidden = true;
   const pedido = ++diagramaUI.pedido;
   try {
