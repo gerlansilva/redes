@@ -221,6 +221,7 @@ function renderizarBibliometria(painel, d) {
       graficoProducao(d.producao), "bib-larga") +
     secaoBib("Documentos acumulados", "Total de documentos do corpus ao longo dos anos.",
       graficoAcumulado(d.producao), "bib-larga") +
+    secaoNuvem() + secaoRajadas() +
     '<div class="bib-grade">' +
     secaoBib("Autores mais produtivos", "Por número de documentos; h calculado dentro do corpus.", tabelaBib(colAutores, d.autores, "Autores")) +
     secaoBib("Fontes mais produtivas", "Periódicos que mais publicam no corpus.", tabelaBib(colFontes, d.fontes, "Fontes")) +
@@ -237,4 +238,113 @@ function renderizarBibliometria(painel, d) {
     secaoBib("Lei de Zipf", zipfTxt, graficoLogLog(d.zipf.pontos, "posto", "frequencia", null,
       "Posição da palavra", "Frequência")) +
     "</div>";
+  iniciarNuvem();
+  iniciarRajadas();
+}
+
+/* ------------------------------------------------- nuvem de palavras e rajadas */
+
+function secaoNuvem() {
+  return secaoBib("Nuvem de palavras",
+    "Os termos mais frequentes. Clique numa palavra para ocultá-la e recalcular.",
+    '<div class="bib-controles">' +
+    '<label>Fonte <select id="nuvemFonte"><option value="palavras">Palavras-chave dos autores</option>' +
+    '<option value="titulos">Títulos dos documentos</option></select></label>' +
+    '<label class="bib-so-titulos"><input type="checkbox" id="nuvemExpr"> Expressões de duas palavras</label>' +
+    '<label class="bib-so-titulos"><input type="checkbox" id="nuvemAcad" checked> Ocultar termos genéricos (estudo, análise, research…)</label>' +
+    '<label>Ocultar <input type="text" id="nuvemOcultar" placeholder="ex.: statistics, students"></label>' +
+    '<button type="button" class="botao-mini" id="nuvemAtualizar">Atualizar</button></div>' +
+    '<div id="nuvemSaida" class="bib-saida">Calculando…</div><div id="nuvemExtra"></div>',
+    "bib-larga");
+}
+
+function secaoRajadas() {
+  return secaoBib("Rajadas (bursts)",
+    "Termos cuja presença no corpus cresceu de repente, por Kleinberg (2002). A barra vermelha marca os anos da rajada.",
+    '<div class="bib-controles">' +
+    '<label>Termos <select id="rajadaTipo"><option value="palavras">Palavras-chave dos autores</option>' +
+    '<option value="referencias">Referências citadas</option></select></label>' +
+    '<label>Mínimo de documentos <select id="rajadaMinimo"><option value="2">2</option>' +
+    '<option value="3" selected>3</option><option value="5">5</option><option value="8">8</option></select></label></div>' +
+    '<div id="rajadaSaida" class="bib-saida">Calculando…</div>',
+    "bib-larga");
+}
+
+function pedirTexto(url) { return api(url); }
+
+async function atualizarNuvem() {
+  const saida = document.getElementById("nuvemSaida");
+  if (!saida || !estado.projeto) return;
+  const fonte = document.getElementById("nuvemFonte").value;
+  const titulos = fonte === "titulos";
+  for (const el of document.querySelectorAll(".bib-so-titulos")) el.hidden = !titulos;
+  const parametrosUrl = new URLSearchParams({
+    caminho: estado.projeto.caminho, fonte,
+    ocultar: document.getElementById("nuvemOcultar").value,
+    academicas: document.getElementById("nuvemAcad").checked ? "1" : "0",
+    expressoes: titulos && document.getElementById("nuvemExpr").checked ? "1" : "0",
+  });
+  saida.textContent = "Calculando…";
+  try {
+    const dados = await pedirTexto(`/api/nuvem?${parametrosUrl}`);
+    saida.innerHTML = dados.svg || '<p class="bib-vazio">Nenhum termo para mostrar.</p>';
+    const extra = document.getElementById("nuvemExtra");
+    extra.innerHTML = dados.expressoes && dados.expressoes.length
+      ? '<p class="bib-nota">Expressões frequentes nos títulos: ' +
+        dados.expressoes.map((e) => `${bibEsc(e.termo)} (${e.documentos})`).join(" · ") + "</p>" : "";
+  } catch (erro) {
+    saida.innerHTML = `<p class="bib-vazio">${bibEsc(erro.message)}</p>`;
+  }
+}
+
+function iniciarNuvem() {
+  const fonte = document.getElementById("nuvemFonte");
+  if (!fonte) return;
+  const saida = document.getElementById("nuvemSaida");
+  fonte.addEventListener("change", atualizarNuvem);
+  document.getElementById("nuvemExpr").addEventListener("change", atualizarNuvem);
+  document.getElementById("nuvemAcad").addEventListener("change", atualizarNuvem);
+  document.getElementById("nuvemAtualizar").addEventListener("click", atualizarNuvem);
+  document.getElementById("nuvemOcultar").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") atualizarNuvem();
+  });
+  saida.addEventListener("click", (evento) => {
+    const palavra = evento.target.closest("text[data-termo]");
+    if (!palavra) return;
+    const campo = document.getElementById("nuvemOcultar");
+    const atual = campo.value.split(",").map((t) => t.trim()).filter(Boolean);
+    if (!atual.includes(palavra.dataset.termo)) atual.push(palavra.dataset.termo);
+    campo.value = atual.join(", ");
+    atualizarNuvem();
+  });
+  atualizarNuvem();
+}
+
+async function atualizarRajadas() {
+  const saida = document.getElementById("rajadaSaida");
+  if (!saida || !estado.projeto) return;
+  const parametrosUrl = new URLSearchParams({
+    caminho: estado.projeto.caminho,
+    tipo: document.getElementById("rajadaTipo").value,
+    minimo: document.getElementById("rajadaMinimo").value,
+  });
+  saida.textContent = "Calculando…";
+  try {
+    const dados = await pedirTexto(`/api/rajadas?${parametrosUrl}`);
+    const avisos = (dados.avisos || []).map((a) => `<p class="bib-nota bib-aviso">${bibEsc(a)}</p>`).join("");
+    saida.innerHTML = avisos + (dados.svg ? `<div class="bib-rolagem">${dados.svg}</div>` : "") +
+      '<p class="bib-nota">Força: ganho de verossimilhança do estado de rajada (s = 2, γ = 1). ' +
+      "Diferente do CiteSpace, a contagem é de documentos do corpus que usam o termo ou citam a referência, " +
+      "e não de citações recebidas.</p>";
+  } catch (erro) {
+    saida.innerHTML = `<p class="bib-vazio">${bibEsc(erro.message)}</p>`;
+  }
+}
+
+function iniciarRajadas() {
+  const tipo = document.getElementById("rajadaTipo");
+  if (!tipo) return;
+  tipo.addEventListener("change", atualizarRajadas);
+  document.getElementById("rajadaMinimo").addEventListener("change", atualizarRajadas);
+  atualizarRajadas();
 }

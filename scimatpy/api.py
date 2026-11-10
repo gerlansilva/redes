@@ -1266,6 +1266,47 @@ class Manipulador(BaseHTTPRequestHandler):
                     (parametros.get("caminho") or [""])[0])
                 with ProjetoScimat(caminho) as kb:
                     self._json(200, bibliometria.calcula(kb.conexao))
+            elif rota == "/api/rajadas":
+                from . import rajadas
+                from .viz import descritiva
+                caminho = _valida_projeto((parametros.get("caminho") or [""])[0])
+                tipo = (parametros.get("tipo") or ["palavras"])[0]
+                try:
+                    minimo = int((parametros.get("minimo") or [rajadas.MINIMO_DOCUMENTOS])[0])
+                except ValueError:
+                    raise ErroApi("o mínimo de documentos precisa ser um número") from None
+                try:
+                    with ProjetoScimat(caminho) as kb:
+                        dados = rajadas.calcula(kb.conexao, tipo, minimo_documentos=max(1, minimo))
+                except ValueError as erro:
+                    raise ErroApi(str(erro)) from None
+                titulo = ("Palavras-chave com as rajadas mais fortes" if tipo == "palavras"
+                          else "Referências com as rajadas mais fortes")
+                dados["svg"] = descritiva.rajadas_svg(
+                    dados, titulo, "Palavras-chave" if tipo == "palavras" else "Referência")
+                self._json(200, dados)
+            elif rota == "/api/nuvem":
+                from . import termos
+                from .viz import descritiva
+                caminho = _valida_projeto((parametros.get("caminho") or [""])[0])
+                fonte = (parametros.get("fonte") or ["palavras"])[0]
+                ocultar = [t for t in re.split(r"[,;\n]", (parametros.get("ocultar") or [""])[0]) if t.strip()]
+                try:
+                    limite = max(10, min(150, int((parametros.get("limite") or ["70"])[0])))
+                except ValueError:
+                    raise ErroApi("o limite precisa ser um número") from None
+                try:
+                    with ProjetoScimat(caminho) as kb:
+                        dados = termos.nuvem_dados(
+                            kb.conexao, fonte, ocultar, limite,
+                            tirar_academicas=(parametros.get("academicas") or ["1"])[0] != "0",
+                            expressoes=(parametros.get("expressoes") or ["0"])[0] == "1")
+                except ValueError as erro:
+                    raise ErroApi(str(erro)) from None
+                dados["svg"] = descritiva.nuvem_svg(
+                    [(t["termo"], t["documentos"]) for t in dados["termos"]],
+                    "Nuvem de palavras")
+                self._json(200, dados)
             elif rota == "/api/documentos":
                 self._json(200, lista_documentos(
                     _param(parametros, "token"),

@@ -354,6 +354,7 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
     (destino / "misc" / "evolutionMap.net").write_text(
         longitudinal.evolucao_pajek(mapa), encoding="utf-8")
 
+    _pagina_bibliometria(destino, kb)
     _pagina_indice(destino, resultados, mapa, config, estendido)
     return {"html": str(destino), "periodos": len(resultados),
             "agrupamentos": sum(len(r.grupos) for r in resultados)}
@@ -373,6 +374,8 @@ def _pagina_indice(destino, resultados, mapa, config, estendido) -> None:
     corpo = [
         "<h1>Relatório — Redes</h1>",
         "<p>Relatório gerado automaticamente a partir do projeto analisado.</p>",
+        '<p><a href="bibliometria.html">Visão geral descritiva do corpus</a> '
+        "(produção, rankings, rajadas e nuvens de palavras)</p>",
         "<h2>Configuração da análise</h2>",
         _configuracao_tabela(config),
         "<h2>Resultados dos períodos</h2>",
@@ -391,6 +394,112 @@ def _pagina_indice(destino, resultados, mapa, config, estendido) -> None:
                      "documentos por mapeador, com citações e referências.</p>")
     (destino / "index.html").write_text(
         _pagina("Relatório — Redes", "\n".join(corpo)), encoding="utf-8")
+
+
+def _pagina_bibliometria(destino: Path, kb) -> None:
+    """Página da visão geral descritiva: o que a tela mostra, em HTML estático."""
+    from . import bibliometria, rajadas, termos
+    from .viz import descritiva
+
+    conexao = kb.conexao
+    dados = bibliometria.calcula(conexao)
+    if dados.get("vazio"):
+        return
+    imagens = destino / "images"
+    p = dados["principal"]
+
+    def num(valor, casas=0):
+        if valor is None:
+            return "—"
+        texto = f"{valor:,.{casas}f}"
+        return texto.replace(",", "X").replace(".", ",").replace("X", ".")
+
+    cartoes = [
+        ["Documentos", num(p["documentos"]), f'{p["primeiro_ano"]}–{p["ultimo_ano"]}'],
+        ["Autores", num(p["autores"]), f'{num(p["autores_por_documento"], 2)} por documento'],
+        ["Fontes", num(p["fontes"]), "periódicos do corpus"],
+        ["Palavras-chave", num(p["palavras_chave"]), "dos autores"],
+        ["Países", num(p["paises"]), "com afiliação"],
+        ["Referências", num(p["referencias"]), "distintas"],
+        ["Citações", num(p["citacoes"]), f'{num(p["citacoes_por_documento"], 2)} por documento'],
+        ["Crescimento anual", f'{num(p["crescimento_anual"], 1)}%'
+         if p["crescimento_anual"] is not None else "—", "taxa composta"],
+        ["Documentos de autor único", num(p["documentos_autor_unico"]), ""],
+        ["Índice de colaboração", num(p["indice_colaboracao"], 2), "autores por documento em coautoria"],
+    ]
+
+    def ranking(titulo, linhas, colunas):
+        cab = [c[0] for c in colunas]
+        corpo = [[_esc(l.get(c[1], "")) if not c[2] else num(l.get(c[1], 0)) for c in colunas]
+                 for l in linhas]
+        numericas = tuple(i for i, c in enumerate(colunas) if c[2])
+        return _tabela(cab, corpo, titulo, numericas=numericas)
+
+    corpo = [
+        '<p><a href="index.html">Índice</a></p>',
+        "<h1>Visão geral descritiva</h1>",
+        _tabela(["Indicador", "Valor", "Observação"], cartoes, "Informações principais",
+                numericas=(1,)),
+        "<h2>Produção e citações por ano</h2>",
+        descritiva.producao_svg(dados["producao"]),
+        '<p class="fonte">Barras: documentos por ano (eixo esquerdo). Linha: citações '
+        "recebidas pelos documentos publicados em cada ano (eixo direito).</p>",
+        "<h2>Autores, fontes e países</h2>",
+        ranking("Autores mais produtivos", dados["autores"],
+                [("Autor", "nome", 0), ("Documentos", "documentos", 1),
+                 ("Citações", "citacoes", 1), ("h", "h", 1)]),
+        ranking("Fontes mais produtivas", dados["fontes"],
+                [("Fonte", "nome", 0), ("Documentos", "documentos", 1), ("Citações", "citacoes", 1)]),
+        ranking("Países", dados["paises"],
+                [("País", "nome", 0), ("Documentos", "documentos", 1), ("Citações", "citacoes", 1)]),
+        ranking("Fontes mais citadas nas referências", dados["fontes_citadas"],
+                [("Fonte citada", "nome", 0), ("Documentos que citam", "documentos", 1)]),
+        ranking("Documentos mais citados", dados["mais_citados"],
+                [("Documento", "titulo", 0), ("Ano", "ano", 0), ("Citações", "citacoes", 1)]),
+        "<h2>Leis bibliométricas</h2>",
+        _tabela(["Lei", "Resultado"], [
+            ["Lotka", f'expoente estimado β = {num(dados["lotka"]["beta"], 2)} '
+                      f'(clássico: 2), {num(dados["lotka"]["autores"])} autores'],
+            ["Bradford", f'{num(dados["bradford"]["fontes"])} '
+                         f'{"fonte" if dados["bradford"]["fontes"] == 1 else "fontes"} em '
+                         f'{len(dados["bradford"]["zonas"])} '
+                         f'{"zona" if len(dados["bradford"]["zonas"]) == 1 else "zonas"}'],
+            ["Zipf", f'inclinação estimada {num(dados["zipf"]["expoente"], 2)} (clássico: 1), '
+                     f'{num(dados["zipf"]["palavras"])} palavras-chave'],
+        ], "Leis de Lotka, Bradford e Zipf"),
+    ]
+
+    # Nuvens de palavras
+    corpo.append("<h2>Nuvens de palavras</h2>")
+    for fonte, titulo in (("palavras", "Palavras-chave dos autores"), ("titulos", "Títulos dos documentos")):
+        nuvem = termos.nuvem_dados(conexao, fonte, limite=70)
+        svg = descritiva.nuvem_svg([(t["termo"], t["documentos"]) for t in nuvem["termos"]], titulo)
+        if svg:
+            corpo.append(f"<h3>{_esc(titulo)}</h3>")
+            corpo.append(svg)
+        if nuvem["expressoes"]:
+            corpo.append('<p class="fonte">Expressões frequentes: ' + " · ".join(
+                f'{_esc(e["termo"])} ({e["documentos"]})' for e in nuvem["expressoes"]) + ".</p>")
+    corpo.append('<p class="fonte">Nos títulos foram retiradas palavras vazias do português, '
+                 "inglês e espanhol e termos genéricos da escrita acadêmica; singular, plural e "
+                 "acento foram unidos.</p>")
+
+    # Rajadas
+    corpo.append("<h2>Rajadas (bursts)</h2>")
+    for tipo, titulo, rotulo in (("palavras", "Palavras-chave com as rajadas mais fortes", "Palavras-chave"),
+                                 ("referencias", "Referências com as rajadas mais fortes", "Referência")):
+        resultado = rajadas.calcula(conexao, tipo)
+        svg = descritiva.rajadas_svg(resultado, titulo, rotulo)
+        corpo.extend(f'<p class="fonte">{_esc(a)}</p>' for a in resultado["avisos"])
+        if svg:
+            nome = f"bursts-{tipo}.svg"
+            (imagens / nome).write_text(svg, encoding="utf-8")
+            corpo.append(f'<p><img src="images/{nome}" alt="{_esc(titulo)}" style="max-width:100%"></p>')
+    corpo.append('<p class="fonte">Rajadas pelo algoritmo de Kleinberg (s = 2, γ = 1). A contagem é de '
+                 "documentos do corpus que usam o termo ou citam a referência, não de citações recebidas.</p>")
+
+    (destino / "bibliometria.html").write_text(
+        _pagina("Visão geral descritiva — Redes", "\n".join(corpo)), encoding="utf-8")
 
 
 def _pagina_periodo(destino, resultado, grupos, indice) -> None:

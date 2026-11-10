@@ -30,7 +30,8 @@ normalizar, agrupar, medir, desenhar e relatar, sem depender da interface Java.
 | Mapa de colaboração entre países (interativo, com zoom e destaque) | pronto |
 | Diagrama estratégico (interativo, com SVG para exportar) | pronto |
 | Mapas longitudinais (evolução e sobreposição) | pronto |
-| Relatório HTML (com referências ABNT) | pronto |
+| Relatório HTML (com referências ABNT e página de visão geral descritiva) | pronto |
+| Visão geral descritiva: produção, rankings, leis de Lotka/Bradford/Zipf, nuvens de palavras e rajadas (Kleinberg) | pronto |
 | Carregadores nativos (BibTeX, RIS, CSV, OpenAlex, WoS, Scopus) | pronto |
 | Armazenamento próprio (`.redes` gravado pelo Python) | pronto: esquema do Bibliomapa (`v1_03`) mais as tabelas de países |
 | Exportações (Pajek, GraphML, XML de grupos, TSV) | pronto |
@@ -338,7 +339,7 @@ interface.
 
 1. Distribuição desktop com Tauri, reaproveitando o servidor local.
 2. Editor de sinônimos, stopwords e equivalências na interface.
-3. Bibliometria descritiva dentro do relatório HTML.
+3. Rajadas de autores e de países, além de palavras-chave e referências.
 4. Mapas de estabilidade e novidade, além de evolução e sobreposição.
 
 ## Testes

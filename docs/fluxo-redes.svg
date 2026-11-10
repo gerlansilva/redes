@@ -81,12 +81,12 @@
 <text x="1070" y="190.0" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">Estatística</text>
 <text x="1070" y="207.0" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">descritiva</text>
 <rect x="1200" y="90" width="450" height="210" rx="16" fill="#E6F8EE" stroke="#00A344" stroke-width="2.5"/>
-<text x="1425" y="122" font-size="18" font-weight="700" fill="#0B1F66" text-anchor="middle">Visão geral descritiva (na tela)</text>
+<text x="1425" y="122" font-size="18" font-weight="700" fill="#0B1F66" text-anchor="middle">Visão geral descritiva</text>
 <text x="1425" y="152" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Produção e citações por ano · acumulado</text>
 <text x="1425" y="176" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Autores, fontes, países e palavras-chave</text>
 <text x="1425" y="200" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Documentos mais citados · fontes citadas</text>
-<text x="1425" y="224" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Coautoria · índice h</text>
-<text x="1425" y="248" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Leis de Lotka, Bradford e Zipf</text>
+<text x="1425" y="224" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Coautoria · índice h · Lotka, Bradford, Zipf</text>
+<text x="1425" y="248" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Nuvens de palavras · rajadas (bursts)</text>
 <path d="M930,605 L930,700 L1200,700" fill="none" stroke="#0B1F66" stroke-width="3" stroke-linejoin="round" marker-end="url(#ponta)"/>
 <rect x="995.0" y="667.5" width="150" height="65" rx="9" fill="#DDE4FF" stroke="#2F2BFF" stroke-width="1.2"/>
 <text x="1070" y="686.5" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">Matriz de rede:</text>
@@ -117,8 +117,8 @@
 <text x="580" y="802" font-size="18" font-weight="700" fill="#0B1F66" text-anchor="middle">Saídas</text>
 <text x="175" y="836" font-size="14" font-weight="700" fill="#2F2BFF" text-anchor="middle">Relatório</text>
 <text x="175" y="859" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">somente HTML</text>
-<text x="175" y="880" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">redes e quadro de métricas</text>
-<text x="175" y="901" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">por período e por agrupamento</text>
+<text x="175" y="880" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">redes, quadro de métricas</text>
+<text x="175" y="901" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">e visão geral descritiva</text>
 <text x="445" y="836" font-size="14" font-weight="700" fill="#2F2BFF" text-anchor="middle">Redes e tabelas</text>
 <text x="445" y="859" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">Pajek · GraphML</text>
 <text x="445" y="880" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">TSV de índices e documentos</text>

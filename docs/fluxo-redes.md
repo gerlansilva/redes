@@ -12,7 +12,7 @@ O Redes segue a mesma lógica do bibliometrix até a matriz documento × item. D
 | 2 | **Limpar e unir** | Remove duplicatas (mesmo DOI, ou mesmo título e ano), une singular/plural e acento em português, espanhol e inglês, e define os períodos pelos anos do corpus. | Automático na importação |
 | 3 | **Projeto `.redes`** | Guarda tudo em um banco SQLite local, com grupos de palavras, autores e países, e a lista de termos ignorados. | Arquivo no seu computador |
 | 4 | **Matriz documento × item** | Cada documento recebe 1 ou 0 para cada palavra-chave, autor, referência, país ou periódico. | Interna |
-| 5a | **Visão geral descritiva** | Produção e citações por ano, rankings de autores, fontes, países e palavras-chave, documentos mais citados, coautoria e leis de Lotka, Bradford e Zipf. | Menu → Visão geral descritiva |
+| 5a | **Visão geral descritiva** | Produção e citações por ano, rankings de autores, fontes, países e palavras-chave, documentos mais citados, coautoria, leis de Lotka, Bradford e Zipf, nuvens de palavras (palavras-chave dos autores e títulos) e rajadas de palavras-chave e referências. | Menu → Visão geral descritiva |
 | 5b | **Matriz de rede** | A matriz vira co-ocorrência (itens que aparecem juntos) ou acoplamento (documentos que citam as mesmas referências). | Menu de análises |
 | 6 | **Rede do período** | Constrói uma rede por período, com a similaridade escolhida: equivalência, associação, inclusão, Jaccard ou Salton. | Aba Rede |
 | 7 | **Agrupamento** | Forma os temas por centros simples, ligação simples, completa, média, soma ou Louvain. | Modo avançado |
@@ -26,7 +26,7 @@ O Redes segue a mesma lógica do bibliometrix até a matriz documento × item. D
 | | Bibliometrix | Redes |
 |---|---|---|
 | Bases aceitas | Scopus, Web of Science, Dimensions, Lens, PubMed, Cochrane, OpenAlex | Scopus, Zotero, OpenAlex, Web of Science e CSV genérico |
-| Estatística descritiva | Sim | Sim (Visão geral descritiva) |
+| Estatística descritiva | Sim | Sim (Visão geral descritiva), incluindo nuvens de palavras e rajadas |
 | Mapeamento temático | Um mapa temático para todo o corpus | Um mapa **por período**, com comparação entre períodos |
 | Medida de desempenho dos temas | Citações e documentos | Documentos, citações, h, g, hg e q2, por mapeador |
 | Edição de grupos e termos | Por código em R | Por tela (Base), com desfazer |
@@ -34,7 +34,8 @@ O Redes segue a mesma lógica do bibliometrix até a matriz documento × item. D
 
 ## O que ainda falta neste fluxo
 
-- A visão geral descritiva aparece só na tela: ainda não entra no relatório HTML nem tem botão de CSV por tabela.
+- A visão geral descritiva já entra no relatório HTML, mas as tabelas ainda não têm botão de CSV.
+- As rajadas contam documentos do corpus, não citações recebidas como no CiteSpace, e ficam instáveis em corpora com menos de 100 documentos.
 - O Zotero não exporta referências, então cocitação e frentes de pesquisa só funcionam com CSV da Scopus.
 - Não há instalador para o Mac: o Redes roda pelo Terminal com `python3 -m scimatpy web`.
 

@@ -93,10 +93,10 @@ linhas(930, 548, ["palavras-chave · autores", "referências · países", "peri�
 seta([(930, 335), (930, 195), (1200, 195)])
 pilula(1070, 195, ["Estatística", "descritiva"], 130)
 caixa(1200, 90, 450, 210, FUNDO_B, VERDE, 16, 2.5)
-texto(1425, 122, "Visão geral descritiva (na tela)", 18, 700, ESCURO)
+texto(1425, 122, "Visão geral descritiva", 18, 700, ESCURO)
 linhas(1425, 152, ["Produção e citações por ano · acumulado", "Autores, fontes, países e palavras-chave",
-                   "Documentos mais citados · fontes citadas", "Coautoria · índice h",
-                   "Leis de Lotka, Bradford e Zipf"], 13, TINTA, "middle", 24)
+                   "Documentos mais citados · fontes citadas", "Coautoria · índice h · Lotka, Bradford, Zipf",
+                   "Nuvens de palavras · rajadas (bursts)"], 13, TINTA, "middle", 24)
 
 # Ramo 2: mapeamento científico
 seta([(930, 605), (930, 700), (1200, 700)])
@@ -122,7 +122,7 @@ for i, (t, l1, l2) in enumerate(etapas):
 caixa(30, 770, 1100, 190, "#fff", AZUL, 16, 2.5)
 texto(580, 802, "Saídas", 18, 700, ESCURO)
 colunas = [
-    ("Relatório", ["somente HTML", "redes e quadro de métricas", "por período e por agrupamento"]),
+    ("Relatório", ["somente HTML", "redes, quadro de métricas", "e visão geral descritiva"]),
     ("Redes e tabelas", ["Pajek · GraphML", "TSV de índices e documentos", "Grupos da base (XML)"]),
     ("Figuras", ["SVG e PNG", "diagrama estratégico", "rede em halos · mapas"]),
     ("Grade de análises", ["162 combinações", "unidade × matriz ×", "algoritmo × similaridade"]),
