@@ -54,7 +54,8 @@ def detecta_formato(caminho: str | Path) -> str:
     if "item type" in colunas and ({"publication year", "manual tags",
                                     "publication title"} & colunas):
         return "zotero"
-    if "openalex id" in colunas or "source keywords" in colunas:
+    if ("openalex id" in colunas or "source keywords" in colunas
+            or {"citation count", "author ids"} <= colunas):
         return "openalex"
     if ("index keywords" in colunas or "document type" in colunas
             or "author(s) id" in colunas or "eid" in colunas):
