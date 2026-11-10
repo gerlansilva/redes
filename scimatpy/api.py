@@ -865,6 +865,103 @@ def gera_relatorio(dados: dict) -> dict:
             "indice": f"/relatorio/{token}/index.html"}
 
 
+# Análises do relatório completo: (chave, rótulo, descrição, parâmetros, requisito em SQL).
+ANALISES_COMPLETO = [
+    ("conceitual", "Estrutura conceitual (palavras-chave)",
+     "Palavras-chave em co-ocorrência: os temas que estruturam o campo.",
+     {"unidade": "Words", "matriz": "CoOccurrence"},
+     "SELECT COUNT(*) FROM WordGroup WHERE COALESCE(stopGroup,0)=0", 3,
+     "a base não tem palavras-chave suficientes"),
+    ("autores", "Colaboração entre autores",
+     "Quem publica com quem, pela co-ocorrência de autores nos documentos.",
+     {"unidade": "Authors", "matriz": "CoOccurrence"},
+     "SELECT COUNT(*) FROM AuthorGroup WHERE COALESCE(stopGroup,0)=0", 3,
+     "a base não tem autores suficientes"),
+    ("paises", "Colaboração entre países",
+     "Cooperação internacional: países que assinam os mesmos documentos.",
+     {"unidade": "Countries", "matriz": "CoOccurrence"},
+     "SELECT COUNT(*) FROM CountryGroup WHERE COALESCE(stopGroup,0)=0", 2,
+     "a base não traz país de afiliação (precisa de ao menos dois países)"),
+    ("referencias", "Cocitação de referências",
+     "Obras citadas em conjunto pelos documentos do corpus.",
+     {"unidade": "References", "matriz": "CoOccurrence"},
+     "SELECT COUNT(*) FROM ReferenceGroup", 3,
+     "a base não traz referências"),
+    ("citados", "Cocitação de autores",
+     "Autores citados em conjunto, formando a base intelectual do campo.",
+     {"unidade": "AuthorsReference", "matriz": "CoOccurrence"},
+     "SELECT COUNT(*) FROM AuthorReferenceGroup", 3,
+     "a base não traz referências"),
+    ("frentes", "Frentes de pesquisa (acoplamento bibliográfico)",
+     "Documentos ligados por referências compartilhadas.",
+     {"unidade": "References", "matriz": "BasicCoupling"},
+     "SELECT COUNT(*) FROM ReferenceGroup", 3,
+     "a base não traz referências"),
+    ("veiculos", "Periódicos citados",
+     "Periódicos citados em conjunto nas referências do corpus.",
+     {"unidade": "ReferenceSources", "matriz": "CoOccurrence"},
+     "SELECT COUNT(*) FROM ReferenceSourceGroup WHERE COALESCE(stopGroup,0)=0", 3,
+     "a base não traz referências"),
+]
+
+
+def gera_relatorio_completo(dados: dict) -> dict:
+    """Uma análise por seção (as que a base permite), num relatório só."""
+    from . import report
+
+    caminho = _valida_projeto(dados.get("projeto", ""))
+    base = {k: v for k, v in dados.items()
+            if k in ("similaridade", "algoritmo", "ignorar", "tamanho_minimo", "tamanho_maximo")}
+    medida = dados.get("medida_temporal", "EquivalenceIndex")
+
+    with ProjetoScimat(caminho) as kb:
+        periodos = kb.periodos()
+        if not periodos:
+            raise ErroApi("o projeto não tem períodos")
+        token = secrets.token_urlsafe(10)
+        destino = CACHE / f"rel-{token}"
+        destino.mkdir(parents=True, exist_ok=True)
+
+        secoes, ignoradas = [], []
+        for chave, rotulo, descricao, parametros, sql, minimo, motivo in ANALISES_COMPLETO:
+            disponivel = kb.conexao.execute(sql).fetchone()[0]
+            if disponivel < minimo:
+                ignoradas.append({"rotulo": rotulo, "motivo": motivo + "."})
+                continue
+            escolhida = None
+            for frequencia in (2, 1):
+                config = _config({**base, **parametros, "minimo_frequencia": frequencia})
+                resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
+                if sum(len(r.grupos) for r in resultados) > 0:
+                    escolhida = (config, frequencia)
+                    break
+            if escolhida is None:
+                ignoradas.append({"rotulo": rotulo,
+                                  "motivo": "nenhum agrupamento se formou com os dados disponíveis."})
+                continue
+            config, frequencia = escolhida
+            pasta = f"{chave}"
+            token_voltar = report._VOLTAR.set("../index.html")
+            try:
+                resumo = report.gera_html(destino / pasta, kb, periodos, config, False, medida,
+                                          com_bibliometria=False, devolve_resultados=True)
+            finally:
+                report._VOLTAR.reset(token_voltar)
+            secoes.append({"rotulo": rotulo, "descricao": descricao + f" Frequência mínima {frequencia}.",
+                           "pasta": pasta, "config": config, "resultados": resumo["resultados"]})
+        if not secoes:
+            raise ErroApi("Nenhuma análise de mapeamento pôde ser gerada com esta base.")
+        report._pagina_bibliometria(destino, kb)
+        report.gera_pagina_completa(destino, kb, secoes, ignoradas)
+
+    with TRAVA_REGISTRO:
+        RELATORIOS[token] = destino
+        while len(RELATORIOS) > 5:
+            RELATORIOS.popitem(last=False)
+    return {"token": token, "url": f"/relatorio/{token}/index.html",
+            "secoes": [s["rotulo"] for s in secoes], "ignoradas": ignoradas}
+
+
 def gera_longitudinal(dados: dict) -> dict:
     """Monta os mapas de evolução e sobreposição de todos os períodos."""
     from . import longitudinal
@@ -1412,6 +1509,8 @@ class Manipulador(BaseHTTPRequestHandler):
                 self._json(200, sugere_grafias(self._json_pedido()))
             elif rota == "/api/relatorio":
                 self._json(200, gera_relatorio(self._json_pedido()))
+            elif rota == "/api/relatorio-completo":
+                self._json(200, gera_relatorio_completo(self._json_pedido()))
             elif rota == "/api/longitudinal":
                 self._json(200, gera_longitudinal(self._json_pedido()))
             elif rota.startswith("/api/trabalho/") and rota.endswith("/cancelar"):

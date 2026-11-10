@@ -125,5 +125,26 @@ class PluralELacunasTest(unittest.TestCase):
         self.assertNotIn("Sem países", texto)
 
 
+class RelatorioCompletoTest(unittest.TestCase):
+    def test_gera_secoes_e_explica_o_que_falta(self):
+        from scimatpy import api
+        docs = [DocumentoFonte(
+            titulo=f"Doc {i}", ano=str(2015 + i % 6), periodico="R",
+            autores=[f"Autor {i % 5} A.", f"Autor {i % 3 + 5} B.", "Autor Z Z."],
+            palavras_autor=[f"tema {i % 4}", f"tema {i % 3 + 4}", "geral"]) for i in range(40)]
+        caminho = Path(tempfile.mkdtemp()) / "c.redes"
+        build.constroi(docs, caminho, periodos=[("A", 2015, 2017), ("B", 2018, 2020)])
+        r = api.gera_relatorio_completo({"projeto": str(caminho)})
+        self.assertTrue(r["secoes"])
+        self.assertTrue(any("referências" in i["motivo"] for i in r["ignoradas"]))
+        pasta = api.RELATORIOS[r["token"]]
+        index = (pasta / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Relatório completo", index)
+        self.assertIn("Por período", index)
+        self.assertTrue((pasta / "bibliometria.html").exists())
+        self.assertIn("Relatório completo", (pasta / "conceitual" / "period0.html").read_text(encoding="utf-8")
+                      if (pasta / "conceitual" / "period0.html").exists() else "Relatório completo")
+
+
 if __name__ == "__main__":
     unittest.main()

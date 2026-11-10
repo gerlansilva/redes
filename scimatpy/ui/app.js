@@ -1818,9 +1818,45 @@ function fecharModal() {
 }
 
 /* Atalhos da barra lateral: cada item leva a uma parte da mesma página. */
+async function gerarRelatorioCompleto() {
+  if (!estado.projeto) {
+    mostrarToast("Abra um projeto para gerar o relatório.", true);
+    return;
+  }
+  const item = $("navRelatorio");
+  const texto = item.querySelector(".nav-texto");
+  item.disabled = true;
+  texto.textContent = "Gerando…";
+  try {
+    const dados = { projeto: estado.projeto.caminho, ignorar: estado.ignorar };
+    const relatorio = await api("/api/relatorio-completo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dados),
+    });
+    const link = document.createElement("a");
+    link.href = relatorio.url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    const falta = relatorio.ignoradas.length
+      ? ` ${relatorio.ignoradas.length} análise(s) não couberam nesta base; o relatório explica o motivo.` : "";
+    mostrarToast(`Relatório completo aberto: ${relatorio.secoes.length} análise(s).${falta}`);
+  } catch (erro) {
+    mostrarToast(erro.message, true);
+  } finally {
+    item.disabled = false;
+    texto.textContent = "Relatório completo";
+  }
+}
+
 function navegar(destino) {
   const rolar = (alvo) => alvo && alvo.scrollIntoView({ behavior: "smooth", block: "start" });
-  if (destino === "analise") {
+  if (destino === "relatorio") {
+    gerarRelatorioCompleto();
+  } else if (destino === "analise") {
     window.scrollTo({ top: 0, behavior: "smooth" });
   } else if (destino === "projeto") {
     abrirModal();

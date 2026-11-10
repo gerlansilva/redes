@@ -18,6 +18,7 @@ from __future__ import annotations
 import html
 import re
 import shutil
+from contextvars import ContextVar
 import unicodedata
 from pathlib import Path
 
@@ -110,6 +111,13 @@ img.mapa-sobreposicao { display:block; margin:10px auto; }
 .marca-relatorio { font-size:10px; font-weight:600; letter-spacing:.14em;
                    text-transform:uppercase; color:#64748B; margin:0; }
 .logo-relatorio { display:block; height:32px; width:auto; flex:none; }
+.voltar { margin:0 0 10px; font-size:13px; }
+.sumario { position:sticky; top:0; background:#fff; padding:8px 0; border-bottom:1px solid #E6E9F2; margin:0 0 18px;
+  display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; z-index:2; }
+.miniaturas { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; margin:8px 0 22px; }
+.miniaturas figure { margin:0; border:1px solid #E6E9F2; border-radius:10px; padding:8px; background:#fff; }
+.miniaturas img { width:100%; height:auto; display:block; }
+.miniaturas figcaption { font-size:12px; color:#475569; margin-top:6px; }
 .fonte { color:#64748B; font-size:12px; margin:0 0 18px; }
 .aviso { background:#FFF9E0; border:1px solid #F0D98A; border-left:4px solid #FFC400; border-radius:8px; padding:8px 14px; margin:0 0 16px; font-size:13px; color:#5C4500; }
 .aviso ul { margin:6px 0 0; padding-left:18px; }
@@ -201,8 +209,15 @@ def _referencias(kb, ids) -> dict[int, list[str]]:
     return resultado
 
 
+_VOLTAR: ContextVar[str] = ContextVar("redes_voltar", default="")
+
+
 def _pagina(titulo: str, corpo: str, profundidade: int = 0) -> str:
     raiz = "../" * profundidade
+    voltar = _VOLTAR.get()
+    if voltar:
+        corpo = (f'<nav class="voltar"><a href="{voltar}">← Relatório completo</a></nav>\n'
+                 + corpo)
     return (
         "<!doctype html>\n<html lang=\"pt-BR\">\n<head>\n"
         "<meta charset=\"utf-8\">\n"
@@ -286,7 +301,8 @@ def _ligacoes(resultado, grupo) -> tuple[list, list]:
 
 
 def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
-              medida_temporal: str = "EquivalenceIndex") -> dict:
+              medida_temporal: str = "EquivalenceIndex",
+              com_bibliometria: bool = True, devolve_resultados: bool = False) -> dict:
     destino.mkdir(parents=True, exist_ok=True)
     (destino / "images").mkdir(exist_ok=True)
     (destino / "misc").mkdir(exist_ok=True)
@@ -298,7 +314,7 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
     for indice, resultado in enumerate(resultados):
         # Um diagrama por mapeador e medida de desempenho, como nas páginas de
         # período do fork: o tamanho das esferas muda com a medida escolhida.
-        for mapeador in resultado.configuracao.mapeadores:
+        for mapeador in (resultado.configuracao.mapeadores if resultado.grupos else ()):
             for medida in ORDEM_MEDIDAS:
                 titulo = (f"Diagrama estratégico — {resultado.periodo} — "
                           f"{ROTULOS_MAPEADOR.get(mapeador, mapeador)} — "
@@ -356,13 +372,18 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
     (destino / "misc" / "evolutionMap.net").write_text(
         longitudinal.evolucao_pajek(mapa), encoding="utf-8")
 
-    _pagina_bibliometria(destino, kb)
-    _pagina_indice(destino, resultados, mapa, config, estendido)
-    return {"html": str(destino), "periodos": len(resultados),
-            "agrupamentos": sum(len(r.grupos) for r in resultados)}
+    if com_bibliometria:
+        _pagina_bibliometria(destino, kb)
+    _pagina_indice(destino, resultados, mapa, config, estendido, com_bibliometria)
+    resumo = {"html": str(destino), "periodos": len(resultados),
+              "agrupamentos": sum(len(r.grupos) for r in resultados)}
+    if devolve_resultados:
+        resumo["resultados"] = resultados
+    return resumo
 
 
-def _pagina_indice(destino, resultados, mapa, config, estendido) -> None:
+def _pagina_indice(destino, resultados, mapa, config, estendido,
+                   com_bibliometria: bool = True) -> None:
     linhas = []
     for indice, resultado in enumerate(resultados):
         linhas.append([
@@ -376,8 +397,9 @@ def _pagina_indice(destino, resultados, mapa, config, estendido) -> None:
     corpo = [
         "<h1>Relatório — Redes</h1>",
         "<p>Relatório gerado automaticamente a partir do projeto analisado.</p>",
-        '<p><a href="bibliometria.html">Visão geral descritiva do corpus</a> '
-        "(produção, rankings, rajadas e nuvens de palavras)</p>",
+        ('<p><a href="bibliometria.html">Visão geral descritiva do corpus</a> '
+         "(produção, rankings, rajadas e nuvens de palavras)</p>")
+        if com_bibliometria else "",
         "<h2>Configuração da análise</h2>",
         _configuracao_tabela(config),
         "<h2>Resultados dos períodos</h2>",
@@ -400,6 +422,7 @@ def _pagina_indice(destino, resultados, mapa, config, estendido) -> None:
 
 def _pagina_bibliometria(destino: Path, kb) -> None:
     """Página da visão geral descritiva: o que a tela mostra, em HTML estático."""
+    (destino / "images").mkdir(parents=True, exist_ok=True)
     from . import bibliometria, rajadas, termos
     from .viz import descritiva
 
@@ -689,3 +712,67 @@ def gera(destino: str | Path, kb, periodos, config, formato: str = "html",
     if formato != "html":
         raise ValueError("o relatório é gerado somente em HTML")
     return gera_html(Path(destino), kb, periodos, config, estendido, medida_temporal)
+
+
+def gera_pagina_completa(destino: Path, kb, secoes: list[dict], ignoradas: list[dict]) -> None:
+    """Índice do relatório completo: seções numeradas, resumo por período e figuras.
+
+    Cada seção é uma análise já gerada em `destino/<pasta>`; `secoes` traz o
+    rótulo, a descrição, a pasta, a configuração e os resultados por período.
+    """
+    numero_figura = 0
+    sumario = ['<a href="bibliometria.html">1 Visão geral descritiva</a>']
+    corpo = ["<h1>Relatório completo — Redes</h1>",
+             "<p>Cada seção traz o quadro por período, o diagrama estratégico e a rede de cada período; "
+             "os links levam às páginas de período e de cada agrupamento.</p>"]
+    blocos = ['<h2 id="visao">1 Visão geral descritiva</h2>'
+              '<p><a href="bibliometria.html">Produção e citações, rankings, leis bibliométricas, '
+              "nuvens de palavras e rajadas</a></p>"]
+    for posicao, secao in enumerate(secoes, start=2):
+        ancora = f"s{posicao}"
+        sumario.append(f'<a href="#{ancora}">{posicao} {_esc(secao["rotulo"])}</a>')
+        pasta = secao["pasta"]
+        resultados = secao["resultados"]
+        linhas = []
+        for indice, r in enumerate(resultados):
+            maior = max((len(g.nos) for g in r.grupos), default=0)
+            linhas.append([
+                f'<a href="{pasta}/period{indice}.html">{_esc(r.periodo)}</a>',
+                str(r.dataset_original.quantidade_itens()),
+                str(len(r.grupos)),
+                f"{maior} nós",
+            ])
+        bloco = [f'<h2 id="{ancora}">{posicao} {_esc(secao["rotulo"])}</h2>',
+                 f'<p>{_esc(secao["descricao"])}</p>',
+                 _tabela(["Período", "Itens", "Grupos", "Maior grupo"], linhas,
+                         f"{posicao}.1 Por período", numericas=(1, 2)),
+                 f'<p><a href="{pasta}/index.html">Configuração, mapa de evolução e sobreposição</a></p>']
+        figuras = []
+        mapeador = secao["config"].mapeadores[0] if secao["config"].mapeadores else "nucleo"
+        for indice, r in enumerate(resultados):
+            if not r.grupos:
+                continue
+            for arquivo, legenda in (
+                    (f"strategicDiagram-period{indice}-{mapeador}-{ORDEM_MEDIDAS[0]}.svg",
+                     "Diagrama estratégico"),
+                    (f"wholeNetwork-period{indice}.svg", "Rede do período")):
+                if not (destino / pasta / "images" / arquivo).exists():
+                    continue
+                numero_figura += 1
+                figuras.append(
+                    f'<figure><a href="{pasta}/period{indice}.html">'
+                    f'<img src="{pasta}/images/{arquivo}" alt="{_esc(legenda)} {_esc(r.periodo)}" loading="lazy"></a>'
+                    f'<figcaption>Figura {numero_figura} — {legenda.lower()} de '
+                    f'{_esc(secao["rotulo"].lower())}, {_esc(r.periodo)}.</figcaption></figure>')
+        if figuras:
+            bloco.append('<div class="miniaturas">' + "".join(figuras) + "</div>")
+        blocos.append("\n".join(bloco))
+    if ignoradas:
+        sumario.append('<a href="#nao-gerados">Não gerados</a>')
+        blocos.append('<h2 id="nao-gerados">Análises não geradas</h2><ul>' + "".join(
+            f'<li><b>{_esc(i["rotulo"])}</b>: {_esc(i["motivo"])}</li>' for i in ignoradas) + "</ul>")
+    corpo.insert(1, '<nav class="sumario">' + " ".join(sumario) + "</nav>")
+    corpo.extend(blocos)
+    shutil.copyfile(_ASSETS / "logo.svg", destino / "logo.svg")
+    (destino / "index.html").write_text(
+        _pagina("Relatório completo — Redes", "\n".join(corpo)), encoding="utf-8")
