@@ -32,6 +32,7 @@ normalizar, agrupar, medir, desenhar e relatar, sem depender da interface Java.
 | Mapas longitudinais (evolução e sobreposição) | pronto |
 | Relatório HTML (com referências ABNT e página de visão geral descritiva) | pronto |
 | Visão geral descritiva: produção, rankings, leis de Lotka/Bradford/Zipf, nuvens de palavras e rajadas (Kleinberg) | pronto |
+| Revisar grafias: variantes de autores, palavras-chave, IES e países, com lista de grafias corretas e agrupamento (com desfazer) | pronto |
 | Carregadores nativos (BibTeX, RIS, CSV, OpenAlex, WoS, Scopus) | pronto |
 | Armazenamento próprio (`.redes` gravado pelo Python) | pronto: esquema do Bibliomapa (`v1_03`) mais as tabelas de países |
 | Exportações (Pajek, GraphML, XML de grupos, TSV) | pronto |

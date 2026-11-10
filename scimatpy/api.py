@@ -774,6 +774,18 @@ def base_conhecimento(caminho: str) -> dict:
         raise ErroApi(str(erro)) from None
 
 
+def sugere_grafias(dados: dict) -> dict:
+    from . import sugestoes
+
+    caminho = _valida_projeto(dados.get("caminho", ""))
+    with ProjetoScimat(caminho) as kb:
+        try:
+            return sugestoes.sugere(kb.conexao, dados.get("tipo", ""),
+                                    dados.get("lista", ""))
+        except ValueError as erro:
+            raise ErroApi(str(erro)) from None
+
+
 def edita_base(dados: dict) -> dict:
     from . import edit
 
@@ -806,6 +818,9 @@ def edita_base(dados: dict) -> dict:
         if acao == "juntar-grupos":
             return edit.junta_grupos(projeto, dados.get("tipo", ""),
                                      int(dados["origem"]), int(dados["destino"]))
+        if acao == "agrupar-sugestoes":
+            return edit.agrupa_sugestoes(projeto, dados.get("tipo", ""),
+                                         dados.get("agrupamentos") or [])
         if acao == "substituir":
             return edit.substitui(projeto, dados.get("tipo", ""),
                                   dados.get("de", ""), dados.get("para", ""))
@@ -1393,6 +1408,8 @@ class Manipulador(BaseHTTPRequestHandler):
                 self._json(202, inicia_grade(self._json_pedido()))
             elif rota == "/api/base":
                 self._json(200, edita_base(self._json_pedido()))
+            elif rota == "/api/sugestoes":
+                self._json(200, sugere_grafias(self._json_pedido()))
             elif rota == "/api/relatorio":
                 self._json(200, gera_relatorio(self._json_pedido()))
             elif rota == "/api/longitudinal":

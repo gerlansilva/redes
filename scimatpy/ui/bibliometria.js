@@ -179,6 +179,7 @@ function renderizarBibliometria(painel, d) {
       `${bibDec.format(p.autores_por_documento ?? 0)} por documento · ${bibNum.format(p.documentos_autor_unico)} de autor único`),
     cartaoBib("Fontes", bibNum.format(p.fontes), "periódicos do corpus"),
     cartaoBib("Palavras-chave", bibNum.format(p.palavras_chave), "dos autores"),
+    cartaoBib("Instituições", bibNum.format(p.instituicoes ?? 0), "distintas, pelas afiliações"),
     cartaoBib("Países", bibNum.format(p.paises), p.coautoria_internacional != null
       ? `${bibDec.format(p.coautoria_internacional)}% em coautoria internacional` : "sem afiliações"),
     cartaoBib("Referências", bibNum.format(p.referencias), "distintas"),
@@ -225,6 +226,7 @@ function renderizarBibliometria(painel, d) {
     '<div class="bib-grade">' +
     secaoBib("Autores mais produtivos", "Por número de documentos; h calculado dentro do corpus.", tabelaBib(colAutores, d.autores, "Autores")) +
     secaoBib("Fontes mais produtivas", "Periódicos que mais publicam no corpus.", tabelaBib(colFontes, d.fontes, "Fontes")) +
+    secaoBib("Instituições (IES)", "Instituição lida da afiliação; use Revisar grafias para unir variantes.", tabelaBib(colPaises.map((c) => c.campo === "nome" ? { ...c, rotulo: "Instituição" } : c), d.instituicoes || [], "Instituições")) +
     secaoBib("Países", "Países de afiliação, por número de documentos.", tabelaBib(colPaises, d.paises, "Países")) +
     secaoBib("Palavras-chave", "Palavras-chave dos autores, já unidas pelos grupos da base.", graficoBarras(d.palavras, "documentos", "#6A3BFF")) +
     secaoBib("Fontes mais citadas", "Periódicos mais presentes nas listas de referências.", tabelaBib(colCitadas, d.fontes_citadas, "Fontes citadas")) +

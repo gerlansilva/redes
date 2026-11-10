@@ -36,6 +36,8 @@ TIPOS = {
                          "idAuthorReference", "idAuthorReferenceGroup",
                          "AuthorReferenceGroup_idAuthorReferenceGroup",
                          "authorName"),
+    "pais": ("Country", "CountryGroup", "idCountry", "idCountryGroup",
+             "CountryGroup_idCountryGroup", "countryName"),
     "fonte": ("ReferenceSource", "ReferenceSourceGroup", "idReferenceSource",
               "idReferenceSourceGroup",
               "ReferenceSourceGroup_idReferencesourceGroup", "source"),
@@ -96,6 +98,7 @@ def resume(caminho: str | Path) -> dict:
                 "ReferenceGroup": "referenceGroup_documentsCount",
                 "AuthorReferenceGroup": "authorReferenceGroup_documentsCount",
                 "ReferenceSourceGroup": "referenceSourceGroup_documentsCount",
+                "CountryGroup": "countryGroup_documentsCount",
             }[tabela]
             grupos[chave] = [
                 {"id": linha["id"], "nome": linha["nome"],
@@ -270,23 +273,90 @@ def marca_parada(caminho, tipo: str, grupo_id: int, parada: bool) -> dict:
     return resume(arquivo)
 
 
-def junta_grupos(caminho, tipo: str, origem: int, destino: int) -> dict:
-    """Move os itens do grupo de origem para o destino e remove a origem."""
+def _junta(conexao, tipo: str, origem: int, destino: int) -> None:
     tabela, coluna_grupo = _tabela_grupo(tipo)
     item, _, _, _, coluna_fk, _ = TIPOS[tipo]
+    conexao.execute(
+        f"UPDATE {item} SET {coluna_fk} = ? WHERE {coluna_fk} = ?",
+        (destino, origem))
+    conexao.execute(f"DELETE FROM {tabela} WHERE {coluna_grupo} = ?", (origem,))
+    _recalcula_grupo(conexao, tipo, destino)
+
+
+def junta_grupos(caminho, tipo: str, origem: int, destino: int) -> dict:
+    """Move os itens do grupo de origem para o destino e remove a origem."""
+    _tabela_grupo(tipo)
     conexao, arquivo = _abre(caminho)
     try:
         _copia_de_seguranca(arquivo)
-        conexao.execute(
-            f"UPDATE {item} SET {coluna_fk} = ? WHERE {coluna_fk} = ?",
-            (destino, origem))
-        conexao.execute(f"DELETE FROM {tabela} WHERE {coluna_grupo} = ?",
-                        (origem,))
-        _recalcula_grupo(conexao, tipo, destino)
+        _junta(conexao, tipo, origem, destino)
         conexao.commit()
     finally:
         conexao.close()
     return resume(arquivo)
+
+
+def agrupa_sugestoes(caminho, tipo: str, agrupamentos: list[dict]) -> dict:
+    """Aplica de uma vez os agrupamentos sugeridos e confirmados.
+
+    Cada agrupamento é `{canonico, membros}`: em palavra, autor e país os
+    membros são ids de grupos, que se fundem no grupo que ficará com a grafia
+    final; em `ies` os membros são nomes de instituição e viram apelidos da
+    grafia final. Uma única cópia de segurança cobre o lote inteiro.
+    """
+    from . import sugestoes
+
+    if tipo != "ies":
+        _tabela_grupo(tipo)
+    if not agrupamentos:
+        raise ValueError("nenhum agrupamento escolhido")
+    conexao, arquivo = _abre(caminho)
+    try:
+        _copia_de_seguranca(arquivo)
+        if tipo == "pais":
+            # Projetos antigos tinham índice único: um país por grupo. Agrupar exige índice comum.
+            conexao.execute("DROP INDEX IF EXISTS fk_Country_CountryGroup")
+            conexao.execute("CREATE INDEX IF NOT EXISTS fk_Country_CountryGroup "
+                            "ON Country(CountryGroup_idCountryGroup)")
+        if tipo == "ies":
+            sugestoes.grava_ies(conexao, agrupamentos)
+        else:
+            for agrupamento in agrupamentos:
+                _agrupa_um(conexao, tipo, agrupamento)
+        conexao.commit()
+    finally:
+        conexao.close()
+    return resume(arquivo)
+
+
+def _agrupa_um(conexao, tipo: str, agrupamento: dict) -> None:
+    tabela, coluna = _tabela_grupo(tipo)
+    canonico = (agrupamento.get("canonico") or "").strip()
+    if not canonico:
+        raise ValueError("a grafia final não pode ser vazia")
+    ids = [int(m) for m in agrupamento.get("membros", [])]
+    existentes = {linha[0]: linha for linha in conexao.execute(
+        f"SELECT {coluna}, groupName, stopGroup FROM {tabela} WHERE {coluna} IN "
+        f"({','.join('?' * len(ids))})", ids)} if ids else {}
+    if any(linha["stopGroup"] for linha in existentes.values()):
+        raise ValueError("grupos de parada não podem ser agrupados com outros")
+    # Se a grafia final já é o nome de outro grupo da base, ele entra e vira o destino.
+    outro = conexao.execute(
+        f"SELECT {coluna} FROM {tabela} WHERE groupName = ?", (canonico,)).fetchone()
+    if outro is not None and outro[0] not in existentes:
+        existentes[outro[0]] = conexao.execute(
+            f"SELECT {coluna}, groupName, stopGroup FROM {tabela} WHERE {coluna} = ?",
+            (outro[0],)).fetchone()
+    if len(existentes) < 2:
+        raise ValueError("escolha ao menos dois itens para agrupar")
+    destino = next((i for i, linha in existentes.items() if linha["groupName"] == canonico), None)
+    if destino is None:
+        destino = max(existentes, key=lambda i: conexao.execute(
+            f"SELECT itemsCount FROM {tabela} WHERE {coluna} = ?", (i,)).fetchone()[0] or 0)
+    for origem in list(existentes):
+        if origem != destino:
+            _junta(conexao, tipo, origem, destino)
+    conexao.execute(f"UPDATE {tabela} SET groupName = ? WHERE {coluna} = ?", (canonico, destino))
 
 
 def _tabela_grupo(tipo: str) -> tuple[str, str]:
@@ -303,6 +373,7 @@ def _recalcula_grupo(conexao, tipo: str, grupo_id: int) -> None:
         "AuthorGroup": ("Document_Author", "Document_idDocument", "Author_idAuthor"),
         "ReferenceGroup": ("Document_Reference", "Document_idDocument",
                            "Reference_idReference"),
+        "CountryGroup": ("Document_Country", "Document_idDocument", "Country_idCountry"),
     }
     if tabela in documentos:
         ligacao, doc, alvo = documentos[tabela]
@@ -323,6 +394,7 @@ def _recalcula_grupo(conexao, tipo: str, grupo_id: int) -> None:
         "ReferenceGroup": "referenceGroup_documentsCount",
         "AuthorReferenceGroup": "authorReferenceGroup_documentsCount",
         "ReferenceSourceGroup": "referenceSourceGroup_documentsCount",
+        "CountryGroup": "countryGroup_documentsCount",
     }[tabela]
     conexao.execute(
         f"UPDATE {tabela} SET {coluna_contagem} = ? WHERE {coluna_grupo} = ?",

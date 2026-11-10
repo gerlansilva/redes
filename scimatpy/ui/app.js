@@ -483,6 +483,12 @@ async function abrir(caminho) {
 }
 
 function aplicarProjeto(projeto) {
+  // Descarta o que a tela guardava do projeto anterior (mesmo caminho reimportado inclusive).
+  if (typeof BIB !== "undefined") {
+    BIB.cache = {};
+    const painel = $("visaoBibliometria");
+    if (painel) painel.innerHTML = '<p class="bib-vazio">Calculando…</p>';
+  }
   estado.projeto = projeto;
   estado.ignorar = [];
   estado.resultado = null;
@@ -1768,6 +1774,7 @@ async function importar(evento) {
       `Base criada: ${dados.resumo.documentos} documentos ` +
       `(${nomes[dados.formato] || dados.formato}).`);
     await previsualizar();
+    mostrarVisaoGeral();
   } catch (erro) {
     mostrarToast(erro.message, true);
   } finally {
@@ -3007,6 +3014,9 @@ async function editarBase(dados) {
       body: JSON.stringify({ caminho: estado.projeto.caminho }),
     });
     aplicarProjeto(projeto);
+    const visao = $("visaoGeral");
+    if (visao && !visao.hidden && !visao.classList.contains("oculta")
+        && typeof carregarBibliometria === "function") carregarBibliometria();
     mostrarToast("Base atualizada.");
   } catch (erro) {
     mostrarToast(erro.message, true);

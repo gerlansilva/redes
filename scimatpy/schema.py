@@ -1161,7 +1161,7 @@ CREATE TABLE Document_Country(
      ON UPDATE CASCADE
 );
 
-CREATE UNIQUE INDEX fk_Country_CountryGroup ON Country(CountryGroup_idCountryGroup);
+CREATE INDEX fk_Country_CountryGroup ON Country(CountryGroup_idCountryGroup);
 
 CREATE UNIQUE INDEX fk_DocumentCountry ON Document_Country(Country_idCountry,Document_idDocument);
 

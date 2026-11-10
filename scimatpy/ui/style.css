@@ -1786,3 +1786,28 @@ body.modo-avancado .parametros .campos + .nota-auto { margin-top: 12px; }
 .bib-nota { font-size: 12px; color: var(--tinta-fraca); margin-top: 10px; line-height: 1.5; }
 .bib-aviso { background: var(--apoio-amarelo); border-radius: 8px; padding: 8px 12px; color: #7A4B00; }
 .bib-rolagem { overflow-x: auto; }
+
+/* Revisar grafias */
+.grafia-lista { margin: 8px 0; font-size: 12.5px; }
+.grafia-lista summary { cursor: pointer; font-weight: 600; color: var(--azul); }
+.grafia-lista textarea { width: 100%; margin: 8px 0 4px; font: 12.5px/1.4 inherit; padding: 8px 10px;
+  border: 1px solid var(--borda, #D9DEEA); border-radius: 8px; resize: vertical; }
+.grafia-resultado { max-height: 340px; overflow: auto; display: grid; gap: 8px; margin: 8px 0; }
+.grafia-grupo { display: grid; grid-template-columns: 150px 1fr; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--borda, #D9DEEA); border-radius: 10px; background: #fff; }
+.grafia-grupo.alta { border-left: 4px solid #00A344; }
+.grafia-grupo.media { border-left: 4px solid #FFC400; }
+.grafia-marca { display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; align-items: flex-start; }
+.grafia-marca .g-selo { white-space: nowrap; border: 0; width: auto; height: auto; display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 700; font-size: 11px; }
+.grafia-marca .g-selo.alta { background: #E6F8EE; color: #067A35; }
+.grafia-marca .g-selo.media { background: #FFF3C4; color: #7A5A00; }
+.grafia-marca .g-selo.informada { background: #E6E4FF; color: #3B2FD6; }
+.grafia-final { display: grid; gap: 3px; font-size: 11px; font-weight: 700; letter-spacing: .03em; }
+.grafia-final input { font: 13px inherit; font-weight: 600; padding: 6px 8px; border: 1px solid var(--borda, #D9DEEA);
+  border-radius: 7px; width: 100%; }
+.grafia-membros { list-style: none; margin: 8px 0 4px; padding: 0; font-size: 12.5px; }
+.grafia-membros li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0;
+  border-bottom: 1px dotted #E3E7F0; }
+.grafia-membros b { font-variant-numeric: tabular-nums; color: var(--tinta-suave); }
+.grafia-faltou { margin: 4px 0 0; }
+@media (max-width: 720px) { .grafia-grupo { grid-template-columns: 1fr; } }

@@ -641,6 +641,34 @@
       </form>
     </div>
 
+    <div class="secao" id="secaoGrafias">
+      <div class="rotulo-secao">Revisar grafias e agrupar</div>
+      <p class="dica">Encontra variantes do mesmo autor, palavra-chave, instituição ou país e propõe uma grafia única. Se quiser, informe as grafias corretas: o programa procura as variantes de cada uma.</p>
+      <div class="linha-base">
+        <label class="campo-mini"><span>O que revisar</span>
+          <select id="grafiaTipo">
+            <option value="autor">Autores</option>
+            <option value="palavra">Palavras-chave</option>
+            <option value="ies">Instituições (IES)</option>
+            <option value="pais">Países</option>
+          </select></label>
+        <button class="botao escuro" type="button" id="btnGrafiaBuscar">Buscar variantes</button>
+        <span class="dica" id="grafiaResumo"></span>
+      </div>
+      <details class="grafia-lista">
+        <summary>Informar grafias corretas (opcional)</summary>
+        <textarea id="grafiaLista" rows="5" spellcheck="false"
+          placeholder="Uma por linha. Apelidos depois de =, separados por |&#10;Universidade Federal de São Carlos = UFSCar | Fed. Univ. São Carlos&#10;Silva, Gerlan M.&#10;Educação Estatística"></textarea>
+        <span class="dica">A lista fica guardada neste navegador, por tipo.</span>
+      </details>
+      <div id="grafiaResultado" class="grafia-resultado"></div>
+      <div class="linha-base" id="grafiaAcoes" hidden>
+        <button class="botao" type="button" id="btnGrafiaAlta">Marcar só as de confiança alta</button>
+        <button class="botao" type="button" id="btnGrafiaLimpar">Desmarcar tudo</button>
+        <button class="botao escuro" type="button" id="btnGrafiaAplicar">Agrupar selecionados</button>
+      </div>
+    </div>
+
     <div class="secao">
       <div class="rotulo-secao">Grupos</div>
       <div class="linha-base">
@@ -855,5 +883,6 @@
 
 <script src="/static/app.js"></script>
 <script src="/static/bibliometria.js"></script>
+<script src="/static/grafias.js"></script>
 </body>
 </html>

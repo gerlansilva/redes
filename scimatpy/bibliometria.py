@@ -189,6 +189,9 @@ def calcula(conexao) -> dict:
     cont_paises, cit_paises, _ = _acumula(paises_doc, documentos)
     cont_citadas, _, _ = _acumula(fontes_citadas_doc, documentos)
     cont_palavras, cit_palavras, _ = _acumula(palavras_doc, documentos)
+    from .sugestoes import instituicoes_por_documento
+    ies_doc = {i: sorted(n) for i, n in instituicoes_por_documento(conexao).items()}
+    cont_ies, cit_ies, _ = _acumula(ies_doc, documentos)
 
     # Produção e citações por ano (todos os anos do intervalo, inclusive vazios).
     por_ano: dict[int, dict] = {}
@@ -230,6 +233,7 @@ def calcula(conexao) -> dict:
         "palavras_chave": len(cont_palavras),
         "referencias": referencias,
         "paises": len(cont_paises),
+        "instituicoes": len(cont_ies),
         "citacoes": total_citacoes,
         "citacoes_por_documento": round(total_citacoes / total, 2),
         "autores_por_documento": round(sum(com_autores) / len(com_autores), 2) if com_autores else None,
@@ -260,6 +264,7 @@ def calcula(conexao) -> dict:
                            for n, d in sorted(cont_citadas.items(),
                                               key=lambda par: (-par[1], par[0]))[:LIMITE]],
         "paises": _ranking(cont_paises, cit_paises),
+        "instituicoes": _ranking(cont_ies, cit_ies),
         "palavras": _ranking(cont_palavras, cit_palavras),
         "mais_citados": [{"titulo": d["titulo"], "ano": d["ano"],
                           "autores": d["autores_texto"], "citacoes": d["citacoes"]}
