@@ -34,6 +34,7 @@ async function carregarBibliometria() {
   }
   if (estado.projeto && estado.projeto.caminho === caminho) {
     renderizarBibliometria(painel, BIB.cache[caminho]);
+    if (typeof atualizarMenuExportar === "function") atualizarMenuExportar();
   }
 }
 

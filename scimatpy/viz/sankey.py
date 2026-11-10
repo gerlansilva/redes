@@ -6,8 +6,8 @@ baricentros, mantendo a melhor de várias varreduras (menos cruzamentos de
 ligações). Os nós levam a cor do país que mais pesa neles.
 
 O SVG usa variáveis CSS com valor de reserva (``--sk-texto``, ``--sk-fundo``,
-``--sk-contorno``, ``--sk-fraco``): na interface elas seguem o tema claro ou
-escuro; fora dela (arquivo baixado, relatório) valem as cores claras. Os ids
+``--sk-contorno``, ``--sk-fraco``): na interface valem as cores do tema da ferramenta (só claro); fora dela
+(arquivo baixado, relatório) valem as mesmas cores claras. Os ids
 levam um prefixo estável derivado dos dados, então duas figuras na mesma
 página não colidem, e cada nó e cada ligação traz ``<title>`` como dica.
 """

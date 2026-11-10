@@ -542,6 +542,12 @@ function aplicarProjeto(projeto) {
   estado.execucoes = [];
   estado.contador = 0;
   estado.token = null;
+  dendro.token = null;
+  document.querySelectorAll(".aba[data-aba]").forEach((aba) => {
+    const ativa = aba.dataset.aba === "rede";
+    aba.classList.toggle("ativa", ativa);
+    aba.setAttribute("aria-selected", ativa ? "true" : "false");
+  });
   redefinirFrequencia();
   localStorage.setItem("scimatpy.projeto", projeto.caminho);
 
@@ -2994,6 +3000,12 @@ const MOTIVO_EXPORTAR = {
   grade: "Rode a grade completa (modo avançado) para liberar este item.",
 };
 
+function fluxoDisponivel() {
+  // Só desabilita quando a visão geral já foi calculada e disse que não há fluxo.
+  const b = typeof BIB !== "undefined" && estado.projeto ? BIB.cache[estado.projeto.caminho] : null;
+  return !(b && b.fluxo !== undefined && (!b.fluxo || !b.fluxo.modo));
+}
+
 function itensMenuExportar() {
   return Array.from(document.querySelectorAll("#listaExportar [data-exp]"))
     .filter((item) => item.offsetParent !== null);
@@ -3017,6 +3029,9 @@ function atualizarMenuExportar() {
       faltaResultado = true;
     }
     else if (precisa === "grade" && !temGrade) motivo = MOTIVO_EXPORTAR.grade;
+    else if (item.dataset.exp === "fluxo-svg" && !fluxoDisponivel()) {
+      motivo = "A base não traz afiliação nem país; não há fluxo Autor – País – IES.";
+    }
     item.setAttribute("aria-disabled", motivo ? "true" : "false");
     if (motivo) item.title = motivo; else item.removeAttribute("title");
   }

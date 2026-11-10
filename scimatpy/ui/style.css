@@ -1800,7 +1800,6 @@ body.modo-avancado .parametros .campos + .nota-auto { margin-top: 12px; }
 
 /* Fluxo Autor – País – IES: o SVG lê estas variáveis (valor de reserva claro no arquivo baixado). */
 :root { --sk-fundo: var(--branco); --sk-texto: var(--tinta); --sk-fraco: var(--tinta-fraca); --sk-contorno: var(--branco); }
-:root[data-tema="escuro"] { --sk-fundo: #121826; --sk-texto: #E6EAF5; --sk-fraco: #9AA6BD; --sk-contorno: #121826; }
 .bib-fluxo .bib-saida svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
 .bib-fluxo .botao-mini { text-decoration: none; display: inline-flex; align-items: center; }
 .bib-fluxo .botao-mini[hidden] { display: none; }

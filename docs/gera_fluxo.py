@@ -50,6 +50,7 @@ add('<defs>'
     f'<marker id="pontaR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="{ROXO}"/></marker></defs>')
 add(f'<rect width="{L}" height="{A}" fill="#fff"/>')
 texto(850, 44, "Fluxo de análise do Redes", 24, 700, ESCURO)
+texto(850, 68, "Abertura  →  importar o corpus  →  análise  →  relatório", 14, 400, FRACA)
 
 CY = 470  # linha central do fluxo
 
@@ -74,7 +75,7 @@ caixa(410, 335, 250, 270, FUNDO_A, ESCURO, 16, 2.5)
 texto(535, 366, "Projeto .redes", 18, 700, ESCURO)
 texto(535, 386, "banco SQLite local", 12, 400, FRACA)
 linhas(535, 418, ["Duplicatas removidas", "(DOI ou título + ano)", "Singular/plural e acento", "(pt · es · en)",
-                  "Grupos de palavras, autores", "e países · termos ignorados", "Períodos sugeridos", "pelos anos do corpus"],
+                  "Revisar grafias: sugere e agrupa", "autores, palavras, IES e países", "Períodos sugeridos", "pelos anos do corpus"],
        12.5, TINTA, "middle", 21)
 
 # 3. Matriz documento x item
@@ -96,7 +97,7 @@ caixa(1200, 90, 450, 210, FUNDO_B, VERDE, 16, 2.5)
 texto(1425, 122, "Visão geral descritiva", 18, 700, ESCURO)
 linhas(1425, 152, ["Produção e citações por ano · acumulado", "Autores, fontes, países e palavras-chave",
                    "Documentos mais citados · fontes citadas", "Coautoria · índice h · Lotka, Bradford, Zipf",
-                   "Nuvens de palavras · rajadas (bursts)"], 13, TINTA, "middle", 24)
+                   "Nuvens de palavras · rajadas (bursts)", "Fluxo Autor – País – IES (Sankey)"], 13, TINTA, "middle", 24)
 
 # Ramo 2: mapeamento científico
 seta([(930, 605), (930, 700), (1200, 700)])
@@ -107,7 +108,7 @@ etapas = [
     ("1  Rede do período", "Similaridade: equivalência, associação,", "inclusão, Jaccard, Salton"),
     ("2  Agrupamento", "Centros simples, ligação simples, completa,", "média, soma · Louvain"),
     ("3  Medidas", "Callon (centralidade e densidade) · h, g, hg, q2", "documentos por mapeador: núcleo, união…"),
-    ("4  Mapas", "Diagrama estratégico: motor, básico, nicho, emergente", "Rede em halos · evolução e sobreposição · países"),
+    ("4  Mapas", "Diagrama estratégico: motor, básico, nicho, emergente", "Halos · evolução · países · dendrograma"),
 ]
 for i, (t, l1, l2) in enumerate(etapas):
     y = 432 + i * 104
@@ -122,7 +123,7 @@ for i, (t, l1, l2) in enumerate(etapas):
 caixa(30, 770, 1100, 190, "#fff", AZUL, 16, 2.5)
 texto(580, 802, "Saídas", 18, 700, ESCURO)
 colunas = [
-    ("Relatório", ["somente HTML", "redes, quadro de métricas", "e visão geral descritiva"]),
+    ("Relatório completo", ["arquivo único ou pastas", "parâmetros e método", "de cada análise"]),
     ("Redes e tabelas", ["Pajek · GraphML", "TSV de índices e documentos", "Grupos da base (XML)"]),
     ("Figuras", ["SVG e PNG", "diagrama estratégico", "rede em halos · mapas"]),
     ("Grade de análises", ["162 combinações", "unidade × matriz ×", "algoritmo × similaridade"]),
