@@ -122,7 +122,7 @@ for i, (t, l1, l2) in enumerate(etapas):
 caixa(30, 770, 1100, 190, "#fff", AZUL, 16, 2.5)
 texto(580, 802, "Saídas", 18, 700, ESCURO)
 colunas = [
-    ("Relatório", ["HTML e LaTeX", "redes e quadro de métricas", "por período e por agrupamento"]),
+    ("Relatório", ["somente HTML", "redes e quadro de métricas", "por período e por agrupamento"]),
     ("Redes e tabelas", ["Pajek · GraphML", "TSV de índices e documentos", "Grupos da base (XML)"]),
     ("Figuras", ["SVG e PNG", "diagrama estratégico", "rede em halos · mapas"]),
     ("Grade de análises", ["162 combinações", "unidade × matriz ×", "algoritmo × similaridade"]),

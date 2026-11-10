@@ -1,6 +1,6 @@
-"""Relatórios do Redes em HTML e LaTeX, simples e estendido.
+"""Relatório do Redes em HTML, simples e estendido.
 
-Reproduz a estrutura dos quatro geradores do fork Bibliomapa:
+Reproduz a estrutura dos geradores de HTML do fork Bibliomapa:
 
 - índice com a configuração da análise, o resumo dos períodos e os mapas
   longitudinais;
@@ -10,8 +10,7 @@ Reproduz a estrutura dos quatro geradores do fork Bibliomapa:
   no relatório estendido, os documentos associados por mapeador e as
   referências em formato ABNT.
 
-As figuras são SVG, vetoriais, sem dependência de rasterizador. O LaTeX usa os
-mesmos dados em tabelas; as imagens entram quando há PNG disponível.
+As figuras são SVG, vetoriais, sem dependência de rasterizador.
 """
 
 from __future__ import annotations
@@ -566,180 +565,10 @@ def _blocos_documentos(corpo, kb, resultado, grupo) -> None:
                              f"{titulo} — medidas de desempenho", numericas=(1,)))
 
 
-# --------------------------------------------------------------------- LaTeX
-
-
-def _tex(texto) -> str:
-    trocas = {
-        "\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$",
-        "#": r"\#", "_": r"\_", "{": r"\{", "}": r"\}",
-        "~": r"\textasciitilde{}", "^": r"\textasciicircum{}",
-    }
-    return "".join(trocas.get(c, c) for c in str(texto or ""))
-
-
-def gera_latex(destino: Path, kb, periodos, config, estendido: bool = False,
-               medida_temporal: str = "EquivalenceIndex") -> dict:
-    destino.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(_ASSETS / "logo.png", destino / "logo.png")
-    resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
-    mapa = longitudinal.constroi(kb, config, periodos, medida_temporal)
-
-    partes = [
-        r"\documentclass[11pt,a4paper]{article}",
-        r"\usepackage[utf8]{inputenc}",
-        r"\usepackage[T1]{fontenc}",
-        r"\usepackage[brazil]{babel}",
-        r"\usepackage[margin=2.5cm,top=3.2cm]{geometry}",
-        r"\usepackage{longtable}",
-        r"\usepackage{array}",
-        r"\usepackage{booktabs}",
-        r"\usepackage{graphicx}",
-        r"\usepackage{xcolor}",
-        r"\usepackage{fancyhdr}",
-        r"\usepackage[scaled=0.92]{helvet}",
-        r"\renewcommand{\familydefault}{\sfdefault}",
-        r"\usepackage{hyperref}",
-        r"\definecolor{redescinza}{HTML}{64748B}",
-        r"\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}",
-        r"\pagestyle{fancy}",
-        r"\fancyhf{}",
-        r"\fancyhead[L]{\footnotesize\color{redescinza}Redes · mapeamento e "
-        r"análise da produção científica}",
-        r"\fancyhead[R]{\IfFileExists{logo.png}{\includegraphics[height=12mm]{logo.png}}{}}",
-        r"\fancyfoot[C]{\footnotesize\color{redescinza}Gerado por Redes.}",
-        r"\setlength{\headheight}{38pt}",
-        r"\setlength{\headsep}{12pt}",
-        r"\renewcommand{\headrulewidth}{0.4pt}",
-        r"\renewcommand{\footrulewidth}{0pt}",
-        r"\fancypagestyle{plain}{\fancyhf{}"
-        r"\fancyhead[L]{\footnotesize\color{redescinza}Redes · mapeamento e "
-        r"análise da produção científica}"
-        r"\fancyhead[R]{\IfFileExists{logo.png}{\includegraphics[height=12mm]{logo.png}}{}}"
-        r"\fancyfoot[C]{\footnotesize\color{redescinza}Gerado por Redes.}"
-        r"\renewcommand{\headrulewidth}{0.4pt}}",
-        r"\title{Relatório — Redes}",
-        r"\author{Redes}",
-        r"\date{}",
-        r"\begin{document}",
-        r"\maketitle",
-        r"\section*{Configuração da análise}",
-        r"\begin{tabular}{ll}",
-        r"\toprule",
-    ]
-    for rotulo, valor in [
-        ("Unidade de análise", ROTULOS_UNIDADE.get(config.unidade, config.unidade)),
-        ("Tipo de rede", ROTULOS_MATRIZ.get(config.matriz, config.matriz)),
-        ("Normalização", ROTULOS_SIMILARIDADE.get(config.similaridade, config.similaridade)),
-        ("Algoritmo", ROTULOS_ALGORITMO.get(config.algoritmo, config.algoritmo)),
-        ("Frequência mínima", config.minimo_frequencia),
-        ("Coocorrência mínima", config.minimo_coocorrencia),
-        ("Rede", f"{config.tamanho_minimo}–{config.tamanho_maximo}"),
-        ("Corte", _numero(config.corte)),
-        ("Mapeadores", ", ".join(ROTULOS_MAPEADOR.get(m, m) for m in config.mapeadores)),
-    ]:
-        partes.append(f"{_tex(rotulo)} & {_tex(valor)} \\\\")
-    partes += [r"\bottomrule", r"\end{tabular}", ""]
-
-    for indice, resultado in enumerate(resultados):
-        grupos = sorted(resultado.grupos, key=lambda g: (-len(g.nos), g.rotulo or ""))
-        partes.append(f"\\section{{{_tex(resultado.periodo)}}}")
-        partes.append(f"Documentos: {resultado.dataset_original.quantidade_documentos()}; "
-                      f"itens: {resultado.dataset_original.quantidade_itens()}; "
-                      f"agrupamentos: {len(grupos)}.")
-        partes += [
-            r"\begin{longtable}{rlrrrr}",
-            r"\toprule",
-            r"Selo & Agrupamento & Itens & Densidade & Centralidade & Quadrante \\",
-            r"\midrule",
-        ]
-        for posicao, grupo in enumerate(grupos, start=1):
-            partes.append(
-                f"{posicao} & {_tex(grupo.rotulo)} & {len(grupo.nos)} & "
-                f"{_numero(grupo.densidade)} & {_numero(grupo.centralidade)} & "
-                f"{_quadrante(grupo)} \\\\")
-        partes += [r"\bottomrule", r"\end{longtable}"]
-
-        for posicao, grupo in enumerate(grupos, start=1):
-            partes.append(f"\\subsection{{{_tex(grupo.rotulo)}}}")
-            partes += [
-                r"\begin{tabular}{lr}",
-                r"\toprule",
-                f"Itens & {len(grupo.nos)} \\\\",
-                f"Densidade & {_numero(grupo.densidade)} \\\\",
-                f"Centralidade & {_numero(grupo.centralidade)} \\\\",
-                f"Quadrante & {_quadrante(grupo)} \\\\",
-                r"\bottomrule",
-                r"\end{tabular}",
-            ]
-
-            for mapeador in resultado.configuracao.mapeadores:
-                prefixo = f"{mapeador}:"
-                partes += [
-                    f"\\paragraph{{Medidas de desempenho — "
-                    f"{_tex(ROTULOS_MAPEADOR.get(mapeador, mapeador))}}}",
-                    r"\mbox{}\par",
-                    r"\begin{tabular}{lr}",
-                    r"\toprule",
-                    r"Medida & Valor \\",
-                    r"\midrule",
-                ]
-                for medida in ORDEM_MEDIDAS:
-                    partes.append(
-                        f"{_tex(ROTULOS_MEDIDA[medida])} & "
-                        f"{_numero(grupo.medidas.get(prefixo + medida, 0))} \\\\")
-                partes += [r"\bottomrule", r"\end{tabular}"]
-            internas, externas = _ligacoes(resultado, grupo)
-            nomes = {no: resultado.dataset.itens.get(no, str(no))
-                     for no in resultado.rede.nos}
-            if internas:
-                partes += [
-                    r"\paragraph{Ligações internas}",
-                    r"\begin{longtable}{L{6.4cm}L{6.4cm}r}",
-                    r"\toprule",
-                    r"Nó A & Nó B & Peso \\",
-                    r"\midrule",
-                ]
-                for a, b, valor in internas[:40]:
-                    partes.append(
-                        f"{_tex(nomes[a])} & {_tex(nomes[b])} & {_numero(valor)} \\\\")
-                partes += [r"\bottomrule", r"\end{longtable}"]
-            if estendido:
-                _latex_documentos(partes, kb, grupo)
-
-    partes.append(r"\end{document}")
-    (destino / "relatorio.tex").write_text("\n".join(partes) + "\n", encoding="utf-8")
-    return {"latex": str(destino), "periodos": len(resultados),
-            "agrupamentos": sum(len(r.grupos) for r in resultados)}
-
-
-def _latex_documentos(partes, kb, grupo) -> None:
-    for mapeador, ids in grupo.documentos.items():
-        documentos = _documentos(kb, sorted(ids))
-        if not documentos:
-            continue
-        partes += [
-            f"\\paragraph{{{_tex(ROTULOS_MAPEADOR.get(mapeador, mapeador))}}}",
-            r"\mbox{}\par",
-            r"\begin{longtable}{p{6cm}p{3.6cm}r}",
-            r"\toprule",
-            r"Título & Autores & Citações \\",
-            r"\midrule",
-        ]
-        for doc_id in sorted(documentos):
-            doc = documentos[doc_id]
-            partes.append(
-                f"{_tex(doc['titulo'])} & {_tex(doc['autores'])} & "
-                f"{doc['citacoes']} \\\\")
-        partes += [r"\bottomrule", r"\end{longtable}"]
-
-
 def gera(destino: str | Path, kb, periodos, config, formato: str = "html",
          estendido: bool = False,
          medida_temporal: str = "EquivalenceIndex") -> dict:
-    destino = Path(destino)
-    if formato == "html":
-        return gera_html(destino, kb, periodos, config, estendido, medida_temporal)
-    if formato == "latex":
-        return gera_latex(destino, kb, periodos, config, estendido, medida_temporal)
-    raise ValueError(f"formato de relatório inválido: {formato}")
+    """Gera o relatório. O único formato é HTML."""
+    if formato != "html":
+        raise ValueError("o relatório é gerado somente em HTML")
+    return gera_html(Path(destino), kb, periodos, config, estendido, medida_temporal)

@@ -18,7 +18,7 @@ O Redes segue a mesma lógica do bibliometrix até a matriz documento × item. D
 | 7 | **Agrupamento** | Forma os temas por centros simples, ligação simples, completa, média, soma ou Louvain. | Modo avançado |
 | 8 | **Medidas** | Centralidade e densidade de Callon, índices h, g, hg e q2, e documentos por mapeador (núcleo, união, interseção, k-core e acoplamento). | Abas Índices e Agrupamentos |
 | 9 | **Mapas** | Diagrama estratégico (motor, básico, nicho, emergente), rede em halos, rede de agrupamentos, mapas de evolução e sobreposição entre períodos e rede de países. | Resumo, Diagrama, Comparar períodos |
-| 10 | **Saídas** | Relatório HTML e LaTeX com as redes e o quadro de métricas, Pajek, GraphML, TSV, XML de grupos, figuras SVG e PNG e a grade de 162 análises. | Exportar e Relatório |
+| 10 | **Saídas** | Relatório HTML com as redes e o quadro de métricas, Pajek, GraphML, TSV, XML de grupos, figuras SVG e PNG e a grade de 162 análises. | Exportar e Relatório |
 | ↺ | **Editar a base** | Juntar, ignorar ou renomear termos e refazer a análise. É o ciclo que mais se repete no trabalho real. | Base |
 
 ## Em relação ao bibliometrix

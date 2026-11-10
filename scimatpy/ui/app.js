@@ -2797,10 +2797,6 @@ function exportar(tipo) {
     mostrarToast("Execute uma prévia antes de exportar.", true);
     return;
   }
-  if (tipo === "relatorio-latex") {
-    gerarRelatorio("latex");
-    return;
-  }
   window.location.href = `/api/exportar?token=${encodeURIComponent(estado.token)}` +
     `&tipo=${encodeURIComponent(tipo)}`;
 }
@@ -2820,24 +2816,14 @@ async function gerarRelatorio(formato) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dados),
     });
-    if (formato === "html") {
-      const link = document.createElement("a");
-      link.href = relatorio.url;
-      link.target = "_blank";
-      link.rel = "noopener";
-      document.body.append(link);
-      link.click();
-      link.remove();
-      mostrarToast("Relatório aberto em nova aba.");
-    } else {
-      const link = document.createElement("a");
-      link.href = relatorio.url;
-      link.download = "relatorio.tex";
-      document.body.append(link);
-      link.click();
-      link.remove();
-      mostrarToast("LaTeX gerado; o download começou.");
-    }
+    const link = document.createElement("a");
+    link.href = relatorio.url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    mostrarToast("Relatório aberto em nova aba.");
   } catch (erro) {
     mostrarToast(erro.message, true);
   } finally {

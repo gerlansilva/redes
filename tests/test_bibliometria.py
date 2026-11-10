@@ -57,3 +57,13 @@ class CoresDosGruposTest(unittest.TestCase):
         cores = [cor_do_grupo(i) for i in range(60)]
         self.assertNotIn(CINZA, cores)
         self.assertEqual(len(set(cores)), 60)
+
+
+class RelatorioSomenteHtmlTest(unittest.TestCase):
+    def test_latex_recusado(self):
+        from scimatpy import api, report
+        with self.assertRaises(api.ErroApi):
+            api.gera_relatorio({"projeto": __file__, "formato": "latex"})
+        self.assertFalse(hasattr(report, "gera_latex"))
+        with self.assertRaises(ValueError):
+            report.gera("x", None, [], None, formato="latex")

@@ -35,8 +35,9 @@ desktop e integração contínua. Os dois dependem de decisões externas ao cód
 4. **Índices** — calculados por agrupamento e por mapeador, visíveis na aba
    **Índices**, no detalhe do grupo e nas exportações.
 5. **Relatórios** — HTML (índice, período e agrupamento, simples e estendido,
-   com referências ABNT) e LaTeX, ambos com diagrama estratégico por mapeador
-   e medida.
+   com referências ABNT), com rede completa, rede de agrupamentos, quadro de
+   métricas com a rede de cada agrupamento e diagrama estratégico por mapeador
+   e medida. O relatório em LaTeX foi retirado: só HTML.
 6. **Mapas longitudinais** — evolução, sobreposição e Pajek na aba **Comparar
    períodos**.
 7. **Edição da base** — períodos, grupos (renomear, separar, juntar),

@@ -30,7 +30,7 @@ normalizar, agrupar, medir, desenhar e relatar, sem depender da interface Java.
 | Mapa de colaboração entre países (interativo, com zoom e destaque) | pronto |
 | Diagrama estratégico (interativo, com SVG para exportar) | pronto |
 | Mapas longitudinais (evolução e sobreposição) | pronto |
-| Relatórios HTML e LaTeX/ABNT | pronto |
+| Relatório HTML (com referências ABNT) | pronto |
 | Carregadores nativos (BibTeX, RIS, CSV, OpenAlex, WoS, Scopus) | pronto |
 | Armazenamento próprio (`.redes` gravado pelo Python) | pronto: esquema do Bibliomapa (`v1_03`) mais as tabelas de países |
 | Exportações (Pajek, GraphML, XML de grupos, TSV) | pronto |
@@ -173,16 +173,16 @@ equivalência de Callon). **Comparar períodos** (mapa de evolução e de
 sobreposição) só aparece quando o projeto tem dois períodos ou mais. O
 seletor **Exportar…** grava
 índices em TSV, a rede em Pajek ou GraphML, os grupos da base em XML e os
-documentos do período em TSV. **Relatório** gera o HTML completo em nova aba;
-a opção "Relatório (LaTeX)" do seletor grava o `relatorio.tex`. O botão
+documentos do período em TSV. **Relatório** gera o HTML completo em nova aba. O botão
 **Base** abre o editor de períodos e grupos, com substituição de grafia e
 desfazer.
 
 Limites conhecidos: uma execução de grade por vez (proteção de memória); a
 rede interativa fica disponível para a última prévia (as anteriores mantêm o
 detalhe dos grupos e a figura SVG); rótulos em "todos" são limitados aos 400
-nós de maior grau. O relatório HTML traz um diagrama estratégico por mapeador
-e medida; o LaTeX traz as mesmas medidas em tabelas, sem as figuras.
+nós de maior grau. O relatório HTML traz, por período, a rede completa, a
+rede de agrupamentos, o quadro de métricas com a rede de cada agrupamento e um
+diagrama estratégico por mapeador e medida. Não há relatório em LaTeX.
 
 ### Linha de comando
 
@@ -297,7 +297,7 @@ scimatpy/
   mappers.py     mapeadores de documentos
   pipeline.py    configuração e fluxo completo de um período
   grade.py       as 162 combinações de análise
-  report.py      relatórios HTML e LaTeX (simples e estendido)
+  report.py      relatório HTML (simples e estendido)
   longitudinal.py  mapas de evolução, sobreposição e Pajek
   exports.py     grupos XML, Pajek, GraphML e TSV
   edit.py        edição de períodos, grupos e substituição; desfazer
@@ -332,14 +332,13 @@ batam:
 A auditoria original e o que foi corrigido estão em
 [pendencias.md](docs/pendencias.md). O que resta é de produto, não de
 paridade: distribuição desktop (Tauri), edição de sinônimos e stopwords na
-interface e relatório LaTeX com as figuras embutidas quando houver um
-rasterizador instalado.
+interface.
 
 ## Próximos passos
 
 1. Distribuição desktop com Tauri, reaproveitando o servidor local.
 2. Editor de sinônimos, stopwords e equivalências na interface.
-3. Relatório LaTeX com as figuras, usando PNG quando houver conversor.
+3. Bibliometria descritiva dentro do relatório HTML.
 4. Mapas de estabilidade e novidade, além de evolução e sobreposição.
 
 ## Testes

@@ -116,7 +116,7 @@
 <rect x="30" y="770" width="1100" height="190" rx="16" fill="#fff" stroke="#2F2BFF" stroke-width="2.5"/>
 <text x="580" y="802" font-size="18" font-weight="700" fill="#0B1F66" text-anchor="middle">Saídas</text>
 <text x="175" y="836" font-size="14" font-weight="700" fill="#2F2BFF" text-anchor="middle">Relatório</text>
-<text x="175" y="859" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">HTML e LaTeX</text>
+<text x="175" y="859" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">somente HTML</text>
 <text x="175" y="880" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">redes e quadro de métricas</text>
 <text x="175" y="901" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">por período e por agrupamento</text>
 <text x="445" y="836" font-size="14" font-weight="700" fill="#2F2BFF" text-anchor="middle">Redes e tabelas</text>

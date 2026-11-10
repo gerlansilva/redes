@@ -819,12 +819,14 @@ def edita_base(dados: dict) -> dict:
 # --------------------------------------------------------- relatório e mapas
 
 def gera_relatorio(dados: dict) -> dict:
-    """Gera o relatório HTML ou LaTeX e devolve a URL de abertura."""
+    """Gera o relatório HTML e devolve a URL de abertura."""
     from . import report
 
     caminho = _valida_projeto(dados.get("projeto", ""))
     config = _config(dados)
-    formato = dados.get("formato", "html")
+    formato = dados.get("formato") or "html"
+    if formato != "html":
+        raise ErroApi("O relatório é gerado somente em HTML.")
     estendido = bool(dados.get("estendido", False))
     medida = dados.get("medida_temporal", "EquivalenceIndex")
 
@@ -842,7 +844,7 @@ def gera_relatorio(dados: dict) -> dict:
         while len(RELATORIOS) > 5:
             RELATORIOS.popitem(last=False)
 
-    arquivo = "index.html" if formato == "html" else "relatorio.tex"
+    arquivo = "index.html"
     return {"token": token, "formato": formato, "resumo": resumo,
             "url": f"/relatorio/{token}/{arquivo}",
             "indice": f"/relatorio/{token}/index.html"}
@@ -1315,7 +1317,7 @@ class Manipulador(BaseHTTPRequestHandler):
                 if not arquivo.is_file():
                     raise ErroApi(f"arquivo não encontrado: {nome}")
                 tipos = {".html": "text/html", ".svg": "image/svg+xml",
-                         ".tex": "text/plain", ".net": "text/plain",
+                         ".net": "text/plain",
                          ".png": "image/png", ".csv": "text/csv"}
                 tipo = tipos.get(arquivo.suffix.lower(), "application/octet-stream")
                 self._arquivo(arquivo.read_bytes(), arquivo.name, tipo, False)
