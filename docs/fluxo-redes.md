@@ -1,0 +1,41 @@
+# Fluxo de análise do Redes
+
+![Fluxo de análise do Redes](fluxo-redes.png)
+
+O Redes segue a mesma lógica do bibliometrix até a matriz documento × item. Depois dela o caminho se divide em dois: a **estatística descritiva** do corpus e o **mapeamento científico por período**, herdado do SciMAT.
+
+## Etapas
+
+| # | Etapa | O que acontece | Onde fica na ferramenta |
+|---|---|---|---|
+| 1 | **Importar** | Lê CSV da Scopus, RIS, CSV ou BibTeX do Zotero, OpenAlex, Web of Science (texto ISI) e CSV genérico. O formato é reconhecido pelo conteúdo do arquivo. | Abrir projeto → importar |
+| 2 | **Limpar e unir** | Remove duplicatas (mesmo DOI, ou mesmo título e ano), une singular/plural e acento em português, espanhol e inglês, e define os períodos pelos anos do corpus. | Automático na importação |
+| 3 | **Projeto `.redes`** | Guarda tudo em um banco SQLite local, com grupos de palavras, autores e países, e a lista de termos ignorados. | Arquivo no seu computador |
+| 4 | **Matriz documento × item** | Cada documento recebe 1 ou 0 para cada palavra-chave, autor, referência, país ou periódico. | Interna |
+| 5a | **Visão geral descritiva** | Produção e citações por ano, rankings de autores, fontes, países e palavras-chave, documentos mais citados, coautoria e leis de Lotka, Bradford e Zipf. | Menu → Visão geral descritiva |
+| 5b | **Matriz de rede** | A matriz vira co-ocorrência (itens que aparecem juntos) ou acoplamento (documentos que citam as mesmas referências). | Menu de análises |
+| 6 | **Rede do período** | Constrói uma rede por período, com a similaridade escolhida: equivalência, associação, inclusão, Jaccard ou Salton. | Aba Rede |
+| 7 | **Agrupamento** | Forma os temas por centros simples, ligação simples, completa, média, soma ou Louvain. | Modo avançado |
+| 8 | **Medidas** | Centralidade e densidade de Callon, índices h, g, hg e q2, e documentos por mapeador (núcleo, união, interseção, k-core e acoplamento). | Abas Índices e Agrupamentos |
+| 9 | **Mapas** | Diagrama estratégico (motor, básico, nicho, emergente), rede em halos, rede de agrupamentos, mapas de evolução e sobreposição entre períodos e rede de países. | Resumo, Diagrama, Comparar períodos |
+| 10 | **Saídas** | Relatório HTML e LaTeX com as redes e o quadro de métricas, Pajek, GraphML, TSV, XML de grupos, figuras SVG e PNG e a grade de 162 análises. | Exportar e Relatório |
+| ↺ | **Editar a base** | Juntar, ignorar ou renomear termos e refazer a análise. É o ciclo que mais se repete no trabalho real. | Base |
+
+## Em relação ao bibliometrix
+
+| | Bibliometrix | Redes |
+|---|---|---|
+| Bases aceitas | Scopus, Web of Science, Dimensions, Lens, PubMed, Cochrane, OpenAlex | Scopus, Zotero, OpenAlex, Web of Science e CSV genérico |
+| Estatística descritiva | Sim | Sim (Visão geral descritiva) |
+| Mapeamento temático | Um mapa temático para todo o corpus | Um mapa **por período**, com comparação entre períodos |
+| Medida de desempenho dos temas | Citações e documentos | Documentos, citações, h, g, hg e q2, por mapeador |
+| Edição de grupos e termos | Por código em R | Por tela (Base), com desfazer |
+| Uso | Pacote R e aplicativo Shiny | Programa local, em português |
+
+## O que ainda falta neste fluxo
+
+- A visão geral descritiva aparece só na tela: ainda não entra no relatório HTML nem tem botão de CSV por tabela.
+- O Zotero não exporta referências, então cocitação e frentes de pesquisa só funcionam com CSV da Scopus.
+- Não há instalador para o Mac: o Redes roda pelo Terminal com `python3 -m scimatpy web`.
+
+A figura é gerada por `gera_fluxo.py` (`python3 gera_fluxo.py fluxo-redes.svg`), e o arquivo `.svg` pode ser editado em qualquer programa de desenho.

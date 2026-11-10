@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1700 990" width="1700" height="990" font-family="Inter, Helvetica, Arial, sans-serif">
+<defs><marker id="ponta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#0B1F66"/></marker><marker id="pontaA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#A16207"/></marker><marker id="pontaR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#6A3BFF"/></marker></defs>
+<rect width="1700" height="990" fill="#fff"/>
+<text x="850" y="44" font-size="24" font-weight="700" fill="#0B1F66" text-anchor="middle">Fluxo de análise do Redes</text>
+<text x="140" y="290" font-size="18" font-weight="700" fill="#0B1F66" text-anchor="middle">Bases bibliográficas</text>
+<rect x="30" y="306" width="220" height="52" rx="12" fill="#fff" stroke="#2F2BFF" stroke-width="1.8"/>
+<text x="140" y="329" font-size="15" font-weight="700" fill="#0B1F66" text-anchor="middle">Scopus</text>
+<text x="140" y="347" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">CSV</text>
+<rect x="30" y="368" width="220" height="52" rx="12" fill="#fff" stroke="#2F2BFF" stroke-width="1.8"/>
+<text x="140" y="391" font-size="15" font-weight="700" fill="#0B1F66" text-anchor="middle">Zotero</text>
+<text x="140" y="409" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">RIS · CSV · BibTeX</text>
+<rect x="30" y="430" width="220" height="52" rx="12" fill="#fff" stroke="#2F2BFF" stroke-width="1.8"/>
+<text x="140" y="453" font-size="15" font-weight="700" fill="#0B1F66" text-anchor="middle">OpenAlex</text>
+<text x="140" y="471" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">CSV</text>
+<rect x="30" y="492" width="220" height="52" rx="12" fill="#fff" stroke="#2F2BFF" stroke-width="1.8"/>
+<text x="140" y="515" font-size="15" font-weight="700" fill="#0B1F66" text-anchor="middle">Web of Science</text>
+<text x="140" y="533" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">texto ISI</text>
+<rect x="30" y="554" width="220" height="52" rx="12" fill="#fff" stroke="#2F2BFF" stroke-width="1.8"/>
+<text x="140" y="577" font-size="15" font-weight="700" fill="#0B1F66" text-anchor="middle">CSV genérico</text>
+<text x="140" y="595" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">SciMAT e outros</text>
+<text x="140" y="640" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">O formato é reconhecido</text>
+<text x="140" y="657" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">pelo conteúdo do arquivo</text>
+<line x1="250" y1="332" x2="266" y2="332" stroke="#0B1F66" stroke-width="2.6"/>
+<line x1="250" y1="394" x2="266" y2="394" stroke="#0B1F66" stroke-width="2.6"/>
+<line x1="250" y1="456" x2="266" y2="456" stroke="#0B1F66" stroke-width="2.6"/>
+<line x1="250" y1="518" x2="266" y2="518" stroke="#0B1F66" stroke-width="2.6"/>
+<line x1="250" y1="580" x2="266" y2="580" stroke="#0B1F66" stroke-width="2.6"/>
+<line x1="266" y1="332" x2="266" y2="580" stroke="#0B1F66" stroke-width="2.6"/>
+<path d="M266,470 L410,470" fill="none" stroke="#0B1F66" stroke-width="3" stroke-linejoin="round" marker-end="url(#ponta)"/>
+<rect x="278.0" y="446.0" width="120" height="48" rx="9" fill="#DDE4FF" stroke="#2F2BFF" stroke-width="1.2"/>
+<text x="338" y="465.0" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">Importar,</text>
+<text x="338" y="482.0" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">limpar e unir</text>
+<rect x="410" y="335" width="250" height="270" rx="16" fill="#F4F2FF" stroke="#0B1F66" stroke-width="2.5"/>
+<text x="535" y="366" font-size="18" font-weight="700" fill="#0B1F66" text-anchor="middle">Projeto .redes</text>
+<text x="535" y="386" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">banco SQLite local</text>
+<text x="535" y="418" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">Duplicatas removidas</text>
+<text x="535" y="439" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">(DOI ou título + ano)</text>
+<text x="535" y="460" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">Singular/plural e acento</text>
+<text x="535" y="481" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">(pt · es · en)</text>
+<text x="535" y="502" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">Grupos de palavras, autores</text>
+<text x="535" y="523" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">e países · termos ignorados</text>
+<text x="535" y="544" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">Períodos sugeridos</text>
+<text x="535" y="565" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">pelos anos do corpus</text>
+<path d="M660,470 L820,470" fill="none" stroke="#0B1F66" stroke-width="3" stroke-linejoin="round" marker-end="url(#ponta)"/>
+<rect x="680.0" y="437.5" width="120" height="65" rx="9" fill="#DDE4FF" stroke="#2F2BFF" stroke-width="1.2"/>
+<text x="740" y="456.5" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">Matriz</text>
+<text x="740" y="473.5" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">documento ×</text>
+<text x="740" y="490.5" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">item</text>
+<rect x="820" y="335" width="220" height="270" rx="16" fill="#fff" stroke="#0B1F66" stroke-width="2.5"/>
+<text x="930" y="366" font-size="17" font-weight="700" fill="#0B1F66" text-anchor="middle">Documento × item</text>
+<rect x="865" y="388" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="891" y="388" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="917" y="388" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="943" y="388" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="969" y="388" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="865" y="414" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="891" y="414" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="917" y="414" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="943" y="414" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="969" y="414" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="865" y="440" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="891" y="440" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="917" y="440" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="943" y="440" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="969" y="440" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="865" y="466" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="891" y="466" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="917" y="466" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="943" y="466" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="969" y="466" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="865" y="492" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="891" y="492" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="917" y="492" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<rect x="943" y="492" width="26" height="26" fill="#fff" fill-opacity="1" stroke="#0B1F66" stroke-width="1"/>
+<rect x="969" y="492" width="26" height="26" fill="#2F2BFF" fill-opacity="0.85" stroke="#0B1F66" stroke-width="1"/>
+<text x="930" y="548" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">palavras-chave · autores</text>
+<text x="930" y="565" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">referências · países</text>
+<text x="930" y="582" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">periódicos</text>
+<path d="M930,335 L930,195 L1200,195" fill="none" stroke="#0B1F66" stroke-width="3" stroke-linejoin="round" marker-end="url(#ponta)"/>
+<rect x="1005.0" y="171.0" width="130" height="48" rx="9" fill="#DDE4FF" stroke="#2F2BFF" stroke-width="1.2"/>
+<text x="1070" y="190.0" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">Estatística</text>
+<text x="1070" y="207.0" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">descritiva</text>
+<rect x="1200" y="90" width="450" height="210" rx="16" fill="#E6F8EE" stroke="#00A344" stroke-width="2.5"/>
+<text x="1425" y="122" font-size="18" font-weight="700" fill="#0B1F66" text-anchor="middle">Visão geral descritiva (na tela)</text>
+<text x="1425" y="152" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Produção e citações por ano · acumulado</text>
+<text x="1425" y="176" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Autores, fontes, países e palavras-chave</text>
+<text x="1425" y="200" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Documentos mais citados · fontes citadas</text>
+<text x="1425" y="224" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Coautoria · índice h</text>
+<text x="1425" y="248" font-size="13" font-weight="400" fill="#14204A" text-anchor="middle">Leis de Lotka, Bradford e Zipf</text>
+<path d="M930,605 L930,700 L1200,700" fill="none" stroke="#0B1F66" stroke-width="3" stroke-linejoin="round" marker-end="url(#ponta)"/>
+<rect x="995.0" y="667.5" width="150" height="65" rx="9" fill="#DDE4FF" stroke="#2F2BFF" stroke-width="1.2"/>
+<text x="1070" y="686.5" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">Matriz de rede:</text>
+<text x="1070" y="703.5" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">co-ocorrência ou</text>
+<text x="1070" y="720.5" font-size="12.5" font-weight="600" fill="#0B1F66" text-anchor="middle">acoplamento</text>
+<rect x="1200" y="380" width="450" height="480" rx="16" fill="#FBFAFF" stroke="#6A3BFF" stroke-width="2.5"/>
+<text x="1425" y="410" font-size="17" font-weight="700" fill="#6A3BFF" text-anchor="middle">Mapeamento científico, por período</text>
+<rect x="1222" y="432" width="406" height="80" rx="12" fill="#fff" stroke="#6A3BFF" stroke-width="1.8"/>
+<text x="1425" y="458" font-size="15" font-weight="700" fill="#0B1F66" text-anchor="middle">1  Rede do período</text>
+<text x="1425" y="480" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">Similaridade: equivalência, associação,</text>
+<text x="1425" y="497" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">inclusão, Jaccard, Salton</text>
+<path d="M1425,512 L1425,536" fill="none" stroke="#6A3BFF" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#pontaR)"/>
+<rect x="1222" y="536" width="406" height="80" rx="12" fill="#fff" stroke="#6A3BFF" stroke-width="1.8"/>
+<text x="1425" y="562" font-size="15" font-weight="700" fill="#0B1F66" text-anchor="middle">2  Agrupamento</text>
+<text x="1425" y="584" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">Centros simples, ligação simples, completa,</text>
+<text x="1425" y="601" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">média, soma · Louvain</text>
+<path d="M1425,616 L1425,640" fill="none" stroke="#6A3BFF" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#pontaR)"/>
+<rect x="1222" y="640" width="406" height="80" rx="12" fill="#fff" stroke="#6A3BFF" stroke-width="1.8"/>
+<text x="1425" y="666" font-size="15" font-weight="700" fill="#0B1F66" text-anchor="middle">3  Medidas</text>
+<text x="1425" y="688" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">Callon (centralidade e densidade) · h, g, hg, q2</text>
+<text x="1425" y="705" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">documentos por mapeador: núcleo, união…</text>
+<path d="M1425,720 L1425,744" fill="none" stroke="#6A3BFF" stroke-width="2.6" stroke-linejoin="round" marker-end="url(#pontaR)"/>
+<rect x="1222" y="744" width="406" height="80" rx="12" fill="#fff" stroke="#6A3BFF" stroke-width="1.8"/>
+<text x="1425" y="770" font-size="15" font-weight="700" fill="#0B1F66" text-anchor="middle">4  Mapas</text>
+<text x="1425" y="792" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">Diagrama estratégico: motor, básico, nicho, emergente</text>
+<text x="1425" y="809" font-size="12" font-weight="400" fill="#64748B" text-anchor="middle">Rede em halos · evolução e sobreposição · países</text>
+<rect x="30" y="770" width="1100" height="190" rx="16" fill="#fff" stroke="#2F2BFF" stroke-width="2.5"/>
+<text x="580" y="802" font-size="18" font-weight="700" fill="#0B1F66" text-anchor="middle">Saídas</text>
+<text x="175" y="836" font-size="14" font-weight="700" fill="#2F2BFF" text-anchor="middle">Relatório</text>
+<text x="175" y="859" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">HTML e LaTeX</text>
+<text x="175" y="880" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">redes e quadro de métricas</text>
+<text x="175" y="901" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">por período e por agrupamento</text>
+<text x="445" y="836" font-size="14" font-weight="700" fill="#2F2BFF" text-anchor="middle">Redes e tabelas</text>
+<text x="445" y="859" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">Pajek · GraphML</text>
+<text x="445" y="880" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">TSV de índices e documentos</text>
+<text x="445" y="901" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">Grupos da base (XML)</text>
+<text x="715" y="836" font-size="14" font-weight="700" fill="#2F2BFF" text-anchor="middle">Figuras</text>
+<text x="715" y="859" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">SVG e PNG</text>
+<text x="715" y="880" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">diagrama estratégico</text>
+<text x="715" y="901" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">rede em halos · mapas</text>
+<text x="985" y="836" font-size="14" font-weight="700" fill="#2F2BFF" text-anchor="middle">Grade de análises</text>
+<text x="985" y="859" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">162 combinações</text>
+<text x="985" y="880" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">unidade × matriz ×</text>
+<text x="985" y="901" font-size="12.5" font-weight="400" fill="#14204A" text-anchor="middle">algoritmo × similaridade</text>
+<path d="M1200,860 L1132,860" fill="none" stroke="#6A3BFF" stroke-width="3" stroke-linejoin="round" marker-end="url(#pontaR)"/>
+<path d="M535,770 L535,608" fill="none" stroke="#A16207" stroke-width="3.2" stroke-linejoin="round" stroke-dasharray="8 6" marker-end="url(#pontaA)"/>
+<rect x="395" y="672" width="280" height="44" rx="9" fill="#FFF8D6" stroke="#A16207" stroke-width="1.4"/>
+<text x="535" y="691" font-size="12.5" font-weight="700" fill="#7A4B00" text-anchor="middle">Editar a base: juntar, ignorar,</text>
+<text x="535" y="708" font-size="12.5" font-weight="700" fill="#7A4B00" text-anchor="middle">renomear e refazer a análise</text>
+</svg>
