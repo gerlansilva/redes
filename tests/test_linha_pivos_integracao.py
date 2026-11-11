@@ -172,7 +172,10 @@ class RotasTest(unittest.TestCase):
         with mock.patch("scimatpy.api.modulo_pivos.pontos_de_virada",
                         side_effect=RuntimeError("falha de teste")):
             d = self.analisa()
-        self.assertIsNone(d["pivos"])
+        # a falha não derruba a análise, mas aparece como aviso (e não como "sem pivôs")
+        self.assertIn("Não calculado", d["pivos"]["nao_calculado"])
+        self.assertIn("falha de teste", d["pivos"]["nao_calculado"])
+        self.assertEqual([], d["pivos"]["pivos"])
         self.assertTrue(d["grupos"])
         self.assertTrue(d["figuras"]["halo"])
         # a figura da rede continua saindo, sem anéis
@@ -267,7 +270,8 @@ class RelatoriosTest(unittest.TestCase):
         self.assertIn(f"{linha_do_tempo.POR_FAIXA} por faixa", texto)
         self.assertIn(f"{linha_do_tempo.RAJADA_MIN_DOCUMENTOS} documentos", texto)
         self.assertIn(f"{pivos.MINIMO_NOS} nós", texto)
-        self.assertIn("praticamente repete o ranking", texto)
+        self.assertNotIn("praticamente repete", texto)
+        self.assertIn("quem ordena o ranking por sigma é sobretudo a intermediação", texto)
         with mock.patch.object(linha_do_tempo, "MAX_NOS", 33), \
                 mock.patch.object(pivos, "MINIMO_NOS", 77):
             alterado = metodo.algoritmo_html(config, None, 2)

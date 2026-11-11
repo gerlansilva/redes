@@ -27,7 +27,8 @@ from . import build
 from . import pivos as modulo_pivos
 from . import qualidade as modulo_qualidade
 from . import rotulos as modulo_rotulos
-from .grade import grade as combinacoes_grade
+from .grade import UNIDADES as UNIDADES_GRADE, grade as combinacoes_grade
+from .ies import COMPONENTE_MINIMO_PADRAO, tabela_variantes
 from .kb import ProjetoScimat
 from .mappers import MAPEADORES
 from .pipeline import Configuracao, executa_periodo
@@ -40,7 +41,7 @@ from .viz.cluster import rede_de_agrupamentos_svg
 
 FORMATOS = ("csv", "bibtex", "ris", "openalex", "wos", "scopus", "zotero")
 UNIDADES = ("Words", "Authors", "References", "AuthorsReference",
-            "ReferenceSources", "Countries")
+            "ReferenceSources", "Countries", "Institutions")
 MATRIZES = ("CoOccurrence", "BasicCoupling", "AggregatedCouplingBasedOnAuthor",
             "AggregatedCouplingBasedOnJournal")
 SIMILARIDADES = ("EquivalenceIndex", "AssociationStrength", "InclusionIndex",
@@ -303,6 +304,7 @@ def _config(dados: dict) -> Configuracao:
         k_core=inteiro("k_core", 2, 1),
         palavras=tuple(palavras),
         indices=tuple(indices),
+        componente_minimo=inteiro("componente_minimo", COMPONENTE_MINIMO_PADRAO, 1),
     )
 
 
@@ -311,6 +313,8 @@ def _inteiro_limitado(valor, padrao: int, minimo: int, maximo: int, nome: str) -
         return padrao
     try:
         return max(minimo, min(maximo, int(valor)))
+    except OverflowError:
+        raise ErroApi(f"{nome} precisa ser um número finito (recebeu infinito)") from None
     except (TypeError, ValueError):
         raise ErroApi(f"{nome} precisa ser um número") from None
 
@@ -350,6 +354,8 @@ def dendrograma_do_pedido(pedido: dict) -> dict:
     if bruto not in (None, ""):
         try:
             n_pedido = int(bruto)
+        except OverflowError:
+            raise ErroApi("n_grupos precisa ser um número finito (recebeu infinito)") from None
         except (TypeError, ValueError):
             raise ErroApi("n_grupos precisa ser um número inteiro") from None
         if n_pedido < 1:
@@ -393,13 +399,17 @@ MENSAGEM_LT_SEM_SENTIDO = (
     "A linha do tempo mostra itens (palavras, autores, referências) ao longo dos anos. "
     "Com acoplamento, os nós são documentos e cada um já tem um só ano; escolha uma "
     "análise de co-ocorrência para ver a figura.")
+MENSAGEM_LT_UNIDADE = (
+    "A linha do tempo existe para palavras-chave, autores e referências em co-ocorrência. "
+    "Para esta unidade de análise (autores citados, fontes citadas, países ou instituições) "
+    "ela não é gerada; escolha uma dessas três unidades.")
 MAX_NOS_LT = (10, 60)
 
 
 def linha_do_tempo_do_pedido(pedido: dict) -> dict:
     """Linha do tempo do corpus completo (GET e POST). Usa ``token`` de uma análise já
     calculada ou, sem ele, ``projeto``/``caminho`` + a configuração de /api/analisa."""
-    from . import linha_do_tempo, report
+    from . import linha_do_tempo, metodo, report
     from .viz import linha_do_tempo as viz_lt
     max_nos = _inteiro_limitado(pedido.get("max_nos"), linha_do_tempo.MAX_NOS,
                                 MAX_NOS_LT[0], MAX_NOS_LT[1], "max_nos")
@@ -415,6 +425,8 @@ def linha_do_tempo_do_pedido(pedido: dict) -> dict:
         config = _config(pedido)
     if config.matriz != "CoOccurrence":
         raise ErroApi(MENSAGEM_LT_SEM_SENTIDO)
+    if config.unidade not in metodo.UNIDADES_LINHA_DO_TEMPO:
+        raise ErroApi(MENSAGEM_LT_UNIDADE)
     with ProjetoScimat(caminho) as kb:
         dados, rotulos_lt = report.linha_do_tempo_do_corpus(kb, config, max_nos)
     if not dados["faixas"]:
@@ -435,6 +447,52 @@ def linha_do_tempo_do_pedido(pedido: dict) -> dict:
         "omitidos": dados["omitidos"],
         "max_nos": max_nos,
         "por_faixa": linha_do_tempo.POR_FAIXA,
+    }
+
+
+MENSAGEM_DENS_SEM_SENTIDO = (
+    "O mapa de densidade posiciona itens (palavras, autores, referências, países) pela "
+    "co-ocorrência. Com acoplamento ou cocitação os nós são documentos; escolha uma "
+    "análise de co-ocorrência para ver a figura.")
+NOS_DENSIDADE = (20, 300)
+
+
+def densidade_do_pedido(pedido: dict) -> dict:
+    """Mapa de densidade do corpus completo (GET e POST). Usa ``token`` de uma análise já
+    calculada ou, sem ele, ``projeto``/``caminho`` + a configuração de /api/analisa."""
+    from . import report
+    from .viz import densidade
+    topo = _inteiro_limitado(pedido.get("max_nos"), densidade.TOPO_NOS,
+                             NOS_DENSIDADE[0], NOS_DENSIDADE[1], "max_nos")
+    suavizacao = _inteiro_limitado(pedido.get("suavizacao"), densidade.SUAVIZACAO,
+                                   *densidade.LIMITE_SUAVIZACAO, "suavizacao")
+    token = _token(pedido.get("token"))
+    if token:
+        analise = _analise(token)
+        caminho = Path(analise["projeto"])
+        config = analise["config"]
+        if not caminho.exists():
+            raise ErroExpirado(f"O projeto desta análise não existe mais: {caminho}")
+    else:
+        caminho = _valida_projeto(str(pedido.get("projeto") or pedido.get("caminho") or ""))
+        config = _config(pedido)
+    if config.matriz != "CoOccurrence":
+        raise ErroApi(MENSAGEM_DENS_SEM_SENTIDO)
+    with ProjetoScimat(caminho) as kb:
+        resultado = report.densidade_do_corpus(kb, config)
+    dados = densidade.calcula(resultado, topo, suavizacao)
+    if not dados["nos"]:
+        raise ErroApi(dados.get("aviso") or "Não há o que mostrar no mapa de densidade.")
+    titulo = report.titulo_densidade(config) if pedido.get("baixar") in ("1", "true") else ""
+    figura = densidade.svg(resultado, titulo, topo, suavizacao, unidade=config.unidade,
+                           dados=dados)
+    return {
+        "svg": figura,
+        "unidade": config.unidade,
+        "n_nos": len(dados["nos"]),
+        "n_total": dados["total"],
+        "max_nos": topo,
+        "suavizacao": suavizacao,
     }
 
 
@@ -480,6 +538,7 @@ def _pivos_publicos(bruto, nomes: dict) -> dict | None:
                    for t in bruto.get("termos_descritores") or []]
     return {
         "adiado": False,
+        "nao_calculado": bruto.get("nao_calculado"),
         "n_nos": bruto.get("n_nos", 0),
         "suficiente": bool(bruto.get("suficiente")),
         "minimo_nos": modulo_pivos.MINIMO_NOS,
@@ -497,8 +556,15 @@ def _calcula_pivos(kb, resultado):
         if resultado.rede.quantidade_nos() > LIMITE_PIVOS_INLINE:
             return None
         return modulo_pivos.pontos_de_virada(resultado, kb)
-    except Exception:
-        return None
+    except Exception as erro:  # noqa: BLE001
+        # Nunca derruba a análise, mas o aviso aparece: sumir em silêncio pareceria "sem pivôs".
+        traceback.print_exc()
+        try:
+            n = resultado.rede.quantidade_nos()
+        except Exception:  # noqa: BLE001
+            n = 0
+        return modulo_pivos.nao_calculado(
+            n, f"houve um erro ao calcular os pontos de virada ({erro}).")
 
 
 def pivos_da_analise(token: str) -> dict:
@@ -583,6 +649,23 @@ def descreve_projeto(caminho: Path) -> dict:
             for periodo in periodos
         ],
         "unidades": list(UNIDADES),
+    }
+
+
+def _ies_publico(resultado) -> dict | None:
+    """Rede de IES: tabela "variantes unidas" e componentes sem agrupamento."""
+    info = getattr(resultado, "ies", None)
+    if not info:
+        return None
+    return {
+        "componente_minimo": info["componente_minimo"],
+        "variantes_unidas": info["variantes_unidas"],
+        "unioes": info["unioes"],
+        "tabela": tabela_variantes(info["unioes"]),
+        "componentes": info["componentes"],
+        "componentes_pequenos": info["componentes_pequenos"],
+        "isolados": info["isolados"],
+        "sem_agrupamento": len(resultado.conjunto.nos_sem_grupo()),
     }
 
 
@@ -768,7 +851,9 @@ def analisa(dados: dict) -> dict:
             "palavras": list(config.palavras),
             "indices": list(config.indices),
             "ignorar": list(config.ignorar),
+            "componente_minimo": config.componente_minimo,
         },
+        "ies": _ies_publico(resultado),
         "avisos": avisos,
         "termos_genericos": genericos,
         "resumo": {
@@ -1195,6 +1280,12 @@ ANALISES_COMPLETO = [
      {"unidade": "Countries", "matriz": "CoOccurrence"},
      "SELECT COUNT(*) FROM CountryGroup WHERE COALESCE(stopGroup,0)=0", 2,
      "a base não traz país de afiliação (precisa de ao menos dois países)"),
+    ("instituicoes", "Colaboração entre instituições (IES)",
+     "Instituições que assinam os mesmos documentos, com os nomes unidos quando a "
+     "variante é inequívoca; componentes com menos de 3 instituições ficam sem agrupamento.",
+     {"unidade": "Institutions", "matriz": "CoOccurrence"},
+     "SELECT COUNT(DISTINCT Affiliation_idAffiliation) FROM Document_Affiliation", 3,
+     "a base não traz afiliações suficientes (precisa de ao menos três instituições)"),
     ("referencias", "Cocitação de referências",
      "Obras citadas em conjunto pelos documentos do corpus.",
      {"unidade": "References", "matriz": "CoOccurrence"},
@@ -1469,7 +1560,7 @@ def inicia_grade(dados: dict) -> dict:
     if not periodos:
         raise ErroApi("o projeto não tem períodos")
 
-    trabalho = Trabalho("grade", 27 * len(UNIDADES) * len(periodos))
+    trabalho = Trabalho("grade", 27 * len(UNIDADES_GRADE) * len(periodos))
     with TRAVA_TRABALHOS:
         TRABALHOS[trabalho.id] = trabalho
 
@@ -1780,6 +1871,14 @@ class Manipulador(BaseHTTPRequestHandler):
                                   "image/svg+xml", True)
                 else:
                     self._json(200, dados)
+            elif rota == "/api/densidade":
+                pedido = {k: v[0] for k, v in parametros.items() if v}
+                dados = densidade_do_pedido(pedido)
+                if pedido.get("baixar") in ("1", "true"):
+                    self._arquivo(dados["svg"].encode("utf-8"), "densidade.svg",
+                                  "image/svg+xml", True)
+                else:
+                    self._json(200, dados)
             elif rota == "/api/pivos":
                 self._json(200, pivos_da_analise(_param(parametros, "token")))
             elif rota == "/api/rajadas":
@@ -1910,6 +2009,8 @@ class Manipulador(BaseHTTPRequestHandler):
                 self._json(200, dendrograma_do_pedido(self._json_pedido()))
             elif rota == "/api/linha-do-tempo":
                 self._json(200, linha_do_tempo_do_pedido(self._json_pedido()))
+            elif rota == "/api/densidade":
+                self._json(200, densidade_do_pedido(self._json_pedido()))
             elif rota == "/api/analisa":
                 self._json(200, analisa(self._json_pedido()))
             elif rota == "/api/grade":

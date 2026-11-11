@@ -20,7 +20,7 @@ import re
 import statistics
 from collections import defaultdict
 
-from . import rajadas
+from . import pivos, rajadas
 from .dataset import Dataset
 from .pipeline import Configuracao, executa_periodo
 
@@ -97,6 +97,13 @@ def _anos_das_referencias(conexao, teto: int | None) -> dict[int, int]:
     return {g: statistics.median_low(v) for g, v in por_grupo.items()}
 
 
+def _finito(valor) -> bool:
+    try:
+        return math.isfinite(float(valor))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def _arredonda(valor: float) -> int:
     return int(math.floor(valor + 0.5))
 
@@ -104,7 +111,7 @@ def _arredonda(valor: float) -> int:
 def _vazio(unidade: str, aviso: str, **extra) -> dict:
     dados = {"unidade": unidade, "faixas": [], "ligacoes": [], "anos": [],
              "atividade": False, "avisos": [aviso],
-             "omitidos": {"itens": 0, "agrupamentos": 0, "sem_ano": 0}}
+             "omitidos": {"itens": 0, "agrupamentos": 0, "sem_ano": 0, "descritores": 0}}
     dados.update(extra)
     return dados
 
@@ -133,7 +140,18 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
     referencias = unidade == "References" and not por_documento
     anos_ref = (_anos_das_referencias(conexao, max(anos_doc.values()) + 1 if anos_doc else None)
                 if referencias else {})
+    teto_ref = max(anos_doc.values()) + 1 if anos_doc else 2100
     atividade = not referencias and not por_documento
+
+    # Termos-descritor (em mais da metade dos documentos): descrevem o corpus, não um
+    # tema; ficam de fora, como nos pontos de virada.
+    descritores: set[int] = set()
+    if not por_documento:
+        base = getattr(resultado, "dataset_original", None) or resultado.dataset
+        total_docs = base.quantidade_documentos()
+        if total_docs:
+            descritores = {no for no, f in resultado.frequencia_nos.items()
+                           if f / total_docs > pivos.PROPORCAO_DESCRITOR}
     posicao = "referencia" if referencias else "documento" if por_documento else "media"
 
     def anos_do_item(no: int) -> list[int]:
@@ -154,6 +172,7 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
 
     candidatos = []                 # (indice, no_dict)
     sem_ano = 0
+    omitidos_descritor = 0
     itens_por_faixa: dict[int, int] = {}
     frequencia_por_faixa: dict[int, int] = {}
     for indice, grupo in enumerate(resultado.grupos):
@@ -161,6 +180,9 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
         frequencia_por_faixa[indice] = sum(
             int(resultado.frequencia_nos.get(n, 0)) for n in grupo.nos)
         for no in grupo.nos:
+            if no in descritores:
+                omitidos_descritor += 1
+                continue
             if referencias:
                 ano = anos_ref.get(no)
                 primeiro = ultimo = ano
@@ -205,11 +227,24 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
 
     avisos: list[str] = []
     itens_total = sum(itens_por_faixa.values())
-    itens_de_fora = itens_total - total - sem_ano
+    itens_de_fora = itens_total - total - sem_ano - omitidos_descritor
     grupos_de_fora = len(resultado.grupos) - len(faixas)
+    if omitidos_descritor:
+        avisos.append(
+            f"{omitidos_descritor} {'termo-descritor omitido' if omitidos_descritor == 1 else 'termos-descritor omitidos'}"
+            f" (presentes em mais de {pivos.PROPORCAO_DESCRITOR:.0%} dos documentos: descrevem o "
+            "corpus, não distinguem temas).")
     if sem_ano:
+        if referencias:
+            motivo = f"a referência não traz um ano válido, entre 1400 e {teto_ref}" if sem_ano == 1 \
+                else f"as referências não trazem um ano válido, entre 1400 e {teto_ref}"
+        elif not anos_doc:
+            motivo = "nenhum documento do projeto traz o ano de publicação"
+        else:
+            motivo = ("os documentos do item não trazem o ano" if sem_ano == 1
+                      else "os documentos dos itens não trazem o ano")
         avisos.append(f"{sem_ano} {'item sem ano foi omitido' if sem_ano == 1 else 'itens sem ano foram omitidos'}"
-                      " (os documentos não trazem o ano).")
+                      f" ({motivo}).")
     if itens_de_fora > 0 or grupos_de_fora > 0:
         partes = [f"{itens_de_fora} {'item ficou' if itens_de_fora == 1 else 'itens ficaram'} de fora"]
         if grupos_de_fora:
@@ -218,11 +253,19 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
         avisos.append(f"A figura mostra os {total} itens mais frequentes (no máximo {max_nos} "
                       f"no total e {por_faixa} por faixa); " + " e ".join(partes) + ".")
     if not faixas:
-        avisos.append("Nenhum item dos agrupamentos tem ano; não há o que mostrar na linha do tempo.")
+        if referencias:
+            decisivo = (f"Nenhuma referência dos agrupamentos tem ano válido (entre 1400 e "
+                        f"{teto_ref}); não há o que mostrar na linha do tempo.")
+        elif not anos_doc:
+            decisivo = ("Nenhum documento do projeto traz o ano de publicação (todos os itens "
+                        "ficaram sem ano); não há o que mostrar na linha do tempo.")
+        else:
+            decisivo = "Nenhum item dos agrupamentos tem ano; não há o que mostrar na linha do tempo."
+        avisos.insert(0, decisivo)      # a API devolve o primeiro aviso como erro
         return {"unidade": unidade, "faixas": [], "ligacoes": [], "anos": [],
                 "atividade": atividade, "posicao": posicao, "avisos": avisos,
                 "omitidos": {"itens": max(itens_de_fora, 0), "agrupamentos": grupos_de_fora,
-                             "sem_ano": sem_ano}}
+                             "sem_ano": sem_ano, "descritores": omitidos_descritor}}
 
     todos_anos = [n["ano"] for f in faixas for n in f["nos"]]
     a0, a1 = min(todos_anos), max(todos_anos)
@@ -235,7 +278,9 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
     vizinhos: dict[int, list[tuple[float, int]]] = defaultdict(list)
     cruzadas = []
     for a, b, valor in resultado.rede.arestas():
-        if a not in faixa_de or b not in faixa_de or valor <= 0:
+        # NaN e infinito passam por `valor <= 0`; sem este filtro viram stroke-width="nan".
+        if (a not in faixa_de or b not in faixa_de
+                or not _finito(valor) or valor <= 0):
             continue
         if faixa_de[a] == faixa_de[b]:
             vizinhos[a].append((valor, b))
@@ -257,5 +302,5 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
             "anos": [a0, a1], "atividade": atividade, "posicao": posicao,
             "avisos": avisos,
             "omitidos": {"itens": max(itens_de_fora, 0), "agrupamentos": grupos_de_fora,
-                         "sem_ano": sem_ano},
+                         "sem_ano": sem_ano, "descritores": omitidos_descritor},
             "total_itens": itens_total, "total_agrupamentos": len(resultado.grupos)}

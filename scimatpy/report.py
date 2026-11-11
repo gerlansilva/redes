@@ -27,6 +27,7 @@ from .pipeline import executa_periodo
 from . import exports
 from .viz.cluster import rede_agrupamento_svg, rede_de_agrupamentos_svg
 from .viz.halo import halo_svg
+from .viz import densidade as viz_densidade
 from .viz import linha_do_tempo as viz_linha_do_tempo
 from .viz.strategic import diagrama_svg
 
@@ -311,6 +312,10 @@ NOTA_LINHA_DO_TEMPO = (
     "do primeiro ao último ano do item. O tamanho do nó segue a frequência e o anel vermelho "
     "marca uma rajada (aumento súbito de uso ou de citação).")
 
+NOTA_RAJADA_PALAVRAS = (
+    " As rajadas de palavras-chave são calculadas só sobre as palavras-chave dos autores, "
+    "embora a rede de palavras possa incluir também as de fonte.")
+
 
 def linha_do_tempo_aplicavel(config) -> bool:
     """A figura só tem sentido para palavras, autores ou referências em co-ocorrência."""
@@ -370,7 +375,8 @@ def linha_do_tempo_html(kb, config, figura, classe_nota: str = "nota"):
         if dados.get("faixas"):
             svg = viz_linha_do_tempo.svg(dados, titulo, rotulos=rot)
             partes.append(figura(svg, titulo + "."))
-            partes.append(f'<p class="{classe_nota}">{_esc(NOTA_LINHA_DO_TEMPO)}</p>')
+            nota = NOTA_LINHA_DO_TEMPO + (NOTA_RAJADA_PALAVRAS if config.unidade == "Words" else "")
+            partes.append(f'<p class="{classe_nota}">{_esc(nota)}</p>')
         else:
             partes.append(f'<p class="{classe_nota}">Não foi possível desenhar a linha do '
                           "tempo com estes parâmetros.</p>")
@@ -392,6 +398,65 @@ def _bloco_linha_do_tempo_pasta(destino: Path, kb, config) -> str:
     if not partes:
         return ""
     return "\n".join(['<h2 id="linha-do-tempo">Linha do tempo (corpus completo)</h2>'] + partes)
+
+
+# ------------------------------------------------------- mapa de densidade (corpus)
+
+NOTA_DENSIDADE = (
+    "Como ler: os itens mais frequentes da rede do corpus completo (todos os documentos, "
+    "sem dividir em períodos) ficam mais perto quanto mais forte é a ligação entre eles. "
+    "A cor mostra a densidade: do branco (pouca) ao amarelo (muita), somando a frequência "
+    "dos itens vizinhos. Uma área quente é um conjunto de itens frequentes e fortemente "
+    "ligados; áreas azuis e vazias são temas periféricos. Só os rótulos que cabem sem "
+    "sobreposição são escritos (os maiores são os mais frequentes), e a posição absoluta "
+    "não tem unidade: vale a distância relativa entre os itens.")
+
+
+def densidade_aplicavel(config) -> bool:
+    """O mapa precisa de itens ligados por co-ocorrência (não de documentos)."""
+    return config.matriz == "CoOccurrence"
+
+
+def densidade_do_corpus(kb, config):
+    """Resultado de período do corpus completo, base do mapa de densidade."""
+    return executa_periodo(linha_do_tempo._TodosOsDocumentos(kb), 0, "Corpus", config)
+
+
+def titulo_densidade(config) -> str:
+    unidade = viz_linha_do_tempo.NOMES_UNIDADE.get(config.unidade, config.unidade)
+    return f"Mapa de densidade — {unidade} (corpus completo)"
+
+
+def densidade_html(kb, config, figura, classe_nota: str = "nota"):
+    """Partes HTML da seção "Mapa de densidade (corpus completo)", ou None.
+
+    None quando a análise não é de co-ocorrência ou quando o cálculo falha: quem chama
+    omite a seção. `figura(svg, legenda)` monta a figura numerada.
+    """
+    if kb is None or not densidade_aplicavel(config):
+        return None
+    try:
+        resultado = densidade_do_corpus(kb, config)
+        dados = viz_densidade.calcula(resultado)
+        if not dados["nos"]:
+            return [f'<p class="{classe_nota}">{_esc(dados.get("aviso") or "Sem dados para o mapa de densidade.")}</p>']
+        titulo = titulo_densidade(config)
+        svg = viz_densidade.svg(resultado, titulo, unidade=config.unidade, dados=dados)
+        return [figura(svg, titulo + "."), f'<p class="{classe_nota}">{_esc(NOTA_DENSIDADE)}</p>']
+    except Exception:
+        return None
+
+
+def _bloco_densidade_pasta(destino: Path, kb, config) -> str:
+    """HTML da seção para o relatório em pasta (figura em images/); "" se não se aplica."""
+    def figura(svg, legenda):
+        (destino / "images" / "densidade.svg").write_text(svg, encoding="utf-8")
+        return (f'<p><img src="images/densidade.svg" alt="{_esc(legenda)}" '
+                'width="100%"></p>')
+    partes = densidade_html(kb, config, figura, classe_nota="fonte")
+    if not partes:
+        return ""
+    return "\n".join(['<h2 id="densidade">Mapa de densidade (corpus completo)</h2>'] + partes)
 
 
 def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
@@ -477,6 +542,12 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
         bloco_lt = _bloco_linha_do_tempo_pasta(destino, kb, config)
     except Exception:
         bloco_lt = ""
+    try:
+        bloco_dens = _bloco_densidade_pasta(destino, kb, config)
+    except Exception:
+        bloco_dens = ""
+    if bloco_dens:
+        bloco_lt = (bloco_lt + "\n" + bloco_dens) if bloco_lt else bloco_dens
     _pagina_indice(destino, resultados, mapa, config, estendido, com_bibliometria,
                    kb=kb, periodos=periodos, medida_temporal=medida_temporal,
                    linha_do_tempo_bloco=bloco_lt)
@@ -802,6 +873,11 @@ def _pagina_periodo(destino, resultado, grupos, indice, kb=None) -> None:
         "quando o agrupamento tem poucos itens). Ano médio: dos documentos do núcleo. "
         "Rótulo em destaque: termos distintivos do período; abaixo, o nome do item central.</p>")
 
+    if resultado.configuracao.unidade == "Institutions":
+        corpo.append("<h2>Variantes unidas</h2>")
+        corpo.append(metodo.ies_html(
+            resultado, lambda cab, lin, leg, numericas=(): _tabela(cab, lin, leg, numericas=numericas)))
+
     corpo.extend(diagramas)
     (destino / f"period{indice}.html").write_text(
         _pagina(f"Relatório — Redes — {resultado.periodo}", "\n".join(corpo)),
@@ -936,6 +1012,9 @@ def gera_pagina_completa(destino: Path, kb, secoes: list[dict], ignoradas: list[
                  f'<p><a href="{pasta}/index.html">Configuração, mapa de evolução e sobreposição</a></p>']
         if (destino / pasta / "images" / "linhaDoTempo.svg").exists():
             bloco.append(f'<p><a href="{pasta}/index.html#linha-do-tempo">Linha do tempo do '
+                         "corpus completo</a></p>")
+        if (destino / pasta / "images" / "densidade.svg").exists():
+            bloco.append(f'<p><a href="{pasta}/index.html#densidade">Mapa de densidade do '
                          "corpus completo</a></p>")
         figuras = []
         mapeador = secao["config"].mapeadores[0] if secao["config"].mapeadores else "nucleo"

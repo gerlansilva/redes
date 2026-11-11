@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import math
 import re
 import unicodedata
 
@@ -157,6 +158,14 @@ def _prefixo(dados: dict, titulo: str, rotulos) -> str:
 # ------------------------------------------------------------------ eixo
 
 
+def _valor_finito(valor) -> bool:
+    """NaN e infinito não desenham: viram stroke-width="nan" e quebram o SVG."""
+    try:
+        return math.isfinite(float(valor))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def _passo(span: int) -> int:
     for passo in (1, 2, 5, 10, 20, 25, 50, 100):
         if span / passo <= 14:
@@ -287,7 +296,10 @@ def svg(dados: dict, titulo: str = "", rotulos: dict | None = None) -> str:
         itens_leg.append(("linha", "linha fina = do primeiro ao último ano em que o item aparece"))
     if teve_rajada:
         itens_leg.append(("anel", "anel vermelho = rajada de " + ("citação" if modo == "referencia" else "uso")
-                                  + " (3 documentos ou mais, entre as 10 mais fortes do corpus)" + ("; traço vermelho = anos da rajada" if teve_linha else "")))
+                                  + " (3 documentos ou mais, entre as 10 mais fortes do corpus)"
+                                  + ("; traço vermelho = anos da rajada" if teve_linha else "")
+                                  + ("; rajadas calculadas só sobre palavras-chave dos autores"
+                                     if unidade == "Words" else "")))
     if teve_interna:
         itens_leg.append(("arco", "arco colorido = ligação dentro da faixa (as 3 mais fortes de cada item)"))
     if teve_cruzada:
@@ -359,7 +371,8 @@ def svg(dados: dict, titulo: str = "", rotulos: dict | None = None) -> str:
 
     # arcos
     o.append(f'<g class="lt-plot" clip-path="url(#{p}-area)">')
-    ligacoes = [l for l in dados.get("ligacoes", []) if l["origem"] in pos and l["destino"] in pos]
+    ligacoes = [l for l in dados.get("ligacoes", [])
+                if l["origem"] in pos and l["destino"] in pos and _valor_finito(l.get("valor", 0))]
     vmax = max((float(l.get("valor", 0)) for l in ligacoes), default=0.0) or 1.0
     topo_faixa = {i: layout[i][0] for i in range(len(layout))}
     for l in sorted(ligacoes, key=lambda l: (bool(l.get("cruzada")), float(l.get("valor", 0)),
@@ -412,6 +425,12 @@ def svg(dados: dict, titulo: str = "", rotulos: dict | None = None) -> str:
                     if rs:
                         o.append(f'<line x1="{X(rs[0]):.1f}" y1="{it["cy"]:.1f}" x2="{X(rs[1]):.1f}" '
                                  f'y2="{it["cy"]:.1f}" stroke="{VERMELHO}" stroke-width="2.8" stroke-linecap="round"/>')
+                        # Rajada que começa antes (ou termina depois) do eixo: setinha, como na atividade.
+                        for flag, xx, sinal in ((rs[2], X(rs[0]), 1), (rs[3], X(rs[1]), -1)):
+                            if flag:
+                                o.append(f'<path class="lt-seta-rajada" d="M{xx + 4 * sinal:.1f},{it["cy"] - 3.5:.1f} '
+                                         f'L{xx:.1f},{it["cy"]:.1f} L{xx + 4 * sinal:.1f},{it["cy"] + 3.5:.1f}" '
+                                         f'fill="none" stroke="{VERMELHO}" stroke-width="1.6"/>')
     o.append('</g>')
     for i, (y0, h, faixa, itens) in enumerate(layout):
         c = cores[i]

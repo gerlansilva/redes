@@ -116,6 +116,25 @@ class Rede:
             grafo.add_edge(a, b, weight=valor)
         return grafo
 
+    def componentes(self) -> list[list[int]]:
+        """Componentes conexos (nó isolado conta como componente de um nó)."""
+        visto: set[int] = set()
+        saida: list[list[int]] = []
+        for inicio in self.nos:
+            if inicio in visto:
+                continue
+            visto.add(inicio)
+            pilha, membros = [inicio], []
+            while pilha:
+                no = pilha.pop()
+                membros.append(no)
+                for vizinho in self.adjacencia[no]:
+                    if vizinho not in visto:
+                        visto.add(vizinho)
+                        pilha.append(vizinho)
+            saida.append(sorted(membros))
+        return saida
+
     def filtra_por_valor(self, minimo: float) -> None:
         for a, b, valor in self.arestas():
             if valor < minimo:

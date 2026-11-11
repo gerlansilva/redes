@@ -54,7 +54,8 @@ UNIDADE_TITULO = {"Words": "palavras-chave", "Authors": "autores",
                   "References": "referências",
                   "AuthorsReference": "autores de referência",
                   "ReferenceSources": "fontes de referência",
-                  "Countries": "países"}
+                  "Countries": "países",
+                  "Institutions": "instituições (IES)"}
 
 # Abaixo disto a legenda cabe em uma coluna; acima, ela é distribuída.
 LARGURA_COLUNA_LEGENDA = 236

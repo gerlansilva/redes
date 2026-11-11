@@ -53,11 +53,14 @@ class Configuracao:
     indices: tuple[str, ...] = ("h", "g", "hg", "q2", "media", "soma", "minimo", "maximo")
     # Itens a descartar antes da rede (termos genéricos como "ESTATISTICA").
     ignorar: tuple[str, ...] = ()
+    # Só na unidade Institutions: componente conexo da rede com menos
+    # instituições que isto não vira agrupamento (os nós ficam sem agrupamento).
+    componente_minimo: int = 3
 
     def valida(self) -> None:
         if self.unidade not in ("Words", "Authors", "References",
                                 "AuthorsReference", "ReferenceSources",
-                                "Countries"):
+                                "Countries", "Institutions"):
             raise ValueError(f"unidade inválida: {self.unidade}")
         if self.matriz not in MATRIZES:
             raise ValueError(f"matriz inválida: {self.matriz}")
@@ -73,6 +76,8 @@ class Configuracao:
             raise ValueError(f"corte inválido: {self.corte}")
         if self.k_core < 1:
             raise ValueError(f"k-core inválido: {self.k_core}")
+        if self.componente_minimo < 1:
+            raise ValueError(f"tamanho mínimo do componente inválido: {self.componente_minimo}")
 
 
 @dataclass
@@ -107,6 +112,8 @@ class ResultadoPeriodo:
     centralidades: dict[str, dict[int, float]]
     agregado: Agregado | None = None
     rotulos: dict[int, str] = field(default_factory=dict)
+    # Rede de IES: uniões de variantes feitas e componentes deixados sem agrupamento.
+    ies: dict | None = None
 
     def rotulo(self, no: int) -> str:
         """Rótulo de um nó: título do documento ou nome do item."""
@@ -148,6 +155,20 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
 
     conjunto = ALGORITMOS[config.algoritmo](rede, config.tamanho_minimo,
                                             config.tamanho_maximo, config.corte)
+    info_ies = None
+    if config.unidade == "Institutions":
+        conjunto, pequenos = _descarta_componentes_pequenos(
+            rede, conjunto, config.componente_minimo)
+        indice = projeto.indice_ies()
+        info_ies = {
+            "componente_minimo": config.componente_minimo,
+            "unioes": indice.unioes,
+            "variantes_unidas": indice.quantidade_variantes_unidas(),
+            "componentes": sorted((len(c) for c in rede.componentes()), reverse=True),
+            "componentes_pequenos": [
+                [dataset.itens.get(no, str(no)) for no in comp] for comp in pequenos],
+            "isolados": sum(1 for c in rede.componentes() if len(c) == 1),
+        }
 
     # No acoplamento os nós são documentos; o rótulo vem do título.
     rotulos = (projeto.titulos(rede.nos)
@@ -195,7 +216,30 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
         centralidades=centralidades,
         agregado=agregado,
         rotulos=rotulos,
+        ies=info_ies,
     )
+
+
+def _descarta_componentes_pequenos(rede: Rede, conjunto: ConjuntoDeAgrupamentos,
+                                   minimo: int):
+    """Tira dos agrupamentos os componentes conexos com menos de `minimo` nós.
+
+    Um agrupamento nunca atravessa componentes, então basta olhar o componente
+    de qualquer nó dele. Os nós dos componentes pequenos ficam sem agrupamento
+    (e, portanto, fora dos halos). Devolve (conjunto, componentes pequenos).
+    """
+    if minimo <= 1:
+        return conjunto, []
+    pequenos = [c for c in rede.componentes() if len(c) < minimo]
+    if not pequenos:
+        return conjunto, []
+    fora = {no for comp in pequenos for no in comp}
+    novo = ConjuntoDeAgrupamentos(rede)
+    for agrupamento in conjunto.agrupamentos:
+        if not any(no in fora for no in agrupamento.nos):
+            novo.adiciona(agrupamento.nos, agrupamento.principal)
+    # Só os componentes com mais de um nó: o isolado não é "componente" para o leitor.
+    return novo, [c for c in pequenos if len(c) > 1]
 
 
 def _remove_ignorados(dataset: Dataset, ignorar) -> None:

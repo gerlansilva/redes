@@ -11,14 +11,15 @@ O Redes segue a mesma lógica do bibliometrix até a matriz documento × item. D
 | 1 | **Importar** | Lê CSV da Scopus, RIS, CSV ou BibTeX do Zotero, OpenAlex, Web of Science (texto ISI) e CSV genérico. O formato é reconhecido pelo conteúdo do arquivo. | Abrir projeto → importar |
 | 2 | **Limpar e unir** | Remove duplicatas (mesmo DOI, ou mesmo título e ano), une singular/plural e acento em português, espanhol e inglês, e define os períodos pelos anos do corpus. | Automático na importação |
 | 3 | **Projeto `.redes`** | Guarda tudo em um banco SQLite local, com grupos de palavras, autores e países, e a lista de termos ignorados. | Arquivo no seu computador |
-| 4 | **Matriz documento × item** | Cada documento recebe 1 ou 0 para cada palavra-chave, autor, referência, país ou periódico. | Interna |
-| 5a | **Visão geral descritiva** | Produção e citações por ano, rankings de autores, fontes, países e palavras-chave, documentos mais citados, coautoria, leis de Lotka, Bradford e Zipf, nuvens de palavras (palavras-chave dos autores e títulos) e rajadas de palavras-chave e referências. | Menu → Visão geral descritiva |
+| 4 | **Matriz documento × item** | Cada documento recebe 1 ou 0 para cada palavra-chave, autor, referência, país, instituição (IES) ou periódico. | Interna |
+| 5a | **Visão geral descritiva** | Produção e citações por ano, rankings de autores, fontes, países e palavras-chave, documentos mais citados, coautoria, leis de Lotka, Bradford e Zipf, nuvens de palavras (palavras-chave dos autores e títulos) e rajadas de palavras-chave e referências, e o fluxo Autor – País – IES (Sankey). | Menu → Visão geral descritiva |
 | 5b | **Matriz de rede** | A matriz vira co-ocorrência (itens que aparecem juntos) ou acoplamento (documentos que citam as mesmas referências). | Menu de análises |
-| 6 | **Rede do período** | Constrói uma rede por período, com a similaridade escolhida: equivalência, associação, inclusão, Jaccard ou Salton. | Aba Rede |
+| 6 | **Rede do período** | Constrói uma rede por período, com a similaridade escolhida: equivalência, associação, inclusão, Jaccard ou Salton. Na unidade IES, as variantes inequívocas do nome são unidas e componentes com menos de 3 instituições ficam sem agrupamento. | Aba Rede |
 | 7 | **Agrupamento** | Forma os temas por centros simples, ligação simples, completa, média, soma ou Louvain. | Modo avançado |
 | 8 | **Medidas** | Centralidade e densidade de Callon, índices h, g, hg e q2, e documentos por mapeador (núcleo, união, interseção, k-core e acoplamento). | Abas Índices e Agrupamentos |
-| 9 | **Mapas** | Diagrama estratégico (motor, básico, nicho, emergente), rede em halos, rede de agrupamentos, mapas de evolução e sobreposição entre períodos e rede de países. | Resumo, Diagrama, Comparar períodos |
-| 10 | **Saídas** | Relatório HTML com as redes e o quadro de métricas, Pajek, GraphML, TSV, XML de grupos, figuras SVG e PNG e a grade de 162 análises. | Exportar e Relatório |
+| 9 | **Qualidade e rótulos** | Selo de qualidade do mapa (Q, comparação com o Louvain, silhueta) e rótulo por tema (LLR), este só em palavras-chave e referências. | Cartão da análise, tabela de agrupamentos |
+| 10 | **Mapas e figuras** | Diagrama estratégico (motor, básico, nicho, emergente), rede em halos, rede de agrupamentos, mapas de evolução e sobreposição entre períodos, rede de países, dendrograma, linha do tempo com rajadas, pontos de virada e mapa de densidade. | Resumo, Diagrama, Comparar períodos, Dendrograma, Linha do tempo, Densidade |
+| 11 | **Saídas** | Relatório HTML com as redes, o quadro de métricas e os parâmetros e o método de cada análise, Pajek, GraphML, TSV, XML de grupos, figuras SVG e PNG e a grade de 162 análises. | Exportar e Relatório |
 | ↺ | **Editar a base** | Juntar, ignorar ou renomear termos e refazer a análise. É o ciclo que mais se repete no trabalho real. | Base |
 
 ## Em relação ao bibliometrix
@@ -34,6 +35,9 @@ O Redes segue a mesma lógica do bibliometrix até a matriz documento × item. D
 
 ## O que ainda falta neste fluxo
 
+- O selo de qualidade fica quase sempre em "Atenção"; os limiares ainda precisam de revisão.
+- Rótulos por tema só existem para palavras-chave e referências; autores, países e IES ficam com o nome do líder.
+- A linha do tempo e a densidade usam o corpus completo, não o período, e não valem para acoplamento nem cocitação de documentos.
 - A visão geral descritiva já entra no relatório HTML, mas as tabelas ainda não têm botão de CSV.
 - As rajadas contam documentos do corpus, não citações recebidas como no CiteSpace, e ficam instáveis em corpora com menos de 100 documentos.
 - O Zotero não exporta referências, então cocitação e frentes de pesquisa só funcionam com CSV da Scopus.

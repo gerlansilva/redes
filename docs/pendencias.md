@@ -1,6 +1,6 @@
 # Pendências do Redes
 
-Estado em 10/11/2026. Este documento substitui o diagnóstico anterior: os
+Estado em 11/11/2026. Este documento substitui o diagnóstico anterior: os
 itens que descreviam lacunas de análise, interface, relatório e testes foram
 fechados e constam aqui apenas como registro. O que resta está na seção
 **O que falta**, no fim.
@@ -8,12 +8,15 @@ fechados e constam aqui apenas como registro. O que resta está na seção
 ## Resumo
 
 O núcleo de análise, a interface web e os relatórios estão completos para as
-seis unidades, quatro matrizes, seis algoritmos e cinco similaridades. A
+sete unidades (com Países e Instituições), quatro matrizes, seis algoritmos e
+cinco similaridades. A
 paridade com o fork Java cobre 540 comparações, sem divergência. A suíte tem
-74 testes, todos passando.
+mais de 400 casos de teste.
 
-Não há pendência funcional conhecida. O que falta é distribuição: instalador
-desktop e integração contínua. Os dois dependem de decisões externas ao código
+As análises novas (qualidade, rótulos, linha do tempo, pontos de virada,
+densidade, dendrograma, IES e Sankey) estão entregues, com arestas conhecidas
+listadas em **O que falta**. Fora isso, falta distribuição: instalador desktop
+e integração contínua. Os dois dependem de decisões externas ao código
 (repositório, plataforma alvo e assinatura), não de implementação de análise.
 
 ## O que foi fechado
@@ -99,9 +102,38 @@ desktop e integração contínua. Os dois dependem de decisões externas ao cód
 16. **Marca e figuras** — as figuras geradas dizem "Redes ·"; as 20 figuras
     antigas do vault Obsidian que traziam "Bibliomapa/SciMAT" no rodapé foram
     atualizadas para "Redes".
-17. **Testes** — 74 testes: esquema e contadores, grade, opções de análise,
+17. **Testes** — esquema e contadores, grade, opções de análise,
     similaridade, medidas e índices, agrupamentos, mapeadores, carregadores,
-    conversão de referências, figuras e API da interface.
+    conversão de referências, figuras e API da interface; depois, também as
+    análises novas (itens 18 a 25).
+18. **Qualidade do mapa** — `qualidade.py`: modularidade Q ponderada, Q do
+    Louvain como régua (razão), silhueta por agrupamento (grupos com menos de 3
+    itens ficam fora; acima de 2000 itens agrupados é dispensada) e selo OK,
+    Atenção, Ruim ou Indefinido. Em coautoria o selo nunca passa de Atenção.
+    Limiares em `docs/qualidade.md`.
+19. **Rótulos por tema** — `rotulos.py`: termos que distinguem cada
+    agrupamento dos demais documentos do período (LLR de Dunning sobre título,
+    palavras-chave e bigramas do resumo). Só para palavras-chave e referências;
+    autores, países e IES mantêm o nome do líder. Menos de 5 documentos ou
+    cobertura acima de 70%: sem rótulo; 5 a 9: indicativo.
+20. **Fluxo Autor – País – IES (Sankey)** — `fluxos.py` e `viz/sankey.py`, com
+    ligação autor–instituição exata, inferida ou ausente, e queda para País →
+    IES quando não há ligação. Nenhum vínculo é inventado.
+21. **Dendrograma** — `dendrograma.py` e aba no modo avançado: corte, cofenética,
+    ARI/NMI contra a rede, 60 itens mais frequentes (`docs/dendrograma.md`).
+22. **Linha do tempo e pontos de virada** — `linha_do_tempo.py`, `pivos.py`:
+    faixa por agrupamento no corpus completo, rajadas de Kleinberg, pontos de
+    virada (intermediação no decil superior e vizinhos em 2 ou mais
+    agrupamentos) e sigma para quem tem rajada (`docs/linha-do-tempo.md`).
+23. **Mapa de densidade** — `viz/densidade.py`: layout tipo VOS e núcleos
+    gaussianos ponderados pela frequência, em SVG próprio (`docs/densidade.md`).
+24. **Unidade Instituições (IES)** — `ies.py`: união de variantes só quando
+    inequívoca, tabela "variantes unidas" com o motivo, e componente mínimo de
+    3 instituições (`docs/ies.md`).
+25. **Parâmetros e método por análise nos relatórios** — `metodo.py`: cada
+    análise traz parâmetros adotados, algoritmo em linguagem simples,
+    indicadores por período, e as seções de qualidade, rótulos, linha do tempo,
+    densidade, pontos de virada e IES, com as constantes lidas do código.
 
 ## Decisões que fecharam pendências
 
@@ -129,16 +161,36 @@ Não são pendências, mas convém registrar:
 
 ## O que falta
 
-1. **Empacotamento desktop.** Só existe a interface web local (`scimatpy web`).
+Arestas das análises novas:
+
+1. **Selo quase sempre "Atenção".** Com os limiares atuais, a maioria das redes
+   reais cai em Atenção; o selo informa pouco. Falta decidir se os limiares
+   mudam ou se o selo ganha outra escala. Hoje o texto já avisa que isso não
+   invalida o mapa.
+2. **Termos em maiúsculas do SciMAT perdem a caixa.** Os termos que vêm em
+   maiúsculas do importador do SciMAT não mantêm a caixa original nos rótulos
+   novos. Falta preservar a grafia de siglas e nomes próprios.
+3. **Estresse completo no corpus SERJ.** Qualidade, rótulos, linha do tempo,
+   densidade, pontos de virada e IES não foram rodados de ponta a ponta no
+   SERJ completo (References com 9.744 nós); falta medir tempo e memória.
+4. **Duplo mapa simplificado.** Só se o usuário quiser: uma versão simplificada
+   do mapa ao lado do mapa completo. Sem demanda, fica fora.
+5. **Rótulos por tema fora de palavras-chave e referências.** Autores, países
+   e IES seguem com o nome do líder, de propósito; só entra se houver um método
+   que faça sentido para essas unidades.
+
+Distribuição:
+
+6. **Empacotamento desktop.** Só existe a interface web local (`scimatpy web`).
    Falta o empacotamento Tauri, o instalador e a assinatura para uso por não
    técnicos. Bloqueio: o diretório não é um repositório git, não há
    identidade de assinatura definida e é preciso escolher a plataforma alvo
    (macOS, Windows ou ambos).
-2. **Integração contínua.** Não há pipeline. A suíte roda à mão
+7. **Integração contínua.** Não há pipeline. A suíte roda à mão
    (`python3 -m unittest discover -s tests -t .`) e a paridade depende de
    `/tmp/demo/celii` com o fork Java compilado. Bloqueio: sem repositório,
    não há onde executar o fluxo.
-3. **Publicação do pacote (opcional).** `pyproject.toml` já descreve o pacote
+8. **Publicação do pacote (opcional).** `pyproject.toml` já descreve o pacote
    e o ponto de entrada `scimatpy`; falta decidir se ele será publicado em
    índice interno ou no PyPI, com as credenciais correspondentes.
 
@@ -146,7 +198,7 @@ Não são pendências, mas convém registrar:
 
 ```bash
 cd ~/Documents/scimatpy
-python3 -m unittest discover -s tests -t . -q     # 73 testes, OK
+python3 -m unittest discover -s tests -t . -q     # mais de 400 casos, OK
 python3 scripts/grade.py completo                 # 162 análises, 135 comparações, 0 divergências
 python3 scripts/grade.py periodos                 # 162 análises, 405 comparações, 0 divergências
 ```

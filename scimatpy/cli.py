@@ -75,6 +75,7 @@ def _config(args) -> Configuracao:
         k_core=args.k_core,
         palavras=tuple(args.palavras),
         indices=tuple(args.indices),
+        componente_minimo=args.componente_min,
     )
 
 
@@ -206,7 +207,7 @@ def monta_parser() -> argparse.ArgumentParser:
     comum.add_argument("--unidade", default="Words",
                        choices=["Words", "Authors", "References",
                                 "AuthorsReference", "ReferenceSources",
-                                "Countries"])
+                                "Countries", "Institutions"])
     comum.add_argument("--matriz", default="CoOccurrence",
                        choices=["CoOccurrence", "BasicCoupling",
                                 "AggregatedCouplingBasedOnAuthor",
@@ -227,6 +228,9 @@ def monta_parser() -> argparse.ArgumentParser:
                        choices=["nucleo", "interseccao", "secundarios", "kcore",
                                 "uniao", "acoplamento"],
                        help="mapeadores de documentos a aplicar")
+    comum.add_argument("--componente-min", type=int, default=3, dest="componente_min",
+                       help="unidade Institutions: componentes com menos instituições "
+                            "que isto ficam sem agrupamento (padrão 3)")
     comum.add_argument("--k-core", type=int, default=2, dest="k_core",
                        help="valor de k do mapeador k-core")
     comum.add_argument("--palavras", nargs="+", default=["autor", "fonte"],

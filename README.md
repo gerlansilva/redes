@@ -15,7 +15,7 @@ normalizar, agrupar, medir, desenhar e relatar, sem depender da interface Java.
 | Etapa | Situação |
 |---|---|
 | Leitura de projeto `.redes` (SQLite), inclusive `.scimat` antigo | pronto, com as mesmas consultas e ordem do original |
-| Conjunto documento × item (6 unidades, com países) | pronto |
+| Conjunto documento × item (7 unidades, com países e instituições) | pronto |
 | Conjunto agregado por autor e por periódico | pronto |
 | Redes de co-ocorrência, acoplamento e acoplamento agregado | pronto |
 | Similaridades (equivalência, associação, inclusão, Jaccard, Salton) | pronto |
@@ -35,7 +35,14 @@ normalizar, agrupar, medir, desenhar e relatar, sem depender da interface Java.
 | Revisar grafias: variantes de autores, palavras-chave, IES e países, com lista de grafias corretas e agrupamento (com desfazer) | pronto |
 | Relatório completo (arquivo único ou pastas): cada análise traz parâmetros adotados, algoritmo em linguagem simples e tabela de indicadores por período | pronto |
 | Fluxo Autor – País – IES (Sankey), com aviso do que falta quando a base não traz a afiliação por autor | pronto |
-| Dendrograma (agrupamento hierárquico, corte, cofenética, ARI/NMI contra a rede) | pronto (ver `docs/dendrograma.md`) |
+| Dendrograma (agrupamento hierárquico, corte, cofenética, ARI/NMI contra a rede) | pronto, aba no modo avançado (ver `docs/dendrograma.md`) |
+| Qualidade do mapa: modularidade Q, comparação com o Louvain, silhueta por agrupamento e selo (OK, Atenção, Ruim, Indefinido) | pronto (ver `docs/qualidade.md`) |
+| Rótulos por tema (LLR de Dunning sobre título, palavras-chave e bigramas do resumo) | pronto, só para palavras-chave e referências; autores, países e IES mantêm o nome do líder |
+| Linha do tempo dos agrupamentos (estilo CiteSpace), com rajadas | pronto, corpus completo, aba no modo avançado (ver `docs/linha-do-tempo.md`) |
+| Pontos de virada e sigma (intermediação alta, vizinhos em 2 ou mais agrupamentos) | pronto, só co-ocorrência; sigma só para quem tem rajada (ver `docs/linha-do-tempo.md`) |
+| Mapa de densidade (estilo VOSviewer, SVG próprio) | pronto, corpus completo, aba no modo avançado (ver `docs/densidade.md`) |
+| Unidade Instituições (IES): união de variantes inequívocas do nome e componente mínimo de 3 instituições | pronto (ver `docs/ies.md`) |
+| Parâmetros e método por análise nos relatórios (inclui qualidade, rótulos, linha do tempo, densidade, pontos de virada e IES) | pronto |
 | Carregadores nativos (BibTeX, RIS, CSV, OpenAlex, WoS, Scopus) | pronto |
 | Armazenamento próprio (`.redes` gravado pelo Python) | pronto: esquema do Bibliomapa (`v1_03`) mais as tabelas de países |
 | Exportações (Pajek, GraphML, XML de grupos, TSV) | pronto |
@@ -95,7 +102,7 @@ As análises são escolhidas no menu lateral, agrupadas por propósito, no estil
 do bibliometrix: **Estrutura conceitual** (palavras-chave), **Estrutura
 intelectual** (cocitação de autores, cocitação de referências e frentes de
 pesquisa), **Estrutura social** (colaboração entre autores e entre países) e
-**Fontes** (periódicos citados). Clicar em uma análise preenche os parâmetros,
+**Fontes** (periódicos citados). A colaboração entre instituições (IES) fica junto com a social. Clicar em uma análise preenche os parâmetros,
 executa a prévia do período e destaca o item no menu. O cartão de parâmetros
 mostra **Unidade**, **Matriz** e a frequência mínima; similaridade, algoritmo,
 mapeadores, palavras, corte e tamanho da rede ficam em **Parâmetros
@@ -181,6 +188,41 @@ seletor **Exportar…** grava
 documentos do período em TSV. **Relatório** gera o HTML completo em nova aba. O botão
 **Base** abre o editor de períodos e grupos, com substituição de grafia e
 desfazer.
+
+**Abas do modo avançado.** Além das abas acima, o modo avançado mostra
+**Dendrograma**, **Linha do tempo** e **Densidade**. As três usam o corpus
+completo (ou o período, no caso do dendrograma) com os mesmos parâmetros da
+análise, e cada uma baixa o SVG. A linha do tempo e a densidade não valem para
+acoplamento nem cocitação de documentos, cujos nós são documentos. Detalhes em
+[`docs/dendrograma.md`](docs/dendrograma.md),
+[`docs/linha-do-tempo.md`](docs/linha-do-tempo.md) e
+[`docs/densidade.md`](docs/densidade.md).
+
+**Qualidade e rótulos.** O cartão de cada análise mostra o selo de qualidade
+do mapa: Q (força da divisão, de cerca de 0 a 1), a razão contra o Q do
+Louvain e a silhueta média e por agrupamento. O selo é **OK**, **Atenção**,
+**Ruim** ou **Indefinido** (menos de 15 itens, menos de 2 agrupamentos ou rede
+sem ligações). Na prática, a maioria das redes reais fica em "Atenção", e isso
+não invalida o mapa; em coautoria de autores o selo nunca passa de "Atenção".
+Os agrupamentos de palavras-chave e de referências ganham um **rótulo novo**
+com os termos que os distinguem dos demais documentos do período (razão de
+verossimilhança de Dunning); com 5 a 9 documentos no núcleo o rótulo é só
+indicativo e, com menos de 5 ou cobertura acima de 70% do período, não há
+rótulo. Autores, países e instituições mantêm o nome do item líder. Limiares e
+regras completas em [`docs/qualidade.md`](docs/qualidade.md).
+
+**Instituições (IES).** A unidade une variantes do mesmo nome só quando a
+normalização é inequívoca (caixa, acento, pontuação, ligações, Univ./University,
+sigla entre parênteses, país depois de hífen) e registra cada união na tabela
+"variantes unidas", na aba **IES** e no relatório. Componentes conexos com
+menos de 3 instituições não viram agrupamento (parâmetro "tamanho mínimo do
+componente"). Ver [`docs/ies.md`](docs/ies.md).
+
+**Fluxo Autor – País – IES.** O Sankey fica na visão geral descritiva, com
+limites de autores, países e instituições ajustáveis. A ligação autor–instituição
+é exata quando o Scopus traz "Authors with affiliations", inferida quando o
+documento tem uma só instituição e ausente nos demais casos; sem nenhuma ligação
+o fluxo cai para País → IES. Nenhum vínculo é inventado.
 
 Limites conhecidos: uma execução de grade por vez (proteção de memória); a
 rede interativa fica disponível para a última prévia (as anteriores mantêm o
@@ -313,6 +355,18 @@ scimatpy/
   viz/halo.py    rede completa em halos
   viz/strategic.py  diagrama estratégico
   viz/cluster.py    rede de um agrupamento e rede de agrupamentos (temas)
+  viz/dendrograma.py  figura do dendrograma
+  viz/linha_do_tempo.py  linha do tempo dos agrupamentos
+  viz/densidade.py  mapa de densidade
+  viz/sankey.py     fluxo Autor – País – IES
+  dendrograma.py    agrupamento hierárquico, corte, cofenética, ARI/NMI
+  qualidade.py      modularidade Q, silhueta e selo de qualidade
+  rotulos.py        rótulos de agrupamento por LLR (palavras-chave e referências)
+  linha_do_tempo.py dados da linha do tempo do corpus completo
+  pivos.py          pontos de virada e sigma
+  ies.py            nomes de instituições unidos e componentes
+  fluxos.py         fluxo Autor – País – IES
+  metodo.py         parâmetros, método e indicadores dos relatórios
 ```
 
 ## Detalhes replicados de propósito
@@ -337,7 +391,9 @@ batam:
 A auditoria original e o que foi corrigido estão em
 [pendencias.md](docs/pendencias.md). O que resta é de produto, não de
 paridade: distribuição desktop (Tauri), edição de sinônimos e stopwords na
-interface.
+interface, e algumas arestas das análises novas (selo quase sempre "Atenção",
+termos em maiúsculas do SciMAT que perdem a caixa, estresse completo no corpus
+SERJ).
 
 ## Próximos passos
 
@@ -345,6 +401,7 @@ interface.
 2. Editor de sinônimos, stopwords e equivalências na interface.
 3. Rajadas de autores e de países, além de palavras-chave e referências.
 4. Mapas de estabilidade e novidade, além de evolução e sobreposição.
+5. Duplo mapa simplificado (só se o usuário quiser; ver `docs/pendencias.md`).
 
 ## Testes
 
@@ -352,12 +409,14 @@ interface.
 python3 -m unittest discover -s tests -t .
 ```
 
-Os 73 testes cobrem o esquema `.redes` e os contadores dos gatilhos, a grade
+Os testes (mais de 400 casos) cobrem o esquema `.redes` e os contadores dos gatilhos, a grade
 de 162 linhas, as opções de análise (corte, origens de palavras, k-core),
 similaridade, medidas e índices, agrupamentos, mapeadores de documentos, os
 carregadores, a conversão de referências e a API da interface: importação por
 HTTP, prévia, figuras, índices, documentos, exportações, relatório, mapa
-longitudinal e grade em segundo plano.
+longitudinal e grade em segundo plano, além de qualidade e rótulos, dendrograma,
+linha do tempo, pontos de virada, densidade, instituições (IES) e o fluxo
+Autor – País – IES.
 
 ## Teste rápido dos carregadores
 

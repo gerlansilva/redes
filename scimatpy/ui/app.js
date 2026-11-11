@@ -7,8 +7,10 @@ const UNIDADES = {
   Words: "Palavras", Authors: "Autores", References: "Referências",
   AuthorsReference: "Autores de referência",
   ReferenceSources: "Fontes de referência", Countries: "Países",
+  Institutions: "Instituições (IES)",
 };
-const TOTAL_POR_PERIODO = Object.keys(UNIDADES).length * 27;
+// A grade completa cobre as seis unidades originais; Instituições não entra nela.
+const TOTAL_POR_PERIODO = 6 * 27;
 const ALGORITMOS = {
   CentersSimples: "Centros simples", AverageLink: "Média",
   CompleteLink: "Completa", SingleLink: "Simples", SumLink: "Soma",
@@ -38,12 +40,14 @@ const GRUPOS_ANALISE = {
   frentes: "Estrutura intelectual",
   autores: "Estrutura social",
   paises: "Estrutura social",
+  instituicoes: "Estrutura social",
   veiculos: "Fontes",
 };
 const ROTULO_UNIDADE = {
   Words: "Palavras", Authors: "Autores", References: "Referências",
   AuthorsReference: "Autores de referência",
   ReferenceSources: "Fontes de referência", Countries: "Países",
+  Institutions: "Instituições (IES)",
 };
 const ROTULO_MATRIZ = {
   CoOccurrence: "Co-ocorrência", BasicCoupling: "Acoplamento",
@@ -64,13 +68,15 @@ const CONFIG_ABAS = {
              padrao: "rede", redeRotulo: "Rede de coautoria" },
   paises: { abas: ["paises", "rede", "diagrama", "agrupamentos", "grupos", "indices", "longitudinal"],
             padrao: "paises", redeRotulo: "Rede de países" },
+  instituicoes: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "ies", "indices", "longitudinal"],
+                  padrao: "rede", redeRotulo: "Rede de instituições" },
   veiculos: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "longitudinal"],
               padrao: "rede", redeRotulo: "Rede de periódicos" },
 };
-const ABAS_TODAS = ["resumo", "rede", "paises", "diagrama", "agrupamentos",
+const ABAS_TODAS = ["resumo", "rede", "paises", "ies", "diagrama", "agrupamentos",
                     "grupos", "indices", "documentos", "dendrograma", "linhatempo", "longitudinal"];
 // No modo simples só aparecem estas abas; as demais ficam no modo avançado.
-const ABAS_SIMPLES = ["resumo", "rede", "paises", "diagrama", "longitudinal"];
+const ABAS_SIMPLES = ["resumo", "rede", "paises", "ies", "diagrama", "longitudinal"];
 
 // Limites da frequência mínima automática (modo simples).
 const LIMITE_TEMAS = 14;
@@ -88,6 +94,7 @@ const SUBSTANTIVO_GRUPO = {
   References: ["grupo de referências", "grupos de referências"],
   ReferenceSources: ["grupo de periódicos", "grupos de periódicos"],
   Countries: ["grupo de países", "grupos de países"],
+  Institutions: ["grupo de instituições", "grupos de instituições"],
 };
 const INTERPRETACAO = {
   motor: "Centrais e bem desenvolvidos: sustentam o campo.",
@@ -117,6 +124,11 @@ const ANALISES = [
   { chave: "paises", nome: "Colaboração entre países",
     descricao: "Cooperação internacional: países que assinam os mesmos documentos.",
     unidade: "Countries", matriz: "CoOccurrence", similaridade: "EquivalenceIndex",
+    algoritmo: "CentersSimples", mapeadores: "nucleo,interseccao",
+    palavras: "autor,fonte", corte: "0", rede: "2-15" },
+  { chave: "instituicoes", nome: "Colaboração entre instituições",
+    descricao: "Instituições (IES) que assinam os mesmos documentos; nomes unidos quando a variante é inequívoca.",
+    unidade: "Institutions", matriz: "CoOccurrence", similaridade: "EquivalenceIndex",
     algoritmo: "CentersSimples", mapeadores: "nucleo,interseccao",
     palavras: "autor,fonte", corte: "0", rede: "2-15" },
   { chave: "citados", nome: "Cocitação de autores",
@@ -190,6 +202,7 @@ async function iniciar() {
 function ligarEventos() {
   ligarDendrograma();
   ligarLinhaDoTempo();
+  ligarDensidade();
   ligarPivos();
   $("fecharBase").addEventListener("click", fecharBase);
   $("modalBase").addEventListener("click", (evento) => {
@@ -278,10 +291,12 @@ function ligarEventos() {
     }
   });
   for (const id of ["unidade", "matriz", "similaridade", "algoritmo",
-                    "mapeadores", "palavras", "corte", "rede"]) {
+                    "mapeadores", "palavras", "corte", "rede", "componenteMin"]) {
     $(id).addEventListener("change", () => {
       marcarDesatualizada();
       marcarPersonalizada();
+      mostrarCampoComponente();
+      if ($("analise").value === "personalizada") aplicarAbas(null, true);
     });
   }
   $("analise").addEventListener("change", () => {
@@ -548,6 +563,7 @@ function aplicarProjeto(projeto) {
   estado.token = null;
   dendro.token = null;
   limparLinhaDoTempo(true);
+  limparDensidade(true);
   document.querySelectorAll(".aba[data-aba]").forEach((aba) => {
     const ativa = aba.dataset.aba === "rede";
     aba.classList.toggle("ativa", ativa);
@@ -663,6 +679,7 @@ function parametros() {
     tamanho_minimo: minimo,
     tamanho_maximo: maximo,
     corte: Number($("corte").value) || 0,
+    componente_minimo: Math.max(1, Math.floor(Number($("componenteMin").value)) || 3),
     mapeadores,
     palavras,
     periodo: Number($("periodo").value),
@@ -682,6 +699,7 @@ function selecionarAba(chave) {
   if (chave === "longitudinal") compararPeriodos();
   if (chave === "dendrograma") carregarDendrograma();
   if (chave === "linhatempo") carregarLinhaDoTempo();
+  if (chave === "densidade") carregarDensidade();
 }
 
 function abasDaAnalise(chave) {
@@ -690,6 +708,8 @@ function abasDaAnalise(chave) {
   const totalPeriodos = estado.projeto ? estado.projeto.periodos.length : 0;
   if (totalPeriodos < 2) abas = abas.filter((aba) => aba !== "longitudinal");
   if (!estado.avancado) abas = abas.filter((aba) => ABAS_SIMPLES.includes(aba));
+  // "Variantes unidas" só existe na rede de instituições.
+  if (!cfg && $("unidade").value !== "Institutions") abas = abas.filter((aba) => aba !== "ies");
   // Visão secundária: só no modo avançado, antes de "Comparar períodos".
   else {
     if (!abas.includes("dendrograma")) {
@@ -697,6 +717,7 @@ function abasDaAnalise(chave) {
       abas.splice(i < 0 ? abas.length : i, 0, "dendrograma");
     }
     if (!abas.includes("linhatempo")) abas.splice(abas.indexOf("dendrograma") + 1, 0, "linhatempo");
+    if (!abas.includes("densidade")) abas.splice(abas.indexOf("linhatempo") + 1, 0, "densidade");
   }
   return abas;
 }
@@ -723,6 +744,7 @@ const BLOCO_POR_ABA = {
   resumo: "blocoResumo",
   rede: "blocoRede",
   paises: "blocoPaises",
+  ies: "blocoIes",
   diagrama: "blocoDiagrama",
   agrupamentos: "blocoAgrupamentos",
   grupos: "blocoGrupos",
@@ -730,6 +752,7 @@ const BLOCO_POR_ABA = {
   documentos: "blocoDocumentos",
   dendrograma: "blocoDendrograma",
   linhatempo: "blocoLinhaDoTempo",
+  densidade: "blocoDensidade",
   longitudinal: "blocoLongitudinal",
 };
 
@@ -879,6 +902,7 @@ function aplicarAnalise(chave) {
   for (const [campo, valor] of Object.entries(valores)) $(campo).value = valor;
   estado.aplicandoAnalise = false;
   $("analise").value = analise.chave;
+  mostrarCampoComponente();
   const fixa = $("analiseFixa");
   if (fixa) {
     fixa.hidden = false;
@@ -891,6 +915,11 @@ function aplicarAnalise(chave) {
   aplicarAbas(analise.chave);
   sincronizarAnalises();
   if (mudou) marcarDesatualizada();
+}
+
+function mostrarCampoComponente() {
+  const campo = $("campoComponente");
+  if (campo) campo.hidden = $("unidade").value !== "Institutions";
 }
 
 function marcarPersonalizada() {
@@ -1092,6 +1121,8 @@ function renderizarResultado(resultado) {
   if (abaAtual() === "dendrograma") carregarDendrograma();
   limparLinhaDoTempo(false);
   if (abaAtual() === "linhatempo") carregarLinhaDoTempo();
+  limparDensidade(false);
+  if (abaAtual() === "densidade") carregarDensidade();
   $("seloPrevia").textContent = "Prévia sob demanda";
   $("seloPrevia").classList.remove("alerta");
   fecharDrawer();
@@ -1112,7 +1143,10 @@ function renderizarResultado(resultado) {
   $("visaoGrupos").textContent = nf.format(resumo.grupos);
   $("visaoGruposDetalhe").textContent =
     resultado.parametros.unidade === "Countries"
-      ? "grupos de países" : "temas identificados";
+      ? "grupos de países"
+      : (resultado.parametros.unidade === "Institutions"
+         ? "grupos de instituições" : "temas identificados");
+  renderizarIes(resultado);
 
   const halo = resultado.figuras.halo;
   const estrategico = resultado.figuras.estrategico;
@@ -1437,6 +1471,52 @@ function renderizarResumo(resultado) {
   }
 
   corpo.replaceChildren(...blocos);
+}
+
+function renderizarIes(resultado) {
+  const corpo = $("iesCorpo");
+  const meta = $("metaIes");
+  const rodape = $("rodapeIes");
+  if (!corpo) return;
+  const ies = resultado.ies;
+  corpo.replaceChildren();
+  if (!ies) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 4;
+    td.style.color = "#8A94A6";
+    td.textContent = "Disponível na unidade Instituições (IES).";
+    tr.appendChild(td);
+    corpo.appendChild(tr);
+    meta.textContent = "disponível na unidade Instituições (IES)";
+    return;
+  }
+  for (const linha of ies.tabela) {
+    const tr = document.createElement("tr");
+    const celulas = [linha.adotado, linha.variante, nf.format(linha.documentos), linha.motivo];
+    celulas.forEach((texto, i) => {
+      const td = document.createElement("td");
+      if (i === 2) td.className = "num";
+      td.textContent = texto;
+      tr.appendChild(td);
+    });
+    corpo.appendChild(tr);
+  }
+  if (!ies.tabela.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 4;
+    td.style.color = "#8A94A6";
+    td.textContent = "Nenhuma variante unida: nenhum nome tinha variante inequívoca nesta base.";
+    tr.appendChild(td);
+    corpo.appendChild(tr);
+  }
+  meta.textContent =
+    `${plural(ies.unioes.length, "instituição com variantes unidas", "instituições com variantes unidas")}`;
+  rodape.textContent =
+    `Componentes com menos de ${ies.componente_minimo} instituições ficam sem agrupamento: ` +
+    `${ies.componentes_pequenos.length} de 2 a ${Math.max(1, ies.componente_minimo - 1)} ` +
+    `e ${ies.isolados} isoladas (${ies.sem_agrupamento} nós sem agrupamento no total).`;
 }
 
 function renderizarTabela(resultado) {
@@ -3288,7 +3368,10 @@ function atualizarMenuExportar() {
     }
     else if (precisa === "grade" && !temGrade) motivo = MOTIVO_EXPORTAR.grade;
     else if (item.dataset.exp === "linhatempo-svg" && !linhaDoTempoAplicavel()) {
-      motivo = MOTIVO_LINHA_DO_TEMPO;
+      motivo = motivoLinhaDoTempo();
+    }
+    else if (item.dataset.exp === "densidade-svg" && !densidadeAplicavel()) {
+      motivo = MOTIVO_DENSIDADE;
     }
     else if (item.dataset.exp === "fluxo-svg" && !fluxoDisponivel()) {
       motivo = "A base não traz afiliação nem país; não há fluxo Autor – País – IES.";
@@ -3329,6 +3412,7 @@ function executarExportacao(tipo) {
   else if (tipo === "fluxo-svg") baixarFluxo();
   else if (tipo === "dendrograma-svg") baixarDendrograma();
   else if (tipo === "linhatempo-svg") baixarLinhaDoTempo();
+  else if (tipo === "densidade-svg") baixarDensidade();
   else exportar(tipo);
 }
 
@@ -3487,9 +3571,19 @@ const MOTIVO_LINHA_DO_TEMPO =
   "Escolha uma análise de co-ocorrência.";
 const lt = { token: null, seq: 0, tempo: null, max: null };
 
+const UNIDADES_LINHA_DO_TEMPO = ["Words", "Authors", "References"];
+const MOTIVO_LINHA_DO_TEMPO_UNIDADE =
+  "A linha do tempo existe para palavras-chave, autores e referências em co-ocorrência. " +
+  "Para esta unidade de análise ela não é gerada.";
+
 function linhaDoTempoAplicavel() {
   const p = estado.resultado && estado.resultado.parametros;
-  return !p || p.matriz === "CoOccurrence";
+  return !p || (p.matriz === "CoOccurrence" && UNIDADES_LINHA_DO_TEMPO.includes(p.unidade));
+}
+
+function motivoLinhaDoTempo() {
+  const p = estado.resultado && estado.resultado.parametros;
+  return p && p.matriz === "CoOccurrence" ? MOTIVO_LINHA_DO_TEMPO_UNIDADE : MOTIVO_LINHA_DO_TEMPO;
 }
 
 function urlLinhaDoTempo(extra = {}) {
@@ -3526,7 +3620,7 @@ async function carregarLinhaDoTempo(forcar) {
   if (!forcar && lt.token === estado.token && !$("ltFigura").hidden) return;
   if (!linhaDoTempoAplicavel()) {
     lt.token = null;
-    mensagemLinhaDoTempo(MOTIVO_LINHA_DO_TEMPO);
+    mensagemLinhaDoTempo(motivoLinhaDoTempo());
     return;
   }
   const seq = ++lt.seq;
@@ -3586,6 +3680,110 @@ async function baixarLinhaDoTempo() {
   }
 }
 
+/* ----------------------------------------------------------------- densidade */
+
+const MOTIVO_DENSIDADE =
+  "O mapa de densidade posiciona itens pela co-ocorrência; com acoplamento ou cocitação " +
+  "os nós são documentos. Escolha uma análise de co-ocorrência.";
+const dn = { token: null, seq: 0, tempo: null };
+
+function densidadeAplicavel() {
+  const p = estado.resultado && estado.resultado.parametros;
+  return !p || p.matriz === "CoOccurrence";
+}
+
+function urlDensidade(extra = {}) {
+  const q = new URLSearchParams({
+    token: estado.token, max_nos: $("dnNos").value, suavizacao: $("dnSuav").value, ...extra });
+  return `/api/densidade?${q}`;
+}
+
+function mensagemDensidade(texto) {
+  $("vazioDensidade").hidden = false;
+  $("vazioDensidade").textContent = texto;
+  $("dnFigura").hidden = true;
+  $("dnFigura").replaceChildren();
+}
+
+// Esquece a figura (e ignora respostas em andamento) quando a análise ou o projeto muda.
+function limparDensidade(novoProjeto) {
+  dn.token = null;
+  dn.seq += 1;
+  clearTimeout(dn.tempo);
+  if (novoProjeto) {
+    $("dnNos").value = "150";
+    $("dnNosValor").textContent = "150";
+    $("dnSuav").value = "4";
+    $("dnSuavValor").textContent = "4";
+  }
+  mensagemDensidade("Execute uma análise para ver o mapa de densidade.");
+  $("metaDensidade").textContent = "itens mais frequentes do corpus completo, por vizinhança";
+}
+
+async function carregarDensidade(forcar) {
+  if (!estado.token) {
+    mensagemDensidade("Execute uma análise para ver o mapa de densidade.");
+    return;
+  }
+  if (!forcar && dn.token === estado.token && !$("dnFigura").hidden) return;
+  if (!densidadeAplicavel()) {
+    dn.token = null;
+    mensagemDensidade(MOTIVO_DENSIDADE);
+    return;
+  }
+  const seq = ++dn.seq;
+  const token = estado.token;
+  if (!forcar) mensagemDensidade("calculando o mapa de densidade…");
+  try {
+    const d = await api(urlDensidade());
+    if (seq !== dn.seq || token !== estado.token) return;
+    dn.token = token;
+    $("dnFigura").innerHTML = d.svg;
+    const svg = $("dnFigura").querySelector("svg");
+    if (svg) { svg.removeAttribute("height"); svg.style.height = "auto"; }
+    $("dnFigura").hidden = false;
+    $("vazioDensidade").hidden = true;
+    $("metaDensidade").textContent =
+      `${d.n_nos} de ${plural(d.n_total, "item", "itens")} · suavização ${d.suavizacao}`;
+  } catch (erro) {
+    if (seq !== dn.seq) return;
+    dn.token = null;
+    mensagemDensidade(erro.message);
+    mostrarToast(erro.message, true);
+  }
+}
+
+function ligarDensidade() {
+  for (const [campo, rotulo] of [["dnNos", "dnNosValor"], ["dnSuav", "dnSuavValor"]]) {
+    $(campo).addEventListener("input", () => {
+      $(rotulo).textContent = $(campo).value;
+      clearTimeout(dn.tempo);
+      dn.tempo = setTimeout(() => carregarDensidade(true), 250);
+    });
+  }
+}
+
+async function baixarDensidade() {
+  if (!estado.token) return;
+  try {
+    const resposta = await fetch(urlDensidade({ baixar: "1" }));
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(corpo.erro || "Não há dados para o mapa de densidade.");
+    }
+    const blob = await resposta.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "densidade.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  } catch (erro) {
+    mostrarToast(erro.message, true);
+  }
+}
+
 /* ---------------------------------------------------------- pontos de virada */
 
 function limparPivos() {
@@ -3604,6 +3802,7 @@ function renderizarPivos(resultado) {
   const desc = $("pivosDescritores");
   aviso.hidden = true;
   desc.hidden = true;
+  desc.textContent = "";
   adiado.hidden = !p.adiado;
   $("pivosTabelaCaixa").hidden = Boolean(p.adiado);
   if (p.adiado) {
@@ -3621,7 +3820,7 @@ function renderizarPivos(resultado) {
     const celula = document.createElement("td");
     celula.colSpan = colunas;
     celula.style.color = "#8A94A6";
-    celula.textContent = "Nenhum ponto de virada identificado nesta análise.";
+    celula.textContent = p.nao_calculado || "Nenhum ponto de virada identificado nesta análise.";
     linha.append(celula);
     corpo.append(linha);
   }
@@ -3649,9 +3848,9 @@ function renderizarPivos(resultado) {
   }
   const avisos = [];
   if (!p.suficiente) {
-    avisos.push(`Poucos dados: a rede tem ${nf.format(p.n_nos)} nós (o mínimo confiável é ${p.minimo_nos}); leia os pontos de virada como indício.`);
+    avisos.push(`Poucos dados: a rede tem ${plural(p.n_nos, "nó", "nós")} (o mínimo confiável é ${p.minimo_nos}); leia os pontos de virada como indício.`);
   }
-  if (!p.pivos.length) {
+  if (!p.pivos.length && !p.nao_calculado) {
     for (const texto of p.avisos || []) {
       if (!texto.startsWith("Poucos dados") && !texto.includes("fora do ranking")) avisos.push(texto);
     }
@@ -3671,7 +3870,7 @@ function renderizarPivos(resultado) {
   if (comSigma) {
     desc.hidden = false;
     desc.textContent += (termos.length ? " " : "") +
-      "Sigma = (intermediação + 1) elevado à força da rajada; como a rajada pesa muito, o ranking por sigma quase repete o ranking pela rajada.";
+      "Sigma = (intermediação + 1) elevado à força da rajada; entre os pontos de virada, o ranking por sigma acompanha sobretudo a intermediação, não a força da rajada. A rajada de palavras-chave é calculada só sobre as palavras-chave dos autores.";
   }
 }
 

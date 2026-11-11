@@ -51,6 +51,7 @@
         <p class="grupo-titulo">Estrutura social</p>
         <button type="button" class="nav-analise" data-analise="autores"><span class="ponto"></span><span class="nav-texto">Colaboração entre autores</span></button>
         <button type="button" class="nav-analise" data-analise="paises"><span class="ponto"></span><span class="nav-texto">Colaboração entre países</span></button>
+        <button type="button" class="nav-analise" data-analise="instituicoes"><span class="ponto"></span><span class="nav-texto">Colaboração entre instituições</span></button>
       </div>
     </nav>
 
@@ -130,6 +131,7 @@
               <option value="conceitual">Estrutura conceitual</option>
               <option value="autores">Colaboração entre autores</option>
               <option value="paises">Colaboração entre países</option>
+              <option value="instituicoes">Colaboração entre instituições</option>
               <option value="citados">Cocitação de autores</option>
               <option value="referencias">Cocitação de referências</option>
               <option value="frentes">Frentes de pesquisa</option>
@@ -154,6 +156,7 @@
                 <option value="AuthorsReference">Autores de referência</option>
                 <option value="ReferenceSources">Fontes de referência</option>
                 <option value="Countries">Países</option>
+                <option value="Institutions">Instituições (IES)</option>
               </select>
                 <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
               </div>
@@ -242,6 +245,10 @@
               <label for="corte" title="Similaridade mínima para unir dois temas nos algoritmos de ligação. O algoritmo Centros simples não usa este valor.">Corte</label>
               <div class="controle"><input id="corte" type="number" min="0" step="0.05" value="0" title="Similaridade mínima para unir temas (0 = unir tudo)." style="width:100%;border:0;outline:0;background:transparent;font:inherit;color:inherit"></div>
             </div>
+            <div class="campo min" id="campoComponente" hidden>
+              <label for="componenteMin" title="Rede de instituições: componentes conexos com menos instituições que isto não viram agrupamento e ficam sem agrupamento (fora dos halos).">Componente mínimo</label>
+              <div class="controle"><input id="componenteMin" type="number" min="1" step="1" value="3" title="Menor componente (em instituições) que pode virar agrupamento. Padrão: 3." style="width:100%;border:0;outline:0;background:transparent;font:inherit;color:inherit"></div>
+            </div>
             <div class="campo rede">
               <label for="rede" title="Número mínimo e máximo de itens em cada agrupamento.">Tamanho do grupo</label>
               <div class="controle"><select id="rede">
@@ -319,6 +326,7 @@
         <div class="aba ativa" data-aba="resumo" role="tab" tabindex="0" aria-selected="true">Resumo</div>
         <div class="aba" data-aba="rede" role="tab" tabindex="0" aria-selected="false">Rede</div>
         <div class="aba" data-aba="paises" role="tab" tabindex="0" aria-selected="false">Países</div>
+        <div class="aba" data-aba="ies" role="tab" tabindex="0" aria-selected="false">Variantes unidas</div>
         <div class="aba" data-aba="diagrama" role="tab" tabindex="0" aria-selected="false">Diagrama estratégico</div>
         <div class="aba" data-aba="agrupamentos" role="tab" tabindex="0" aria-selected="false">Rede de agrupamentos</div>
         <div class="aba" data-aba="grupos" role="tab" tabindex="0" aria-selected="false">Agrupamentos</div>
@@ -326,6 +334,7 @@
         <div class="aba" data-aba="documentos" role="tab" tabindex="0" aria-selected="false">Documentos</div>
         <div class="aba" data-aba="dendrograma" role="tab" tabindex="0" aria-selected="false">Dendrograma</div>
         <div class="aba" data-aba="linhatempo" role="tab" tabindex="0" aria-selected="false">Linha do tempo</div>
+        <div class="aba" data-aba="densidade" role="tab" tabindex="0" aria-selected="false">Densidade</div>
         <div class="aba" data-aba="longitudinal" role="tab" tabindex="0" aria-selected="false">Comparar períodos</div>
       </div>
       <div class="qualidade-caixa" id="qualidadeCaixa" hidden>
@@ -521,6 +530,29 @@
         <div class="rodape-tabela" id="rodapeTabela">Quadrantes pela mediana das faixas normalizadas de centralidade e densidade de Callon.</div>
       </section>
 
+      <section class="tabela-bloco" id="blocoIes" data-bloco="blocoIes">
+        <header>
+          <h2>Variantes unidas</h2>
+          <span class="meta" id="metaIes">disponível na unidade Instituições (IES)</span>
+        </header>
+        <div class="tabela-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome adotado</th>
+                <th>Variante</th>
+                <th class="num" style="width:96px">Documentos</th>
+                <th style="width:260px">Motivo da união</th>
+              </tr>
+            </thead>
+            <tbody id="iesCorpo">
+              <tr><td colspan="4" style="color:#8A94A6">Nenhuma análise de instituições executada.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rodape-tabela" id="rodapeIes">Só se unem nomes cuja normalização é inequívoca (caixa, acentos, pontuação, Univ./University, sigla entre parênteses, país depois de hífen).</div>
+      </section>
+
       <section class="tabela-bloco" id="blocoIndices" data-bloco="blocoIndices">
         <header>
           <h2>Índices por agrupamento</h2>
@@ -672,7 +704,27 @@
           <div class="lt-figura" id="ltFigura" hidden></div>
         </div>
         <ul class="dendro-frases" id="ltAvisos"></ul>
-        <div class="rodape-tabela" id="rodapeLinhaDoTempo">Posição = ano médio dos documentos do item (nas referências, o ano da obra); anel vermelho = rajada. Usa o corpus completo, não só o período.</div>
+        <div class="rodape-tabela" id="rodapeLinhaDoTempo">Posição = ano médio dos documentos do item (nas referências, o ano da obra); anel vermelho = rajada (palavras-chave: só as dos autores). Usa o corpus completo, não só o período.</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoDensidade" data-bloco="blocoDensidade">
+        <header>
+          <h2>Mapa de densidade</h2>
+          <span class="meta" id="metaDensidade">itens mais frequentes do corpus completo, por vizinhança</span>
+        </header>
+        <div class="dendro-controles">
+          <label class="campo-mini dendro-grupos">Nº de itens: <b id="dnNosValor">150</b>
+            <input type="range" id="dnNos" min="20" max="200" step="10" value="150" aria-label="Número máximo de itens do mapa">
+          </label>
+          <label class="campo-mini dendro-grupos">Suavização: <b id="dnSuavValor">4</b>
+            <input type="range" id="dnSuav" min="1" max="9" step="1" value="4" aria-label="Suavização do mapa de densidade">
+          </label>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioDensidade">Execute uma análise para ver o mapa de densidade.</div>
+          <div class="dn-figura" id="dnFigura" hidden></div>
+        </div>
+        <div class="rodape-tabela" id="rodapeDensidade">Cor = densidade de itens frequentes e fortemente ligados (branco: pouca; amarelo: muita). Usa o corpus completo, não só o período; só os rótulos que cabem aparecem.</div>
       </section>
 
       <section class="acoes-finais">
@@ -706,6 +758,7 @@
               <button type="button" role="menuitem" tabindex="-1" data-exp="documentos-tsv" data-precisa="resultado">Documentos do período (TSV)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="dendrograma-svg" data-precisa="resultado">Dendrograma do período (SVG)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="linhatempo-svg" data-precisa="resultado">Linha do tempo (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="densidade-svg" data-precisa="resultado">Mapa de densidade (SVG)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="fluxo-svg">Fluxo Autor – País – IES (SVG)</button>
             </div>
             <p class="menu-aviso" id="avisoExportar" hidden>Escolha uma análise no menu lateral para liberar os dados.</p>

@@ -43,6 +43,15 @@ ramos têm a cor do grupo e acima ficam em cinza. O raio do ponto da folha
 reflete o peso do nó (quando informado). A escala inferior é a altura de
 fusão.
 
+## Na ferramenta
+
+Aba **Dendrograma** (modo avançado), rota `/api/dendrograma`, com escolha da
+ligação (média, completa ou simples) e do número de grupos; mostra a figura
+(baixável em SVG), as frases de interpretação, a correlação cofenética e
+ARI/NMI contra a rede. Para não travar, usa os **60 itens mais frequentes** do
+período; o aviso diz quantos ficaram de fora. O relatório traz o mesmo bloco por
+período.
+
 ## Uso
 
 ```python
@@ -68,7 +77,7 @@ figura = svg(res, n_grupos=5, titulo="Palavras, 2020")
 ## Limites
 
 Python puro, O(n³): adequado a redes de até algumas centenas de nós (676 nós
-rodam em poucos segundos). Em redes esparsas muitos pares têm distância 1 e as
+rodam em poucos segundos). Na interface e no relatório o limite é de 60 itens. Em redes esparsas muitos pares têm distância 1 e as
 fusões altas empatam; nesse caso o resultado depende da ordem dos nós e a
 correlação cofenética tende a parecer alta. O dendrograma é uma leitura
 complementar, não substitui a partição usada no mapa estratégico.

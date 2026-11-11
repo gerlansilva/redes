@@ -68,9 +68,22 @@ def _intermediacao(resultado) -> dict[int, float]:
     return measures.intermediacao(resultado.rede)
 
 
-def _vazio(n: int, avisos: list[str]) -> dict:
+def _nos(n: int) -> str:
+    return f"{n} {'nó' if n == 1 else 'nós'}"
+
+
+def _vazio(n: int, avisos: list[str], nao_calculado: str | None = None) -> dict:
+    """Resultado sem pivôs. `nao_calculado` (texto) marca que o cálculo foi pulado ou falhou:
+    nesse caso "não há pivôs" seria enganoso, e quem exibe mostra esse texto."""
     return {"n_nos": n, "suficiente": n >= MINIMO_NOS, "pivos": [],
-            "termos_descritores": [], "nos_com_rajada": [], "avisos": avisos}
+            "termos_descritores": [], "nos_com_rajada": [], "avisos": avisos,
+            "nao_calculado": nao_calculado}
+
+
+def nao_calculado(n: int, motivo: str) -> dict:
+    """Resultado de uma rede cujos pontos de virada não puderam ser calculados."""
+    texto = f"Não calculado: {motivo}"
+    return _vazio(n, [texto], nao_calculado=texto)
 
 
 def pontos_de_virada(resultado, kb=None, topo: int = 10) -> dict:
@@ -84,7 +97,7 @@ def pontos_de_virada(resultado, kb=None, topo: int = 10) -> dict:
     n = rede.quantidade_nos()
     avisos: list[str] = []
     if n < MINIMO_NOS:
-        avisos.append(f"Poucos dados: só {n} nós (o mínimo confiável é {MINIMO_NOS}); "
+        avisos.append(f"Poucos dados: só {_nos(n)} (o mínimo confiável é {MINIMO_NOS}); "
                       "leia como indício.")
     if n < 3 or rede.quantidade_arestas() == 0:
         avisos.append("A rede tem menos de 3 nós ou nenhuma ligação; não há pontos de virada.")
@@ -94,9 +107,10 @@ def pontos_de_virada(resultado, kb=None, topo: int = 10) -> dict:
         avisos.append("Não há agrupamentos; sem eles não se identificam pontos de virada.")
         return _vazio(n, avisos)
     if n > LIMITE_NOS:
-        avisos.append(f"Rede com {n} nós (mais de {LIMITE_NOS}): a intermediação foi "
-                      "pulada para não travar. Filtre a rede e tente de novo.")
-        return _vazio(n, avisos)
+        texto = (f"Não calculado: rede com {n} nós (limite {LIMITE_NOS}); a intermediação "
+                 "foi pulada para não travar. Filtre a rede e tente de novo.")
+        avisos.append(texto)
+        return _vazio(n, avisos, nao_calculado=texto)
 
     bc = _intermediacao(resultado)
     norma = (n - 1) * (n - 2) / 2
@@ -155,7 +169,8 @@ def pontos_de_virada(resultado, kb=None, topo: int = 10) -> dict:
     com_rajada = [item(no) for no in rede.nos if forcas.get(chave(rotulo(no)))]
     com_rajada = tabela_sigma({"nos_com_rajada": com_rajada})
     return {"n_nos": n, "suficiente": n >= MINIMO_NOS, "pivos": pivos,
-            "termos_descritores": termos, "nos_com_rajada": com_rajada, "avisos": avisos}
+            "termos_descritores": termos, "nos_com_rajada": com_rajada, "avisos": avisos,
+            "nao_calculado": None}
 
 
 def tabela_sigma(dicionario: dict) -> list:

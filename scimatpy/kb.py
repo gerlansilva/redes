@@ -15,7 +15,7 @@ from pathlib import Path
 from .dataset import Dataset
 
 UNIDADES = ("Words", "Authors", "References", "AuthorsReference",
-            "ReferenceSources", "Countries")
+            "ReferenceSources", "Countries", "Institutions")
 
 _SQL_PERIODOS = "SELECT * FROM Period ORDER BY position ASC;"
 
@@ -74,6 +74,7 @@ class ProjetoScimat:
         self.conexao = sqlite3.connect(self.caminho)
         self.conexao.row_factory = sqlite3.Row
         self._grupos: dict[str, dict[int, tuple[str, bool]]] = {}
+        self._ies = None
 
     def _grupo(self, tabela: str, coluna: str, grupo: int) -> tuple[str, bool] | None:
         """Nome e marca de parada de um agrupamento, com cache por tabela."""
@@ -185,6 +186,18 @@ class ProjetoScimat:
             if dados is None or dados[1]:
                 continue
             ds.adiciona_item_ao_documento(doc_id, grupo, dados[0])
+
+    def indice_ies(self):
+        """Instituições do projeto com as variantes unidas (calculado uma vez)."""
+        if self._ies is None:
+            from .ies import indice_de_ies
+            self._ies = indice_de_ies(self.conexao)
+        return self._ies
+
+    def _unidade_Institutions(self, ds: Dataset, doc_id: int) -> None:
+        indice = self.indice_ies()
+        for ies in indice.por_documento.get(doc_id, ()):
+            ds.adiciona_item_ao_documento(doc_id, ies, indice.nomes[ies])
 
     def _unidade_References(self, ds: Dataset, doc_id: int) -> None:
         for linha in self.conexao.execute(_SQL_REFERENCIAS, (doc_id,)):

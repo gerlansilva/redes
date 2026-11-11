@@ -1087,7 +1087,12 @@ tbody tr:hover td { background: #FBFCFE; }
 
 .dendro-controles .dendro-grupos:has(#ltNos) { flex: 0 1 360px; }
 .lt-figura { max-width: 100%; overflow-x: auto; border: 1px solid var(--linha); border-radius: 10px; background: var(--branco); }
-.lt-figura svg { display: block; width: 100%; min-width: 960px; max-width: none; height: auto; }
+.lt-figura svg { display: block; width: 100%; min-width: 880px; max-width: none; height: auto; }
+
+/* ------------------------------------------------------------------ densidade */
+
+.dn-figura { max-width: 100%; overflow-x: auto; border: 1px solid var(--linha); border-radius: 10px; background: var(--branco); }
+.dn-figura svg { display: block; width: 100%; min-width: 900px; max-width: none; height: auto; }
 
 /* --------------------------------------------------------- pontos de virada */
 

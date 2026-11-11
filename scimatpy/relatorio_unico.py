@@ -89,7 +89,11 @@ def _data_extenso(data: datetime.date) -> str:
 
 
 def _prefixa_ids(svg: str, prefixo: str) -> str:
-    """Prefixa os ids do SVG (e suas referências) para evitar colisões no documento."""
+    """Prefixa os ids do SVG (e suas referências) para evitar colisões no documento.
+
+    Cobre ``id``, ``url(#id)``, ``href="#id"`` e as listas de ids separados por espaço
+    de ``aria-labelledby`` e ``aria-describedby``.
+    """
     ids = set(re.findall(r'\sid="([^"]+)"', svg))
     if not ids:
         return svg
@@ -98,7 +102,12 @@ def _prefixa_ids(svg: str, prefixo: str) -> str:
         svg = svg.replace(f'id="{ident}"', f'id="{novo}"')
         svg = svg.replace(f'url(#{ident})', f'url(#{novo})')
         svg = svg.replace(f'href="#{ident}"', f'href="#{novo}"')
-    return svg
+
+    def lista(m: re.Match) -> str:
+        nomes = " ".join(f"{prefixo}-{i}" if i in ids else i for i in m.group(2).split())
+        return f'{m.group(1)}="{nomes}"'
+
+    return re.sub(r'(aria-labelledby|aria-describedby)="([^"]*)"', lista, svg)
 
 
 class _Documento:
@@ -213,6 +222,18 @@ def _linha_do_tempo_partes(kb, config):
     return ("\n".join(partes), figuras) if partes else None
 
 
+def _densidade_partes(kb, config):
+    """(HTML com marcadores de figura, figuras) do mapa de densidade, ou None."""
+    figuras: list[tuple[str, str]] = []
+
+    def figura(svg, legenda):
+        figuras.append((svg, legenda))
+        return f"\x00FIG{len(figuras) - 1}\x00"
+
+    partes = report.densidade_html(kb, config, figura, classe_nota="nota")
+    return ("\n".join(partes), figuras) if partes else None
+
+
 def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
                    numero: int, medida_temporal: str, limite) -> tuple[str, int]:
     """HTML de uma análise. Devolve também quantas redes de agrupamento foram omitidas."""
@@ -258,6 +279,9 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
         ])
     partes.append(doc.tabela(["Período", "Itens", "Grupos", "Maior grupo"], linhas,
                              f"Resumo por período — {rotulo}.", numericas=(1, 2)))
+
+    if config.unidade == "Institutions" and resultados and resultados[0].ies:
+        partes.append(metodo.ies_html(resultados[0], doc.tabela, rotulo.lower()))
 
     # X.3 Períodos
     partes.append(doc.cabecalho(3, f"{numero}.3", "Resultados de cada período",
@@ -342,10 +366,13 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
         if figuras:
             partes.append('<div class="redes-grupos">' + "".join(figuras) + "</div>")
 
-    # X.4 Evolução e sobreposição
+    # X.4 Evolução e sobreposição; as subseções seguintes seguem um contador único,
+    # para que a numeração não pule quando não há evolução.
+    subsecao = 4
     if len(resultados) >= 2 and config.matriz == "CoOccurrence":
-        partes.append(doc.cabecalho(3, f"{numero}.4", "Evolução e sobreposição temática",
+        partes.append(doc.cabecalho(3, f"{numero}.{subsecao}", "Evolução e sobreposição temática",
                                     f"s{numero}-evolucao"))
+        subsecao += 1
         mapa = cache.obtem((chave, "mapa"), lambda: longitudinal.constroi(
             kb, config, periodos, medida_temporal, resultados=resultados))
         if mapa is not None:
@@ -360,8 +387,7 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
         else:
             partes.append('<p class="nota">Os mapas de evolução e sobreposição não '
                           "puderam ser construídos.</p>")
-    # X.5 Linha do tempo (só palavras, autores e referências em co-ocorrência)
-    subsecao = 5
+    # X.n Linha do tempo (só palavras, autores e referências em co-ocorrência)
     bloco_lt = cache.obtem((chave, "linha-do-tempo"),
                            lambda: _linha_do_tempo_partes(kb, config))
     if bloco_lt:
@@ -372,7 +398,17 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
             texto_lt = texto_lt.replace(f"\x00FIG{i}\x00", doc.figura(svg, legenda))
         partes.append(texto_lt)
         subsecao += 1
-    # X.6 (ou X.5) Dendrograma
+    # X.n Mapa de densidade (co-ocorrência)
+    bloco_dens = cache.obtem((chave, "densidade"), lambda: _densidade_partes(kb, config))
+    if bloco_dens:
+        partes.append(doc.cabecalho(3, f"{numero}.{subsecao}", "Mapa de densidade (corpus completo)",
+                                    f"s{numero}-densidade"))
+        texto_d, figuras_d = bloco_dens
+        for i, (svg, legenda) in enumerate(figuras_d):
+            texto_d = texto_d.replace(f"\x00FIG{i}\x00", doc.figura(svg, legenda))
+        partes.append(texto_d)
+        subsecao += 1
+    # X.n Dendrograma
     partes.append(doc.cabecalho(3, f"{numero}.{subsecao}", "Dendrograma (agrupamento hierárquico)",
                                 f"s{numero}-dendrograma"))
     partes.append(

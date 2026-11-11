@@ -18,6 +18,7 @@ from __future__ import annotations
 import html
 
 from . import bibliometria, linha_do_tempo, pivos, qualidade, rajadas, rotulos, termos
+from .viz import densidade as viz_densidade
 from .clustering import ALGORITMOS
 from .similarity import MEDIDAS
 
@@ -28,6 +29,7 @@ _ROTULOS_UNIDADE = {
     "AuthorsReference": "Autores de referência",
     "ReferenceSources": "Fontes de referência",
     "Countries": "Países",
+    "Institutions": "Instituições (IES)",
 }
 
 _ITEM_UNIDADE = {
@@ -37,6 +39,7 @@ _ITEM_UNIDADE = {
     "AuthorsReference": "autores de referência",
     "ReferenceSources": "fontes de referência",
     "Countries": "países",
+    "Institutions": "instituições",
 }
 
 _ROTULOS_MATRIZ = {
@@ -244,6 +247,9 @@ def pivos_html(kb, resultado, tabela, legenda: str, classe_nota: str = "nota") -
         return ""
     partes: list[str] = []
     itens = dados.get("pivos") or []
+    if dados.get("nao_calculado"):
+        # Cálculo pulado (rede grande): dizer isso, e não "nenhum ponto de virada".
+        return f'<p class="{classe_nota}">{_esc(dados["nao_calculado"])}</p>'
     if itens:
         com_sigma = any(i.get("sigma") is not None for i in itens)
         cabecalho = ["Nº", "Item", "Intermediação", "Agrupamentos vizinhos", "Grupo",
@@ -268,9 +274,11 @@ def pivos_html(kb, resultado, tabela, legenda: str, classe_nota: str = "nota") -
             f'<p class="{classe_nota}">Pontos de virada: itens de intermediação alta (decil '
             "superior da rede) cujos vizinhos estão em dois ou mais agrupamentos; ligam "
             "temas que, sem eles, ficariam mais separados. Intermediação normalizada, de 0 a "
-            "1." + (" Sigma = (intermediação + 1) elevado à força da rajada do termo; como "
-                    "a rajada pesa muito, o ranking por sigma quase repete o ranking pela "
-                    "rajada." if com_sigma else "") + "</p>")
+            "1." + (" Sigma = (intermediação + 1) elevado à força da rajada do termo; entre "
+                    "os pontos de virada, o ranking por sigma acompanha sobretudo a "
+                    "intermediação, não a força da rajada. A rajada de palavras-chave é "
+                    "calculada só sobre as palavras-chave dos autores." if com_sigma else "")
+            + "</p>")
     else:
         motivos = [a for a in dados.get("avisos", [])
                    if not a.startswith("Poucos dados") and "fora do ranking" not in a]
@@ -287,7 +295,7 @@ def pivos_html(kb, resultado, tabela, legenda: str, classe_nota: str = "nota") -
     if not dados.get("suficiente"):
         partes.append(
             f'<p class="{classe_nota}"><strong>Poucos dados:</strong> a rede tem '
-            f"{dados.get('n_nos', 0)} nós (o mínimo confiável é {pivos.MINIMO_NOS}); leia os "
+            f"{pivos._nos(dados.get('n_nos', 0))} (o mínimo confiável é {pivos.MINIMO_NOS}); leia os "
             "pontos de virada como indício.</p>")
     return "\n".join(partes)
 
@@ -468,6 +476,14 @@ def parametros_linhas(config, periodos=None, resultados=(), frequencia=None,
         origens = [_ORIGEM_PALAVRAS.get(o, o) for o in config.palavras]
         linhas.append(["Origem das palavras",
                        ", ".join(origens) if origens else "todas (nenhuma origem marcada)"])
+    if config.unidade == "Institutions":
+        minimo_comp = config.componente_minimo
+        linhas.append(["Tamanho mínimo do componente (IES)",
+                       f"{minimo_comp} (componentes conexos da rede com menos de {minimo_comp} "
+                       "instituições não viram agrupamento e ficam sem agrupamento, fora dos halos)"
+                       if minimo_comp > 1 else "1 (todo componente pode virar agrupamento)"])
+        linhas.append(["União de variantes de nome",
+                       "automática e conservadora; cada união está na tabela \"variantes unidas\""])
     linhas.append(["Termos ignorados",
                    _Seguro(_esc(", ".join(config.ignorar)) if config.ignorar else "nenhum")])
     if resultados:
@@ -556,6 +572,9 @@ def algoritmo_html(config, medida_temporal: str | None = None,
             f"de documentos do {quem}. Como no SciMAT, quem aparece em muitos documentos "
             "tende a se ligar a quase todos os demais.</p>")
 
+    if config.unidade == "Institutions":
+        p.append(_texto_ies_nomes())
+
     # 2. Redução
     p.append(
         f"<p><strong>2. Redução.</strong> Antes de montar a rede, saem os termos ignorados "
@@ -581,7 +600,9 @@ def algoritmo_html(config, medida_temporal: str | None = None,
         "disponíveis são:</p><ul>" + "".join(itens) + "</ul>")
 
     # 4. Agrupamento
-    p.append("<p><strong>4. Agrupamento.</strong> " + _texto_algoritmo(config) + "</p>")
+    p.append("<p><strong>4. Agrupamento.</strong> " + _texto_algoritmo(config)
+             + (_texto_ies_componentes(config) if config.unidade == "Institutions" else "")
+             + "</p>")
 
     # 5. Diagrama estratégico
     p.append(
@@ -638,8 +659,12 @@ def algoritmo_html(config, medida_temporal: str | None = None,
     if config.matriz == "CoOccurrence" and config.unidade in UNIDADES_LINHA_DO_TEMPO:
         p.append(_texto_linha_do_tempo(config, proximo))
         proximo += 1
+    if config.matriz == "CoOccurrence":
+        p.append(_texto_densidade(proximo))
+        proximo += 1
     p.append(_texto_pivos(config, proximo))
-    p.append(_texto_qualidade(config))
+    proximo += 1
+    p.append(_texto_qualidade(config, proximo))
     p.append("</div>")
     return "\n".join(p)
 
@@ -660,12 +685,48 @@ def _texto_linha_do_tempo(config, numero: int) -> str:
         + ("Cada referência fica no ano da própria obra. " if referencias else
            "Cada item fica no seu ano médio, a média dos anos dos documentos em que "
            "aparece, arredondada; a linha fina atrás do nó vai do primeiro ao último ano "
-           "do item e a atividade anual aparece como traço sob a faixa. ")
+           "do item e, quando o item tem rajada, um traço vermelho sobre essa linha marca "
+           "os anos da rajada. ")
         + "O tamanho do nó segue a frequência. Os arcos mostram as "
         f"{lt.LIGACOES_POR_NO} ligações mais fortes de cada nó dentro da faixa e as "
         f"{lt.LIGACOES_CRUZADAS} mais fortes entre faixas. O anel vermelho marca rajadas "
         f"(Kleinberg): as {lt.RAJADAS_MAXIMAS} mais fortes do corpus, com pelo menos "
-        f"{lt.RAJADA_MIN_DOCUMENTOS} documentos. Itens sem ano ficam de fora, com aviso.</p>")
+        f"{lt.RAJADA_MIN_DOCUMENTOS} documentos"
+        + (", calculadas sobre as referências citadas" if referencias else
+           ", calculadas só sobre as palavras-chave dos autores (a rede de palavras pode "
+           "incluir também as de fonte)" if config.unidade == "Words"
+           else " (não há rajada para autores)")
+        + ". Itens sem ano ficam de fora, com aviso; os termos-descritor (presentes em mais "
+        f"de {pivos.PROPORCAO_DESCRITOR:.0%} dos documentos) também, como nos pontos de "
+        "virada.</p>")
+
+
+def _texto_densidade(numero: int) -> str:
+    """Método do mapa de densidade, com as constantes lidas de `viz.densidade`."""
+    d = viz_densidade
+    return (
+        f"<p><strong>{numero}. Mapa de densidade.</strong> Figura complementar sobre o corpus "
+        "completo, com os mesmos parâmetros e o mesmo algoritmo desta análise. Entram os "
+        f"{d.TOPO_NOS} itens mais frequentes da rede (padrão; a tela aceita de "
+        f"{d.LIMITE_NOS[0]} a {d.LIMITE_NOS[1]}). A similaridade entre dois itens é a força "
+        "da ligação na rede, dividida pela maior ligação entre os itens do mapa. As "
+        "posições vêm de um layout de atração e repulsão no plano (energia do tipo VOS): "
+        "minimiza-se a soma de s<sub>ij</sub>·d<sub>ij</sub>² − c·Σ ln d<sub>ij</sub> por "
+        f"descida de gradiente com momento ({d.ITERACOES} iterações, semente fixa, c = 4), de "
+        "modo que o resultado se repete; itens soltos, muito afastados do conjunto (além de "
+        f"1,3 vez o percentil 85 da distância ao centro), têm o excesso de distância reduzido a "
+        f"{d.COMPRESSAO_PERIFERIA:.0%} antes de escalar o mapa. A densidade em "
+        "cada ponto da imagem é a soma de núcleos gaussianos centrados nos itens, cada um "
+        "com peso igual à frequência do item (número de documentos); o desvio-padrão do "
+        f"núcleo (largura de banda) é a suavização × {d.SIGMA_POR_PASSO * 100:g}% da largura "
+        f"do quadro, com suavização padrão {d.SUAVIZACAO} (de {d.LIMITE_SUAVIZACAO[0]} a "
+        f"{d.LIMITE_SUAVIZACAO[1]}). A soma é normalizada pelo máximo, para ficar entre 0 e 1, "
+        f"e elevada a {str(d.GAMMA).replace('.', ',')} para realçar as áreas médias; a cor vai do "
+        "branco (0) ao amarelo (1). Os rótulos aparecem por ordem de frequência, sem "
+        f"sobreposição e inteiros dentro do quadro, até o máximo de {d.MAX_ROTULOS}; nomes com "
+        f"mais de {d.LIMITE_ROTULO} caracteres são cortados e o texto inteiro fica na dica "
+        "do item. O mapa não é calculado para acoplamento nem cocitação, cujos nós são "
+        "documentos.</p>")
 
 
 def _texto_pivos(config, numero: int) -> str:
@@ -682,14 +743,22 @@ def _texto_pivos(config, numero: int) -> str:
         f"de {pivos.MINIMO_NOS} nós, a lista é só indício e o relatório avisa. O sigma, "
         "como no CiteSpace, é (intermediação + 1) elevado à força da rajada do termo; só "
         "existe para quem tem rajada (palavras-chave e referências em co-ocorrência) e a "
-        "coluna só aparece quando algum ponto de virada tem rajada. Atenção: como a "
-        "intermediação normalizada fica perto de zero, o fator (intermediação + 1) quase "
-        "não muda, e o sigma praticamente repete o ranking da força da rajada. "
+        "coluna só aparece quando algum ponto de virada tem rajada. Como o sigma é um "
+        "produto (o logaritmo do sigma é a força da rajada vezes ln(intermediação + 1)), entre "
+        "os pontos de virada, que já têm intermediação alta, quem ordena o ranking por sigma "
+        "é sobretudo a intermediação: nas redes testadas a correlação de Spearman do sigma "
+        "com a intermediação ficou entre 0,89 e 0,97, e com a força da rajada, entre 0,21 e "
+        "0,60. A rajada das palavras-chave é calculada só sobre as palavras-chave dos autores "
+        "(a rede de palavras pode incluir também as de fonte), e a das referências, sobre as "
+        "referências citadas. "
         f"A tabela lista no máximo {TOPO_PIVOS} pontos de virada.</p>")
 
 
-def _texto_qualidade(config) -> str:
-    """Qualidade do mapa e rótulos, em linguagem simples, com os limiares do código."""
+def _texto_qualidade(config, numero: int = 9) -> str:
+    """Qualidade do mapa e rótulos, em linguagem simples, com os limiares do código.
+
+    `numero` é o número da seção "Qualidade do mapa"; "Rótulos" vem logo depois.
+    """
     lim = LIMIARES_QUALIDADE
     minimo_nos = qualidade.MINIMO_NOS
     minimo_sil = qualidade.MINIMO_NOS_SILHUETA
@@ -700,7 +769,7 @@ def _texto_qualidade(config) -> str:
     minimo_grupo = rotulos.MINIMO_NO_GRUPO
     p = []
     p.append(
-        "<p><strong>9. Qualidade do mapa.</strong> Duas medidas dizem se a divisão em "
+        f"<p><strong>{numero}. Qualidade do mapa.</strong> Duas medidas dizem se a divisão em "
         "agrupamentos se sustenta na rede.</p>")
     p.append(
         "<ul>"
@@ -744,7 +813,7 @@ def _texto_qualidade(config) -> str:
             "fragmentada e com o número de itens por agrupamento. Por isso, com autores, o "
             "selo nunca é <em>OK</em>: no máximo <em>Atenção</em>.</p>")
     p.append(
-        "<p><strong>10. Rótulos dos agrupamentos.</strong> O <em>rótulo novo</em> traz "
+        f"<p><strong>{numero + 1}. Rótulos dos agrupamentos.</strong> O <em>rótulo novo</em> traz "
         "os termos que mais distinguem o agrupamento dos demais documentos do mesmo "
         "período, pela razão de verossimilhança de Dunning (G²): comparam-se os "
         "documentos do núcleo do agrupamento com todos os outros documentos do período, "
@@ -761,6 +830,70 @@ def _texto_qualidade(config) -> str:
         "onde não há rótulo novo vale só ele. Nas tabelas, <em>Ano médio</em> é a média "
         "do ano de publicação dos documentos do núcleo.</p>")
     return "\n".join(p)
+
+
+def _texto_ies_nomes() -> str:
+    """Como as variantes do nome de uma instituição são unidas (rede de IES)."""
+    return (
+        "<p><em>Nomes das instituições.</em> A instituição de cada afiliação é o trecho que "
+        "a nomeia (por exemplo, o segmento com \"Universidade\" ou \"University\"). Antes "
+        "de montar a rede, as variantes do mesmo nome são unidas, e só quando a "
+        "normalização é inequívoca: caixa, acentos, pontuação e espaços não contam; "
+        "ligações (de, of, the) são desprezadas; Univ., University, Universidade e "
+        "Universidad valem o mesmo (e também instituto/institute e faculdade/faculty); "
+        "sigla entre parênteses e país depois de hífen ou barra são ignorados. Não se "
+        "une quando a ordem das palavras muda, quando falta ou sobra uma palavra, nem por "
+        "semelhança de grafia. O mesmo nome com países diferentes não é unido entre países. "
+        "A grafia adotada é a mais frequente. Cada união fica registrada na tabela "
+        "\"variantes unidas\", com a grafia adotada, as variantes, o número de documentos "
+        "e o motivo.</p>")
+
+
+def _texto_ies_componentes(config) -> str:
+    """Regra do tamanho mínimo do componente na rede de IES."""
+    minimo = config.componente_minimo
+    if minimo <= 1:
+        return ""
+    return (
+        f" Na rede de instituições, antes de aceitar um agrupamento calculam-se os "
+        f"componentes conexos da rede (conjuntos de instituições ligadas entre si, direta ou "
+        f"indiretamente, por coautoria institucional). Componentes com menos de {minimo} "
+        "instituições não viram agrupamento e não entram nos halos: seus nós ficam como "
+        f"\"sem agrupamento\". O parâmetro é o tamanho mínimo do componente (padrão 3, "
+        f"aqui {minimo}).")
+
+
+def ies_html(resultado, tabela=None, rotulo: str = "") -> str:
+    """Tabela auditável "variantes unidas" e nota dos componentes sem agrupamento (rede de IES)."""
+    info = getattr(resultado, "ies", None)
+    if not info:
+        return ""
+    tabela = tabela or _tabela_padrao
+    sufixo = f" — {rotulo}" if rotulo else ""
+    partes = []
+    linhas = []
+    for uniao in info["unioes"]:
+        for variante in uniao["variantes"]:
+            linhas.append([_esc(uniao["adotado"]), _esc(variante["nome"]),
+                           _inteiro(variante["documentos"]), _esc(variante["motivo"])])
+    if linhas:
+        partes.append(tabela(
+            ["Nome adotado", "Variante", "Documentos", "Motivo da união"], linhas,
+            f"Variantes unidas{sufixo}: {len(info['unioes'])} "
+            f"{_plural(len(info['unioes']), 'instituição teve', 'instituições tiveram')} "
+            "variantes do nome unidas.", numericas=(2,)))
+    else:
+        partes.append('<p class="nota">Variantes unidas: nenhuma. Nenhum nome de instituição '
+                      "tinha variante inequívoca nesta base.</p>")
+    pequenos = info["componentes_pequenos"]
+    minimo = info["componente_minimo"]
+    nota = (f"Componentes com menos de {minimo} instituições não viram agrupamento e ficam "
+            f"sem agrupamento: {len(pequenos)} {_plural(len(pequenos), 'componente', 'componentes')} "
+            f"de 2 a {minimo - 1} instituições e {info['isolados']} "
+            f"{_plural(info['isolados'], 'instituição isolada', 'instituições isoladas')}."
+            if minimo > 1 else "Todos os componentes podem virar agrupamento.")
+    partes.append(f'<p class="nota">{nota}</p>')
+    return "\n".join(partes)
 
 
 def _texto_algoritmo(config) -> str:

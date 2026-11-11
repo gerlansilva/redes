@@ -88,7 +88,7 @@ for r, linha in enumerate(["11010", "00110", "10100", "01011", "00101"]):
     for k, v in enumerate(linha):
         add(f'<rect x="{mx + k * c}" y="{my + r * c}" width="{c}" height="{c}" fill="{AZUL if v == "1" else "#fff"}" '
             f'fill-opacity="{0.85 if v == "1" else 1}" stroke="{ESCURO}" stroke-width="1"/>')
-linhas(930, 548, ["palavras-chave · autores", "referências · países", "periódicos"], 12, FRACA, "middle", 17)
+linhas(930, 548, ["palavras-chave · autores", "referências · países · IES", "periódicos"], 12, FRACA, "middle", 17)
 
 # Ramo 1: descritiva
 seta([(930, 335), (930, 195), (1200, 195)])
@@ -102,22 +102,23 @@ linhas(1425, 152, ["Produção e citações por ano · acumulado", "Autores, fon
 # Ramo 2: mapeamento científico
 seta([(930, 605), (930, 700), (1200, 700)])
 pilula(1070, 700, ["Matriz de rede:", "co-ocorrência ou", "acoplamento"], 150)
-caixa(1200, 380, 450, 480, "#FBFAFF", ROXO, 16, 2.5)
-texto(1425, 410, "Mapeamento científico, por período", 17, 700, ROXO)
+caixa(1200, 326, 450, 540, "#FBFAFF", ROXO, 16, 2.5)
+texto(1425, 356, "Mapeamento científico, por período", 17, 700, ROXO)
 etapas = [
-    ("1  Rede do período", "Similaridade: equivalência, associação,", "inclusão, Jaccard, Salton"),
+    ("1  Rede do período", "Similaridade: equivalência, associação, inclusão, Jaccard, Salton", "Unidade IES: nomes unidos, componente mínimo 3"),
     ("2  Agrupamento", "Centros simples, ligação simples, completa,", "média, soma · Louvain"),
     ("3  Medidas", "Callon (centralidade e densidade) · h, g, hg, q2", "documentos por mapeador: núcleo, união…"),
-    ("4  Mapas", "Diagrama estratégico: motor, básico, nicho, emergente", "Halos · evolução · países · dendrograma"),
+    ("4  Qualidade e rótulos", "Q, silhueta e selo de qualidade do mapa", "Rótulos por tema (LLR): palavras-chave e referências"),
+    ("5  Mapas e figuras", "Estratégico · halos · evolução · países · densidade", "Dendrograma · linha do tempo · pontos de virada"),
 ]
 for i, (t, l1, l2) in enumerate(etapas):
-    y = 432 + i * 104
-    caixa(1222, y, 406, 80, "#fff", ROXO, 12, 1.8)
-    texto(1425, y + 26, t, 15, 700, ESCURO)
-    texto(1425, y + 48, l1, 12, 400, FRACA)
-    texto(1425, y + 65, l2, 12, 400, FRACA)
-    if i < 3:
-        seta([(1425, y + 80), (1425, y + 104)], ROXO, 2.6, ponta="pontaR")
+    y = 378 + i * 96
+    caixa(1218, y, 414, 78, "#fff", ROXO, 12, 1.8)
+    texto(1425, y + 25, t, 15, 700, ESCURO)
+    texto(1425, y + 46, l1, 12, 400, FRACA)
+    texto(1425, y + 63, l2, 12, 400, FRACA)
+    if i < len(etapas) - 1:
+        seta([(1425, y + 78), (1425, y + 96)], ROXO, 2.6, ponta="pontaR")
 
 # Saídas
 caixa(30, 770, 1100, 190, "#fff", AZUL, 16, 2.5)
