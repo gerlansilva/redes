@@ -19,6 +19,8 @@ import math
 import networkx as nx
 import numpy as np
 
+from ..texto import exibe_termo, rotulo_legivel, termo_legivel
+
 PALETA = ["#2F2BFF", "#00A344", "#6A3BFF", "#B45309", "#0B1F66", "#0E7490",
           "#8B5CF6", "#4D7C0F", "#9D174D", "#0369A1", "#A16207", "#7C3AED",
           "#0F766E", "#BE185D", "#DC2626"]
@@ -69,8 +71,7 @@ def _rotulo_curto(texto: str, unidade: str, limite: int = 30) -> str:
     texto = (texto or "Sem grupo").strip()
 
     if unidade == "Words":
-        texto = texto.replace("-", " ")
-        texto = texto[:1] + texto[1:].lower()
+        texto = termo_legivel(texto)
     elif unidade == "References":
         achado = re.match(r"^(.{2,34}?),\s*(\d{4})", texto)
         texto = (achado.group(1) + ", " + achado.group(2)) if achado else texto[:36]
@@ -96,7 +97,8 @@ def texto_rotulo_novo(rotulo, termos: int = 2) -> str | None:
     else:
         texto = str(rotulo)
     texto = " ".join(texto.split())
-    return texto or None
+    # Os termos do rótulo vêm em minúsculas: inicial maiúscula e siglas em cada um.
+    return rotulo_legivel(texto) or None
 
 
 def nomes_por_rotulo(resultado, rotulos: dict | None) -> dict[int, str]:
@@ -302,6 +304,7 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
     for posicao, grupo in enumerate(resultado.grupos):
         grupos[grupo.rotulo or "Sem grupo"].extend(grupo.nos)
         origem[grupo.rotulo or "Sem grupo"].append(posicao)
+    # `grupos` e `origem` ficam com o rótulo guardado (chave); a exibição é `_nome_curto`.
     for no in rede.nos:
         if no not in resultado.conjunto.grupo_do_no:
             soltos.append(no)
@@ -498,7 +501,8 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
     for i, membros in enumerate(lista):
         grupos_dados.append({
             "indice": i + 1,
-            "rotulo": ordem[i],
+            "rotulo": resultado.exibe(ordem[i]),
+            "rotulo_original": ordem[i],
             "indices": list(origem[ordem[i]]),
             "rotulo_curto": _nome_curto(
                 ordem[i], unidade, _nome_do_halo(origem[ordem[i]], nomes_novos)),
@@ -705,7 +709,7 @@ def halo_svg(resultado, titulo: str, subtitulo: str = "", largura: int = 1280,
                 f'font-weight="700" fill="{grupo["cor"]}" '
                 f'font-family="{FONTE}">{grupo["indice"]}</text>'
                 f'<text x="{x + 18}" y="{y + 1}" font-size="12" fill="{TINTA}" '
-                f'font-family="{FONTE}">{html.escape(_nome_curto(grupo["rotulo"], unidade, _nome_do_halo(grupo.get("indices"), nomes_novos)))} '
+                f'font-family="{FONTE}">{html.escape(_nome_curto(grupo["rotulo_original"], unidade, _nome_do_halo(grupo.get("indices"), nomes_novos)))} '
                 f'<tspan fill="{TINTA_FRACA}">({grupo["nos"]})</tspan></text>')
         elif tipo == "soltos":
             legenda_svg += (

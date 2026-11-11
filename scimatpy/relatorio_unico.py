@@ -358,7 +358,7 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
         for posicao, g in enumerate(mostrados, start=1):
             principal, sub, _ind = metodo.nome_do_grupo(kb, r, g)
             svg = cache.obtem((chave, indice, "rede", posicao), lambda: rede_agrupamento_svg(
-                r, g, f"{r.periodo} — {g.rotulo}", largura=720, rotulos=rotulos_novos))
+                r, g, f"{r.periodo} — {g.exibicao}", largura=720, rotulos=rotulos_novos))
             if svg:
                 nome = f"“{principal}”" + (f" (atual: “{sub}”)" if sub else "")
                 figuras.append(doc.figura(

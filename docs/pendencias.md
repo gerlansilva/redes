@@ -105,7 +105,7 @@ e integração contínua. Os dois dependem de decisões externas ao código
 17. **Testes** — esquema e contadores, grade, opções de análise,
     similaridade, medidas e índices, agrupamentos, mapeadores, carregadores,
     conversão de referências, figuras e API da interface; depois, também as
-    análises novas (itens 18 a 25).
+    análises novas (itens 18 a 26).
 18. **Qualidade do mapa** — `qualidade.py`: modularidade Q ponderada, Q do
     Louvain como régua (razão), silhueta por agrupamento (grupos com menos de 3
     itens ficam fora; acima de 2000 itens agrupados é dispensada) e selo OK,
@@ -134,6 +134,16 @@ e integração contínua. Os dois dependem de decisões externas ao código
     análise traz parâmetros adotados, algoritmo em linguagem simples,
     indicadores por período, e as seções de qualidade, rótulos, linha do tempo,
     densidade, pontos de virada e IES, com as constantes lidas do código.
+26. **Termos em maiúsculas do SciMAT** — `scimatpy/texto.py` (`termo_legivel`) é
+    a única função de apresentação: `STATISTICAL-REASONING` sai como
+    "Statistical reasoning", `E-LEARNING` como "E-learning", e as siglas da lista
+    (`SPSS`, `PISA`, `ICME`, `TIMSS`, configurável por `registra_siglas` ou
+    `REDES_SIGLAS`) ficam em maiúsculas. Só palavras-chave em co-ocorrência;
+    caixa mista, autores, países, IES, periódicos e referências não mudam, e o
+    dado guardado, os ids e as chaves de agrupamento também não. Vale para a
+    interface (inclusive a busca da Base, que acha o texto exibido e o
+    original), as figuras, as tabelas, os dois relatórios, as exportações
+    (Pajek, GraphML, TSV de índices) e os rótulos automáticos.
 
 ## Decisões que fecharam pendências
 
@@ -158,6 +168,39 @@ Não são pendências, mas convém registrar:
   frequência; acima de 400 agrupamentos o layout usa a ordenação circular.
 - A prévia é síncrona e a grade roda uma análise por vez, de propósito, para
   não competir por memória.
+- Caixa dos termos: a sigla só fica em maiúsculas se estiver na lista de
+  `texto.py` (não há detecção pelo corpus); termo curto fora dela sai como
+  "Pisa". Nomes próprios em caixa alta e com espaço saem como "South africa",
+  de propósito (regra simples, sem lista de países). Títulos de documentos em
+  caixa alta (rede de acoplamento), o XML de grupos (formato de troca da base)
+  e a aba de revisão de grafias mostram o texto guardado.
+
+## Estresse no SERJ (11/11/2026)
+
+Corrigido: mapeador `acoplamento` só com a matriz `BasicCoupling` (400 claro
+na API e opção oculta na tela); `_divide` do Louvain sem recalcular
+componentes a cada aresta; ligação hierárquica com valores de pares
+guardados e monte ordenado; `tamanho_maximo` limitado ao grau máximo;
+cancelamento da grade dentro do pipeline e do agrupamento (`cancelado()`);
+`corte` e demais números exigem valor finito; abortos de conexão do cliente
+não imprimem traceback. Todas as versões rápidas têm teste de equivalência
+contra a formulação literal (`tests/test_estresse_correcoes.py`).
+
+Registrado, não feito (ganho pequeno frente ao risco):
+
+- **Frequência automática do relatório completo** (`_escolhe_frequencia`):
+  tenta 3, 2 e 1 e descarta os resultados das tentativas que não servem.
+  Guardar resultados entre seções não ajuda, porque cada seção tem unidade e
+  matriz próprias. O ganho barato (reaproveitar o resultado da frequência
+  escolhida em `gera_html` e no mapa longitudinal, que antes refaziam a
+  análise duas vezes) já foi aplicado.
+- **Figuras repetidas no relatório completo**: o halo e o diagrama de cada
+  período são gerados na página do período e de novo no arquivo único. Evitar
+  isso exige um cache de SVG por (período, configuração) compartilhado entre
+  `report.py` e `relatorio_unico.py`; fica para quando o tempo do relatório
+  completo for o gargalo. Medido no SERJ (4 períodos): 20,3 s antes e 19,9 s
+  depois, com as execuções da análise caindo de 128 para 64; o tempo é
+  dominado pelo desenho das figuras, não pela análise.
 
 ## O que falta
 
@@ -167,30 +210,27 @@ Arestas das análises novas:
    reais cai em Atenção; o selo informa pouco. Falta decidir se os limiares
    mudam ou se o selo ganha outra escala. Hoje o texto já avisa que isso não
    invalida o mapa.
-2. **Termos em maiúsculas do SciMAT perdem a caixa.** Os termos que vêm em
-   maiúsculas do importador do SciMAT não mantêm a caixa original nos rótulos
-   novos. Falta preservar a grafia de siglas e nomes próprios.
-3. **Estresse completo no corpus SERJ.** Qualidade, rótulos, linha do tempo,
+2. **Estresse completo no corpus SERJ.** Qualidade, rótulos, linha do tempo,
    densidade, pontos de virada e IES não foram rodados de ponta a ponta no
    SERJ completo (References com 9.744 nós); falta medir tempo e memória.
-4. **Duplo mapa simplificado.** Só se o usuário quiser: uma versão simplificada
+3. **Duplo mapa simplificado.** Só se o usuário quiser: uma versão simplificada
    do mapa ao lado do mapa completo. Sem demanda, fica fora.
-5. **Rótulos por tema fora de palavras-chave e referências.** Autores, países
+4. **Rótulos por tema fora de palavras-chave e referências.** Autores, países
    e IES seguem com o nome do líder, de propósito; só entra se houver um método
    que faça sentido para essas unidades.
 
 Distribuição:
 
-6. **Empacotamento desktop.** Só existe a interface web local (`scimatpy web`).
+5. **Empacotamento desktop.** Só existe a interface web local (`scimatpy web`).
    Falta o empacotamento Tauri, o instalador e a assinatura para uso por não
    técnicos. Bloqueio: o diretório não é um repositório git, não há
    identidade de assinatura definida e é preciso escolher a plataforma alvo
    (macOS, Windows ou ambos).
-7. **Integração contínua.** Não há pipeline. A suíte roda à mão
+6. **Integração contínua.** Não há pipeline. A suíte roda à mão
    (`python3 -m unittest discover -s tests -t .`) e a paridade depende de
    `/tmp/demo/celii` com o fork Java compilado. Bloqueio: sem repositório,
    não há onde executar o fluxo.
-8. **Publicação do pacote (opcional).** `pyproject.toml` já descreve o pacote
+7. **Publicação do pacote (opcional).** `pyproject.toml` já descreve o pacote
    e o ponto de entrada `scimatpy`; falta decidir se ele será publicado em
    índice interno ou no PyPI, com as credenciais correspondentes.
 

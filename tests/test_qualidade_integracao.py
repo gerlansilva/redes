@@ -14,6 +14,7 @@ from scimatpy import api, metodo, qualidade, rotulos
 from scimatpy.api import cria_servidor
 from scimatpy.build import constroi
 from scimatpy.kb import ProjetoScimat
+from scimatpy.texto import rotulo_legivel
 from scimatpy.loaders.base import DocumentoFonte
 from scimatpy.pipeline import executa_periodo
 
@@ -184,12 +185,12 @@ class SerjTest(unittest.TestCase):
                           "Documentos"], cab)
         celulas = "".join(l[1] for l in linhas)
         primeiro = next(iter(novos.values()))
-        self.assertIn(primeiro["rotulo"], celulas)
+        self.assertIn(rotulo_legivel(primeiro["rotulo"]), celulas)
         self.assertIn("rot-atual", celulas)
         self.assertTrue(all(len(l) == len(cab) for l in linhas))
         # o subtítulo (rótulo atual) está presente em quem tem rótulo novo
         for g in grupos[:1]:
-            self.assertIn(g.rotulo, linhas[0][1])
+            self.assertIn(g.exibicao, linhas[0][1])
 
     def test_formato_em_pastas(self):
         r = api.gera_relatorio_completo({"projeto": str(SERJ), "formato": "pastas"})

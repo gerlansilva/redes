@@ -24,6 +24,7 @@ from pathlib import Path
 
 from . import linha_do_tempo, longitudinal, metodo, rotulos
 from .pipeline import executa_periodo
+from .texto import exibe_termo
 from . import exports
 from .viz.cluster import rede_agrupamento_svg, rede_de_agrupamentos_svg
 from .viz.halo import halo_svg
@@ -336,7 +337,7 @@ def rotulos_linha_do_tempo(kb, config, dados: dict) -> dict:
         for faixa in dados.get("faixas", []):
             i = faixa["indice"]
             if i in novos and i < len(resultado.grupos):
-                atual = (linha_do_tempo.limpa(resultado.grupos[i].rotulo)
+                atual = (linha_do_tempo.limpa(resultado.grupos[i].exibicao)
                          or f"Agrupamento {i + 1}")
                 if atual != faixa["rotulo"]:
                     continue
@@ -461,14 +462,18 @@ def _bloco_densidade_pasta(destino: Path, kb, config) -> str:
 
 def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
               medida_temporal: str = "EquivalenceIndex",
-              com_bibliometria: bool = True, devolve_resultados: bool = False) -> dict:
+              com_bibliometria: bool = True, devolve_resultados: bool = False,
+              resultados=None) -> dict:
+    """`resultados` (um por período, na mesma configuração) evita refazer a análise."""
     destino.mkdir(parents=True, exist_ok=True)
     (destino / "images").mkdir(exist_ok=True)
     (destino / "misc").mkdir(exist_ok=True)
     shutil.copyfile(_ASSETS / "logo.svg", destino / "logo.svg")
 
-    resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
-    mapa = longitudinal.constroi(kb, config, periodos, medida_temporal)
+    if resultados is None:
+        resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
+    mapa = longitudinal.constroi(kb, config, periodos, medida_temporal,
+                                 resultados=resultados)
 
     for indice, resultado in enumerate(resultados):
         rotulos_novos = metodo.rotulos_do_resultado(kb, resultado)
@@ -505,7 +510,8 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
                 encoding="utf-8")
         except Exception:
             pass
-        rotulos_rede = resultado.dataset.itens
+        rotulos_rede = {no: exibe_termo(resultado.configuracao.unidade, nome)
+                        for no, nome in resultado.dataset.itens.items()}
         try:
             (destino / "misc" / f"wholeNetwork-period{indice}.net").write_text(
                 exports.pajek(resultado.rede, rotulos_rede), encoding="utf-8")
@@ -517,7 +523,7 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
         for posicao, grupo in enumerate(grupos, start=1):
             svg = rede_agrupamento_svg(
                 resultado, grupo,
-                f"{resultado.periodo} — {grupo.rotulo}", rotulos=rotulos_novos)
+                f"{resultado.periodo} — {grupo.exibicao}", rotulos=rotulos_novos)
             (destino / "images" /
              f"clusterNetwork-period{indice}-cluster{posicao - 1}.svg").write_text(
                 svg, encoding="utf-8")
@@ -887,7 +893,9 @@ def _pagina_periodo(destino, resultado, grupos, indice, kb=None) -> None:
 def _pagina_cluster(destino, kb, resultado, grupo, grupos, indice,
                     posicao, estendido) -> None:
     internas, externas = _ligacoes(resultado, grupo)
-    nomes = {no: resultado.dataset.itens.get(no, str(no)) for no in resultado.rede.nos}
+    nomes = {no: exibe_termo(resultado.configuracao.unidade,
+                             resultado.dataset.itens.get(no, str(no)))
+             for no in resultado.rede.nos}
     principal, sub, indicativo = metodo.nome_do_grupo(kb, resultado, grupo)
     nome_html = _esc(principal) + (' <span class="rot-ind">(indicativo)</span>'
                                    if indicativo else "")

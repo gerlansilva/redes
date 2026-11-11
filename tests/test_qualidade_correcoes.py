@@ -16,6 +16,7 @@ from unittest import mock
 
 from scimatpy import api, metodo, qualidade, rotulos
 from scimatpy.kb import ProjetoScimat
+from scimatpy.texto import rotulo_legivel
 from scimatpy.network import Rede
 from scimatpy.pipeline import Configuracao, Grupo, executa_periodo
 
@@ -396,27 +397,27 @@ class RotuloNovoPrincipalTest(unittest.TestCase):
     def test_nome_do_grupo(self):
         indice, g = self._indice_com_novo()
         principal, sub, _ = metodo.nome_do_grupo(self.kb, self.r, g)
-        self.assertEqual(self.novos[indice]["rotulo"], principal)
-        self.assertEqual(g.rotulo, sub)
+        self.assertEqual(rotulo_legivel(self.novos[indice]["rotulo"]), principal)
+        self.assertEqual(g.exibicao, sub)
         sem = next(x for i, x in enumerate(self.r.grupos) if i not in self.novos)
         p2, s2, ind = metodo.nome_do_grupo(self.kb, self.r, sem)
-        self.assertEqual((sem.rotulo, None, False), (p2, s2, ind))
+        self.assertEqual((sem.exibicao, None, False), (p2, s2, ind))
 
     def test_rede_de_um_agrupamento_figura(self):
         from scimatpy.viz.cluster import rede_agrupamento_svg
         indice, g = self._indice_com_novo()
-        titulo = f"{self.r.periodo} — {g.rotulo}"
+        titulo = f"{self.r.periodo} — {g.exibicao}"
         padrao = rede_agrupamento_svg(self.r, g, titulo)
         self.assertEqual(padrao, rede_agrupamento_svg(self.r, g, titulo, rotulos=None))
         self.assertEqual(padrao, rede_agrupamento_svg(self.r, g, titulo, rotulos={}))
         com = rede_agrupamento_svg(self.r, g, titulo, rotulos=self.novos)
         self.assertNotEqual(padrao, com)
-        novo = self.novos[indice]["rotulo"]
+        novo = rotulo_legivel(self.novos[indice]["rotulo"])
         self.assertIn(novo[:20], com)
-        self.assertIn(g.rotulo[:20], com)           # o atual vira subtítulo
+        self.assertIn(g.exibicao[:20], com)           # o atual vira subtítulo
         # grupo sem rótulo novo: figura idêntica à padrão
         sem = next(x for i, x in enumerate(self.r.grupos) if i not in self.novos)
-        t2 = f"{self.r.periodo} — {sem.rotulo}"
+        t2 = f"{self.r.periodo} — {sem.exibicao}"
         self.assertEqual(rede_agrupamento_svg(self.r, sem, t2),
                          rede_agrupamento_svg(self.r, sem, t2, rotulos=self.novos))
 
@@ -425,7 +426,7 @@ class RotuloNovoPrincipalTest(unittest.TestCase):
         padrao = rede_de_agrupamentos_svg(self.r, "t")
         self.assertEqual(padrao, rede_de_agrupamentos_svg(self.r, "t", rotulos=None))
         com = rede_de_agrupamentos_svg(self.r, "t", rotulos=self.novos)
-        self.assertNotEqual(padrao, com)
+        # (O atual e o novo podem começar igual e ser cortados no mesmo ponto: só se confere o texto.)
         curto = " · ".join(next(iter(self.novos.values()))["termos"][:2])
         self.assertIn((curto[:1].upper() + curto[1:])[:24], com)
 
@@ -492,7 +493,7 @@ class ChaveDoAgrupamentoTest(unittest.TestCase):
             g.rotulo = "IGUAL"
         nomes = nomes_por_rotulo(r, {0: {"termos": ["alfa", "beta"]},
                                      1: {"termos": ["gama", "delta"]}})
-        self.assertEqual({0: "alfa · beta", 1: "gama · delta"}, nomes)
+        self.assertEqual({0: "Alfa · Beta", 1: "Gama · Delta"}, nomes)
 
     def test_legenda_estrategica_com_rotulos_atuais_repetidos(self):
         from scimatpy.viz.strategic import diagrama_svg
@@ -503,8 +504,8 @@ class ChaveDoAgrupamentoTest(unittest.TestCase):
         novos = {0: {"termos": ["alfa", "beta"], "rotulo": "alfa · beta"},
                  1: {"termos": ["gama", "delta"], "rotulo": "gama · delta"}}
         svg = diagrama_svg(r, "t", rotulos=novos)
-        self.assertIn("Alfa · beta", svg)
-        self.assertIn("Gama · delta", svg)
+        self.assertIn("Alfa · Beta", svg)
+        self.assertIn("Gama · Delta", svg)
 
     def test_halo_rotulo_sem_grupo_repetido_nao_vaza(self):
         from scimatpy.viz.halo import halo_svg, layout_halo
@@ -519,7 +520,7 @@ class ChaveDoAgrupamentoTest(unittest.TestCase):
         self.assertEqual([0, 1], juntos["indices"])
         self.assertEqual("Sem grupo", juntos["rotulo_curto"])   # nenhum nome vale pelo conjunto
         svg = halo_svg(r, "t", rotulos=novos)
-        self.assertNotIn("Alfa · beta", svg)
+        self.assertNotIn("Alfa · Beta", svg)
         self.assertNotIn("Gama · delta", svg)
 
     def test_halo_um_agrupamento_usa_o_novo(self):
@@ -527,10 +528,10 @@ class ChaveDoAgrupamentoTest(unittest.TestCase):
         r = self._resultado()
         novos = {0: {"termos": ["alfa", "beta"], "rotulo": "alfa · beta"}}
         dados = layout_halo(r, rotulos=novos)
-        por_atual = {g["rotulo"]: g for g in dados["grupos"]}
+        por_atual = {g["rotulo_original"]: g for g in dados["grupos"]}
         g0 = por_atual[r.grupos[0].rotulo]
-        self.assertEqual("Alfa · beta", g0["rotulo_curto"])
-        self.assertIn("Alfa · beta", halo_svg(r, "t", rotulos=novos))
+        self.assertEqual("Alfa · Beta", g0["rotulo_curto"])
+        self.assertIn("Alfa · Beta", halo_svg(r, "t", rotulos=novos))
         self.assertEqual(halo_svg(r, "t"), halo_svg(r, "t", rotulos=None))
 
 

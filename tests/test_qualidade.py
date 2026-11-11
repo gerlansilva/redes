@@ -313,7 +313,7 @@ class TabelaTest(unittest.TestCase):
         self.assertEqual([l["posicao"] for l in t], [1, 2, 3])
         self.assertEqual([l["itens"] for l in t], [10, 6, 4])
         self.assertEqual([l["quadrante"] for l in t], ["Motor", "Básico", "Nicho"])
-        self.assertEqual(t[0]["rotulo_novo"], "a · b")
+        self.assertEqual(t[0]["rotulo_novo"], "A · B")
         self.assertIsNone(t[1]["rotulo_novo"])
         self.assertAlmostEqual(t[0]["ano_medio"], 2010.0)       # docs 1,2,3 (4 sem ano)
         self.assertIsNone(t[1]["ano_medio"])                    # sem documentos

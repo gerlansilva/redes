@@ -271,6 +271,7 @@ function ligarEventos() {
     if (evento.key === "Enter") $("btnAbrirCaminho").click();
   });
 
+  ajustarMapeadores();
   $("btnPreview").addEventListener("click", previsualizar);
   $("btnGrade").addEventListener("click", rodarGrade);
   $("btnCancelar").addEventListener("click", cancelarTrabalho);
@@ -296,6 +297,7 @@ function ligarEventos() {
       marcarDesatualizada();
       marcarPersonalizada();
       mostrarCampoComponente();
+      ajustarMapeadores();
       if ($("analise").value === "personalizada") aplicarAbas(null, true);
     });
   }
@@ -416,6 +418,7 @@ function ligarEventos() {
 async function carregarInicio() {
   try {
     const dados = await api("/api/projetos");
+    for (const sigla of dados.siglas || []) SIGLAS.add(sigla);
     $("workspace").textContent = `Projetos em ${dados.workspace}`;
     renderizarRecentes(dados.projetos);
   } catch (erro) {
@@ -903,6 +906,7 @@ function aplicarAnalise(chave) {
   estado.aplicandoAnalise = false;
   $("analise").value = analise.chave;
   mostrarCampoComponente();
+  ajustarMapeadores();
   const fixa = $("analiseFixa");
   if (fixa) {
     fixa.hidden = false;
@@ -920,6 +924,19 @@ function aplicarAnalise(chave) {
 function mostrarCampoComponente() {
   const campo = $("campoComponente");
   if (campo) campo.hidden = $("unidade").value !== "Institutions";
+}
+
+/* O mapeador "Acoplamento" só existe no acoplamento básico (os nós são documentos). */
+function ajustarMapeadores() {
+  const seletor = $("mapeadores");
+  if (!seletor) return;
+  const permitido = $("matriz").value === "BasicCoupling";
+  for (const opcao of seletor.options) {
+    if (opcao.value !== "acoplamento") continue;
+    opcao.disabled = !permitido;
+    opcao.hidden = !permitido;
+  }
+  if (!permitido && seletor.value === "acoplamento") seletor.value = "nucleo,interseccao";
 }
 
 function marcarPersonalizada() {
@@ -1272,12 +1289,66 @@ function renderizarResultado(resultado) {
 
 /* ------------------------------------------------------------------- resumo */
 
+// Siglas que ficam em maiúsculas nas palavras-chave (SPSS, PISA, TIMSS...). A lista
+// vem do servidor (`texto.siglas()`), para que a interface e os relatórios usem a mesma.
+const SIGLAS = new Set();
+
+function letrasDe(pedaco) {
+  return (pedaco.match(/\p{L}/gu) || []).length;
+}
+
+// Só há letras e nenhuma é minúscula.
+function caixaAlta(texto) {
+  const letras = texto.match(/\p{L}/gu) || [];
+  return letras.length > 0 && !letras.some((c) => c !== c.toUpperCase());
+}
+
+// Mesma regra de `scimatpy/texto.py` (`termo_legivel`): só muda o termo inteiramente em
+// maiúsculas; "STATISTICAL-REASONING" vira "Statistical reasoning", o hífen entre trechos
+// de 2+ letras vira espaço ("E-LEARNING" fica "E-learning") e as siglas conhecidas ficam.
+function termoLegivel(texto) {
+  const bruto = String(texto ?? "");
+  const base = bruto.replace(/\s+/g, " ").trim();
+  if (!base || !caixaAlta(base)) return bruto;
+  const frase = base.split(" ").map((palavra) => {
+    const pedacos = palavra.split("-");
+    const partes = pedacos.map((p) => (SIGLAS.has(p) ? p : p.toLowerCase()));
+    let r = partes[0];
+    for (let i = 1; i < partes.length; i++) {
+      r += (letrasDe(pedacos[i - 1]) >= 2 && letrasDe(pedacos[i]) >= 2 ? " " : "-") + partes[i];
+    }
+    return r;
+  }).join(" ");
+  const chars = Array.from(frase);
+  for (let i = 0; i < chars.length; i++) {
+    if (/\p{L}/u.test(chars[i])) { chars[i] = chars[i].toUpperCase(); break; }
+    if (!/\d/.test(chars[i]) && !"-'\"(".includes(chars[i])) break;
+  }
+  return chars.join("");
+}
+
+// Termo no meio de uma frase: minúscula inicial, menos siglas e nomes próprios.
+function emFrase(texto) {
+  if (!texto) return texto;
+  const primeira = texto.split(" ")[0];
+  if ((primeira.match(/\p{Lu}/gu) || []).length > 1 || /^\d/.test(texto)) return texto;
+  return texto.charAt(0).toLowerCase() + texto.slice(1);
+}
+
 // "STATISTICAL-REASONING" vira "Statistical reasoning"; nomes de pessoas e
 // países ficam com cada palavra capitalizada.
 //
 // Só se reescreve a caixa de um termo escrito todo em maiúsculas (padrão do SciMAT);
 // o que vem dos dados com caixa mista ("Lee H.S.", "South Africa") fica como está.
+// Palavras-chave (Words) seguem `termoLegivel`; as demais unidades, a regra de sempre.
 function nomeLegivel(texto, unidade) {
+  if (unidade === "Words") {
+    const original = String(texto || "").replace(/\s+/g, " ").trim();
+    if (!original) return "—";
+    if (caixaAlta(original)) return termoLegivel(original);
+    return original === original.toLocaleLowerCase()
+      ? original.charAt(0).toUpperCase() + original.slice(1) : original;
+  }
   const bruto = String(texto || "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
   if (!bruto) return "—";
   const pessoaOuPais = ["Authors", "AuthorsReference", "Countries"].includes(unidade);
@@ -1298,6 +1369,10 @@ function nomeLegivel(texto, unidade) {
 
 function itemLegivel(texto, unidade) {
   const base = nomeLegivel(texto, unidade);
+  if (unidade === "Words") {
+    // Só o que veio todo em maiúsculas ganha minúscula inicial no meio da frase.
+    return caixaAlta(String(texto || "").trim()) ? emFrase(base) : base;
+  }
   const bruto = String(texto || "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
   const tudoMaiusculo = bruto === bruto.toLocaleUpperCase() && bruto !== bruto.toLocaleLowerCase();
   // Só o que veio todo em maiúsculas ganha minúscula inicial no meio da frase.
@@ -2231,6 +2306,7 @@ async function abrirModal() {
   $("tituloModal").focus({ preventScroll: true });
   try {
     const dados = await api("/api/projetos");
+    for (const sigla of dados.siglas || []) SIGLAS.add(sigla);
     $("workspace").textContent = `Projetos em ${dados.workspace}`;
     renderizarRecentes(dados.projetos);
     atualizarContinuar(dados.projetos);
@@ -3034,10 +3110,8 @@ function desenharRotulos(visiveis) {
 
 function textoNo(no) {
   let texto = no.rotulo || "";
-  if (redeUI.dados.meta.unidade === "Words") {
-    texto = texto.replace(/-/g, " ");
-    texto = texto.charAt(0) + texto.slice(1).toLowerCase();
-  }
+  // O servidor já manda a forma legível; `nomeLegivel` cobre o que vier em caixa alta.
+  if (redeUI.dados.meta.unidade === "Words") texto = nomeLegivel(texto, "Words");
   return texto.length > 24 ? `${texto.slice(0, 23)}…` : texto;
 }
 
@@ -4045,7 +4119,10 @@ function renderizarGruposBase(base) {
   const todos = base.grupos[tipo] || [];
   const busca = chaveBusca($("buscaBase").value.trim());
   const grupos = busca
-    ? todos.filter((grupo) => chaveBusca(grupo.nome).includes(busca))
+    // Acha pelo texto exibido e pelo original guardado.
+    ? todos.filter((grupo) => chaveBusca(grupo.nome).includes(busca)
+      || chaveBusca(grupo.exibicao || grupo.nome).includes(busca)
+      || chaveBusca((grupo.exibicao || grupo.nome).replace(/-/g, " ")).includes(busca))
     : todos;
   $("baseGrupoTotal").textContent = busca
     ? `${grupos.length} de ${todos.length} grupos`
@@ -4061,7 +4138,7 @@ function renderizarGruposBase(base) {
     for (const select of [origem, destino]) {
       const opcao = document.createElement("option");
       opcao.value = String(grupo.id);
-      opcao.textContent = grupo.nome;
+      opcao.textContent = grupo.exibicao || grupo.nome;
       select.append(opcao);
     }
   }
@@ -4082,7 +4159,11 @@ function renderizarGruposBase(base) {
 
     const nome = document.createElement("input");
     nome.type = "text";
-    nome.value = grupo.nome;
+    // Palavras-chave em caixa alta aparecem em forma legível; o nome guardado só muda
+    // se a pessoa editar o texto (Salvar sem editar não grava nada).
+    const exibido = grupo.exibicao || grupo.nome;
+    nome.value = exibido;
+    nome.title = exibido === grupo.nome ? "" : `Nome guardado: ${grupo.nome}`;
     nome.className = "nome";
 
     const contagem = document.createElement("span");
@@ -4091,9 +4172,10 @@ function renderizarGruposBase(base) {
       `${grupo.itens} ${grupo.itens === 1 ? "item" : "itens"} · ` +
       `${grupo.documentos} ${grupo.documentos === 1 ? "doc" : "docs"}`;
 
-    const salvar = botaoMini("Salvar", () => editarBase({
-      acao: "renomear-grupo", tipo, id: grupo.id, nome: nome.value,
-    }));
+    const salvar = botaoMini("Salvar", () => {
+      if (nome.value === exibido) return;
+      editarBase({ acao: "renomear-grupo", tipo, id: grupo.id, nome: nome.value });
+    });
     const parada = botaoMini(grupo.parada ? "Reativar" : "Parar", () => editarBase({
       acao: "marcar-parada", tipo, id: grupo.id, parada: !grupo.parada,
     }));

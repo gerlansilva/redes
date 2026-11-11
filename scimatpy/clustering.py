@@ -7,10 +7,14 @@ de pares, como no original.
 
 from __future__ import annotations
 
-import itertools
-import math
+import heapq
 
-from .network import Rede
+from .network import Cancelado, Rede
+
+
+def _verifica(cancelado) -> None:
+    if cancelado is not None and cancelado():
+        raise Cancelado()
 
 
 class Agrupamento:
@@ -58,7 +62,7 @@ class ConjuntoDeAgrupamentos:
 
 
 def centros_simples(rede: Rede, tamanho_minimo: int, tamanho_maximo: int,
-                    corte: float = 0.0) -> ConjuntoDeAgrupamentos:
+                    corte: float = 0.0, cancelado=None) -> ConjuntoDeAgrupamentos:
     """Aglomeração por centros de similaridade, na formulação do SciMAT.
 
     Percorre os pares em ordem decrescente de valor; quando um nó acumula
@@ -85,15 +89,22 @@ def centros_simples(rede: Rede, tamanho_minimo: int, tamanho_maximo: int,
         pares_do_no.setdefault(destino[indice], []).append(indice)
 
     contagem: dict[int, int] = {}
-    tamanho_atual = tamanho_maximo - 1
+    # Nenhum nó acumula mais pares do que o seu grau: os tamanhos acima do maior
+    # grau só produziriam varreduras vazias (o resultado é o mesmo sem elas).
+    # Nunca desce abaixo de `tamanho_minimo - 1`, que é onde a busca para.
+    grau_maximo = max((len(v) for v in pares_do_no.values()), default=0)
+    tamanho_atual = min(tamanho_maximo - 1, max(grau_maximo, tamanho_minimo - 1))
     restantes = total
     i = 0
 
     while restantes > 0 and tamanho_atual >= 1:
+        _verifica(cancelado)
         # Varredura a partir de i, sobre os pares ainda vivos.
         semente = -1
         posicao = -1
         while i < total:
+            if not i & 0x3FFF:
+                _verifica(cancelado)
             if vivo[i]:
                 a = origem[i]
                 b = destino[i]
@@ -142,44 +153,96 @@ def centros_simples(rede: Rede, tamanho_minimo: int, tamanho_maximo: int,
 # ---------------------------------------------------------------- ligação hierárquica
 
 
-def _valor_entre(rede: Rede, grupo_a, grupo_b) -> tuple[float, float, float, float] | None:
-    valores = [rede.valor(a, b) for a in grupo_a for b in grupo_b if rede.contem_aresta(a, b)]
-    if not valores:
-        return None
-    return sum(valores), sum(valores) / len(valores), min(valores), max(valores)
+def _medida_ligacao(valores: list[float], criterio: str) -> float:
+    if criterio == "soma":
+        return sum(valores)
+    if criterio == "media":
+        return sum(valores) / len(valores)
+    if criterio == "completa":
+        return min(valores)
+    return max(valores)
 
 
 def _ligacao(rede: Rede, tamanho_minimo: int, tamanho_maximo: int,
-             criterio: str, corte: float = 0.0) -> ConjuntoDeAgrupamentos:
-    """Hierárquico aglomerativo com corte por similaridade e limite de tamanho."""
+             criterio: str, corte: float = 0.0,
+             cancelado=None) -> ConjuntoDeAgrupamentos:
+    """Hierárquico aglomerativo com corte por similaridade e limite de tamanho.
+
+    A formulação literal (reler todos os pares de grupos a cada fusão) é
+    cúbica. Aqui o valor de cada par de grupos fica guardado e, a cada fusão,
+    só os pares do grupo novo são refeitos a partir da lista de adjacência; os
+    pares ficam num monte ordenado por (valor decrescente, posição). Os valores
+    são somados na mesma ordem da formulação literal (grupo anterior na lista
+    por fora, grupo posterior por dentro), então o resultado é idêntico,
+    inclusive nos desempates e nos arredondamentos.
+    """
     resultado = ConjuntoDeAgrupamentos(rede)
-    grupos = [[no] for no in rede.nos]
+    adjacencia = rede.adjacencia
+
+    # Cada grupo é identificado pela posição inicial do seu primeiro nó; a
+    # ordem dos identificadores é a ordem dos grupos na lista do original.
+    grupo_de = {no: i for i, no in enumerate(rede.nos)}
+    posicao = {no: 0 for no in rede.nos}
+    membros = {i: [no] for i, no in enumerate(rede.nos)}
+    vizinhos: dict[int, set[int]] = {i: set() for i in membros}
+    pares: dict[tuple[int, int], float] = {}
+    monte: list[tuple[float, int, int]] = []
+
+    def refaz(g: int) -> None:
+        """Recalcula os pares entre o grupo g e todos os grupos ligados a ele."""
+        por_grupo: dict[int, list[tuple[int, int, float]]] = {}
+        for pa, a in enumerate(membros[g]):
+            for b, valor in adjacencia[a].items():
+                k = grupo_de[b]
+                if k != g:
+                    por_grupo.setdefault(k, []).append((pa, posicao[b], valor))
+        for k, lista in por_grupo.items():
+            if g < k:
+                lista.sort(key=lambda t: (t[0], t[1]))
+                chave = (g, k)
+            else:
+                lista.sort(key=lambda t: (t[1], t[0]))
+                chave = (k, g)
+            valor = _medida_ligacao([t[2] for t in lista], criterio)
+            vizinhos[g].add(k)
+            vizinhos[k].add(g)
+            if valor > -1.0:             # também descarta NaN, como o original
+                pares[chave] = valor
+                heapq.heappush(monte, (-valor, chave[0], chave[1]))
+
+    for g in list(membros):
+        refaz(g)
 
     while True:
+        _verifica(cancelado)
         melhor = None
-        melhor_valor = -1.0
-
-        for i in range(len(grupos)):
-            for j in range(i + 1, len(grupos)):
-                medidas = _valor_entre(rede, grupos[i], grupos[j])
-                if medidas is None:
-                    continue
-                soma, media, minimo, maximo = medidas
-                valor = {"soma": soma, "media": media,
-                         "completa": minimo, "simples": maximo}[criterio]
-                if valor > melhor_valor and valor >= corte:
-                    melhor_valor = valor
-                    melhor = (i, j)
-
-        if melhor is None:
+        while monte:
+            negativo, i, j = monte[0]
+            if pares.get((i, j)) == -negativo:
+                melhor = (i, j, -negativo)
+                break
+            heapq.heappop(monte)         # entrada velha
+        if melhor is None or melhor[2] < corte:
             break
-        i, j = melhor
-        if len(grupos[i]) + len(grupos[j]) > tamanho_maximo:
+        i, j, _ = melhor
+        if len(membros[i]) + len(membros[j]) > tamanho_maximo:
             break
-        grupos[i] = grupos[i] + grupos[j]
-        grupos.pop(j)
 
-    for grupo in grupos:
+        for g in (i, j):
+            for k in vizinhos.pop(g):
+                if k in vizinhos:
+                    vizinhos[k].discard(g)
+                pares.pop((g, k) if g < k else (k, g), None)
+        deslocamento = len(membros[i])
+        for no in membros[j]:
+            grupo_de[no] = i
+            posicao[no] += deslocamento
+        membros[i] = membros[i] + membros.pop(j)
+        vizinhos[i] = set()
+        refaz(i)
+
+    for g in sorted(membros):
+        grupo = membros[g]
         if len(grupo) >= tamanho_minimo:
             resultado.adiciona(grupo, _no_principal(rede, grupo))
 
@@ -187,23 +250,27 @@ def _ligacao(rede: Rede, tamanho_minimo: int, tamanho_maximo: int,
 
 
 def ligacao_media(rede: Rede, minimo: int, maximo: int,
-                   corte: float = 0.0) -> ConjuntoDeAgrupamentos:
-    return _ligacao(rede, minimo, maximo, "media", corte)
+                  corte: float = 0.0,
+                  cancelado=None) -> ConjuntoDeAgrupamentos:
+    return _ligacao(rede, minimo, maximo, "media", corte, cancelado)
 
 
 def ligacao_completa(rede: Rede, minimo: int, maximo: int,
-                   corte: float = 0.0) -> ConjuntoDeAgrupamentos:
-    return _ligacao(rede, minimo, maximo, "completa", corte)
+                     corte: float = 0.0,
+                     cancelado=None) -> ConjuntoDeAgrupamentos:
+    return _ligacao(rede, minimo, maximo, "completa", corte, cancelado)
 
 
 def ligacao_simples(rede: Rede, minimo: int, maximo: int,
-                   corte: float = 0.0) -> ConjuntoDeAgrupamentos:
-    return _ligacao(rede, minimo, maximo, "simples", corte)
+                    corte: float = 0.0,
+                    cancelado=None) -> ConjuntoDeAgrupamentos:
+    return _ligacao(rede, minimo, maximo, "simples", corte, cancelado)
 
 
 def ligacao_soma(rede: Rede, minimo: int, maximo: int,
-                   corte: float = 0.0) -> ConjuntoDeAgrupamentos:
-    return _ligacao(rede, minimo, maximo, "soma", corte)
+                 corte: float = 0.0,
+                 cancelado=None) -> ConjuntoDeAgrupamentos:
+    return _ligacao(rede, minimo, maximo, "soma", corte, cancelado)
 
 
 def _no_principal(rede: Rede, nos) -> int:
@@ -235,7 +302,7 @@ def _no_principal(rede: Rede, nos) -> int:
 
 
 def louvain(rede: Rede, tamanho_minimo: int, tamanho_maximo: int,
-            corte: float = 0.0) -> ConjuntoDeAgrupamentos:
+            corte: float = 0.0, cancelado=None) -> ConjuntoDeAgrupamentos:
     """Louvain em duas fases, com ajuste de tamanho, como no Bibliomapa.
 
     Detecta comunidades por modularidade, absorve grupos menores que o mínimo
@@ -243,11 +310,12 @@ def louvain(rede: Rede, tamanho_minimo: int, tamanho_maximo: int,
     menor peso.
     """
     grafo = {no: dict(rede.adjacencia[no]) for no in rede.nos}
-    particao = _detecta_comunidades(grafo)
+    particao = _detecta_comunidades(grafo, cancelado)
     grupos = _agrupa(particao)
 
-    grupos = _junta_grupos_pequenos(grupos, grafo, tamanho_minimo)
-    grupos = _divide_grupos_grandes(grupos, grafo, tamanho_maximo)
+    _verifica(cancelado)
+    grupos = _junta_grupos_pequenos(grupos, grafo, tamanho_minimo, cancelado)
+    grupos = _divide_grupos_grandes(grupos, grafo, tamanho_maximo, cancelado)
     grupos.sort(key=lambda grupo: (-len(grupo), min(grupo)))
 
     resultado = ConjuntoDeAgrupamentos(rede)
@@ -257,12 +325,14 @@ def louvain(rede: Rede, tamanho_minimo: int, tamanho_maximo: int,
     return resultado
 
 
-def _detecta_comunidades(original: dict[int, dict[int, float]]) -> dict[int, int]:
+def _detecta_comunidades(original: dict[int, dict[int, float]],
+                         cancelado=None) -> dict[int, int]:
     grafo = {no: dict(vizinhos) for no, vizinhos in original.items()}
     pertence = {no: no for no in original}
 
     while True:
-        particao = _move_nos(grafo)
+        _verifica(cancelado)
+        particao = _move_nos(grafo, cancelado)
         if len(set(particao.values())) == len(grafo):
             break
         for no in pertence:
@@ -272,7 +342,7 @@ def _detecta_comunidades(original: dict[int, dict[int, float]]) -> dict[int, int
     return pertence
 
 
-def _move_nos(grafo: dict[int, dict[int, float]]) -> dict[int, int]:
+def _move_nos(grafo: dict[int, dict[int, float]], cancelado=None) -> dict[int, int]:
     comunidade = {}
     graus = _graus(grafo)
     total_por_comunidade = {}
@@ -291,6 +361,7 @@ def _move_nos(grafo: dict[int, dict[int, float]]) -> dict[int, int]:
     while mudou and passadas < 100:
         mudou = False
         passadas += 1
+        _verifica(cancelado)
 
         for no in list(grafo):
             atual = comunidade[no]
@@ -355,12 +426,13 @@ def _agrupa(particao):
     return list(grupos.values())
 
 
-def _junta_grupos_pequenos(grupos, grafo, minimo):
+def _junta_grupos_pequenos(grupos, grafo, minimo, cancelado=None):
     resultado = [list(grupo) for grupo in grupos]
     grupo_do_no = {no: i for i, grupo in enumerate(resultado) for no in grupo}
 
     juntou = True
     while juntou:
+        _verifica(cancelado)
         juntou = False
         for i in range(len(resultado)):
             if len(resultado[i]) < minimo:
@@ -392,35 +464,59 @@ def _vizinho_mais_forte(grupos, indice, grupo_do_no, grafo):
     return melhor
 
 
-def _divide_grupos_grandes(grupos, grafo, maximo):
+def _divide_grupos_grandes(grupos, grafo, maximo, cancelado=None):
     resultado = []
     for grupo in grupos:
         if len(grupo) <= maximo:
             resultado.append(grupo)
         else:
-            resultado.extend(_divide(grupo, grafo, maximo))
+            _verifica(cancelado)
+            resultado.extend(_divide(grupo, grafo, maximo, cancelado))
     return resultado
 
 
-def _divide(grupo, grafo, maximo):
-    resultado = []
+def _divide(grupo, grafo, maximo, cancelado=None):
+    """Retira as arestas mais fracas, uma a uma, até o grupo se partir.
+
+    A formulação literal refaz os componentes a cada aresta retirada
+    (quadrática). Como estar conexo só depende de quais arestas restam, basta
+    achar o menor `k` tal que, sem as `k` mais fracas, o grupo fica
+    desconexo: devolvendo as arestas à união-separação, da mais forte para a
+    mais fraca, o primeiro instante em que o grafo vira um só componente dá
+    `k - 1`. O resultado é o mesmo da formulação literal.
+    """
+    _verifica(cancelado)
+    if len(grupo) <= 1:
+        return [[no] for no in grupo]
     arestas = _arestas_internas(grupo, grafo)
-    removidas: set[str] = set()
 
-    while True:
-        componentes = _componentes(grupo, arestas, removidas)
-        if len(componentes) > 1:
-            for componente in componentes:
-                if len(componente) > maximo:
-                    resultado.extend(_divide(componente, grafo, maximo))
-                else:
-                    resultado.append(componente)
-            return resultado
+    pai = {no: no for no in grupo}
 
-        if not arestas or len(removidas) == len(arestas):
-            return [[no] for no in grupo]
+    def raiz(no):
+        while pai[no] != no:
+            pai[no] = pai[pai[no]]
+            no = pai[no]
+        return no
 
-        removidas.add(f"{arestas[len(removidas)][0]}:{arestas[len(removidas)][1]}")
+    comp = len(grupo)
+    k = 0                      # sem alcançar um só componente: já nasce desconexo
+    for indice in range(len(arestas) - 1, -1, -1):
+        a, b, _ = arestas[indice]
+        ra, rb = raiz(a), raiz(b)
+        if ra != rb:
+            pai[ra] = rb
+            comp -= 1
+            if comp == 1:
+                k = indice + 1
+                break
+
+    resultado = []
+    for componente in _componentes(grupo, arestas, k):
+        if len(componente) > maximo:
+            resultado.extend(_divide(componente, grafo, maximo, cancelado))
+        else:
+            resultado.append(componente)
+    return resultado
 
 
 def _arestas_internas(grupo, grafo):
@@ -434,7 +530,8 @@ def _arestas_internas(grupo, grafo):
     return arestas
 
 
-def _componentes(grupo, arestas, removidas):
+def _componentes(grupo, arestas, retiradas: int = 0):
+    """Componentes do grupo sem as `retiradas` primeiras arestas (as mais fracas)."""
     pai = {no: no for no in grupo}
 
     def raiz(no):
@@ -442,9 +539,7 @@ def _componentes(grupo, arestas, removidas):
             no = pai[no]
         return no
 
-    for a, b, _ in arestas:
-        if f"{a}:{b}" in removidas:
-            continue
+    for a, b, _ in arestas[retiradas:]:
         raiz_a, raiz_b = raiz(a), raiz(b)
         if raiz_a != raiz_b:
             pai[max(raiz_a, raiz_b)] = min(raiz_a, raiz_b)

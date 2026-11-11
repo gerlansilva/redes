@@ -23,6 +23,7 @@ from collections import defaultdict
 from . import pivos, rajadas
 from .dataset import Dataset
 from .pipeline import Configuracao, executa_periodo
+from .text_utils import chave
 
 MAX_NOS = 40
 POR_FAIXA = 8
@@ -168,7 +169,7 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
         for linha in rajadas.calcula(conexao, tipo_rajada, limite=RAJADAS_MAXIMAS,
                                      minimo_documentos=RAJADA_MIN_DOCUMENTOS)["rajadas"]:
             if linha["documentos"] >= RAJADA_MIN_DOCUMENTOS:
-                forte[linha["termo"]] = linha
+                forte[chave(linha["termo"])] = linha
 
     candidatos = []                 # (indice, no_dict)
     sem_ano = 0
@@ -194,7 +195,9 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
                 sem_ano += 1
                 continue
             nome = limpa(resultado.rotulo(no)) or f"Item {no}"
-            raj = forte.get(nome) if not por_documento else None
+            # `forte` usa a chave (sem caixa nem pontuação): o nome exibido é legível,
+            # o termo da rajada vem como está guardado.
+            raj = forte.get(chave(nome)) if not por_documento else None
             candidatos.append((indice, {
                 "id": int(no), "rotulo": nome, "ano": int(ano),
                 "frequencia": int(resultado.frequencia_nos.get(no, 1)),
@@ -220,7 +223,7 @@ def constroi(kb, config: Configuracao, max_nos: int = MAX_NOS,
         nos = sorted(escolhidos[indice],
                      key=lambda n: (n["ano"], -n["frequencia"], n["rotulo"], n["id"]))
         faixas.append({"indice": indice,
-                       "rotulo": limpa(resultado.grupos[indice].rotulo)
+                       "rotulo": limpa(resultado.grupos[indice].exibicao)
                        or f"Agrupamento {indice + 1}",
                        "frequencia_total": frequencia_por_faixa[indice],
                        "itens_total": itens_por_faixa[indice], "nos": nos})

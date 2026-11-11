@@ -21,6 +21,7 @@ from . import bibliometria, linha_do_tempo, pivos, qualidade, rajadas, rotulos, 
 from .viz import densidade as viz_densidade
 from .clustering import ALGORITMOS
 from .similarity import MEDIDAS
+from .texto import rotulo_legivel
 
 _ROTULOS_UNIDADE = {
     "Words": "Palavras-chave",
@@ -318,13 +319,13 @@ def nome_do_grupo(kb, resultado, grupo) -> tuple[str, str | None, bool]:
     O rótulo novo (quando existe) é o principal e o atual, o subtítulo; sem rótulo
     novo, o principal é o atual e o subtítulo é None.
     """
-    atual = grupo.rotulo or "Sem grupo"
+    atual = grupo.exibicao or "Sem grupo"
     try:
         indice = next(i for i, g in enumerate(resultado.grupos) if g is grupo)
         r = rotulos_do_resultado(kb, resultado).get(indice) or {}
     except Exception:
         r = {}
-    novo = " ".join(str(r.get("rotulo") or "").split())
+    novo = rotulo_legivel(" ".join(str(r.get("rotulo") or "").split()))
     if not novo:
         return atual, None, False
     return novo, atual, bool(r.get("indicativo"))
@@ -351,9 +352,9 @@ def tabela_agrupamentos(kb, resultado, grupos, medidas, formato, ligar=None):
             if extra.get("indicativo"):
                 principal += ' <span class="rot-ind">(indicativo)</span>'
             nome = ((ligar(posicao, principal) if ligar else principal)
-                    + f'<br><span class="rot-atual">{_esc(g.rotulo)}</span>')
+                    + f'<br><span class="rot-atual">{_esc(g.exibicao)}</span>')
         else:
-            atual = _esc(g.rotulo)
+            atual = _esc(g.exibicao)
             nome = ligar(posicao, atual) if ligar else atual
         nome = f'<div class="cel-agrupamento">{nome}</div>'
         sil = extra.get("silhueta")
@@ -1309,7 +1310,9 @@ def metodo_bibliometria_html(tabela=None) -> str:
          "instituição ou um só país; documentos ambíguos ficam de fora e o relatório diz "
          "quantos. Entram os autores, países e instituições mais frequentes.</p>",
          "<p><strong>Nuvem de palavras-chave.</strong> Mostra as palavras-chave dos autores, "
-         "com hífen trocado por espaço e em minúsculas, contadas por documento. O tamanho "
+         "contadas por documento. Os termos que o SciMAT guarda em maiúsculas e com hífen "
+         "(STATISTICAL-REASONING) aparecem em forma legível (Statistical reasoning); "
+         "as siglas conhecidas (SPSS, PISA) ficam em maiúsculas. O tamanho "
          "da letra cresce com a raiz quadrada da frequência, e as palavras são colocadas em "
          "espiral, do termo mais frequente ao menos frequente, sem sobreposição.</p>",
          "<p><strong>Nuvem de títulos.</strong> Os títulos são quebrados em palavras. Saem as "

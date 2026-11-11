@@ -12,6 +12,10 @@ import itertools
 from .dataset import Dataset
 
 
+class Cancelado(Exception):
+    """Levantada quando o chamador pede para interromper o cálculo."""
+
+
 class Rede:
     """Matriz de similaridade simétrica com nós ordenados por identificador."""
 
@@ -156,12 +160,14 @@ def rede_coocorrencia(dataset: Dataset) -> Rede:
     return rede
 
 
-def rede_acoplamento(dataset: Dataset) -> Rede:
+def rede_acoplamento(dataset: Dataset, cancelado=None) -> Rede:
     """Acoplamento bibliográfico: nós são documentos, peso = itens em comum."""
     documentos = dataset.lista_documentos()
     rede = Rede(documentos)
 
     for i, doc_a in enumerate(documentos):
+        if cancelado is not None and not i & 0x3F and cancelado():
+            raise Cancelado()
         itens_a = set(dataset.itens_do_documento(doc_a))
         for doc_b in documentos[i + 1:]:
             comuns = itens_a & set(dataset.itens_do_documento(doc_b))
@@ -170,7 +176,7 @@ def rede_acoplamento(dataset: Dataset) -> Rede:
     return rede
 
 
-def rede_acoplamento_agregado(agregado, dataset: Dataset) -> Rede:
+def rede_acoplamento_agregado(agregado, dataset: Dataset, cancelado=None) -> Rede:
     """Acoplamento agregado: peso = itens de baixo nível em comum.
 
     O original não compara documentos compartilhados: reúne todos os itens de
@@ -189,6 +195,8 @@ def rede_acoplamento_agregado(agregado, dataset: Dataset) -> Rede:
         itens_por_alto[alto] = conjunto
 
     for i, a in enumerate(altos):
+        if cancelado is not None and not i & 0x3F and cancelado():
+            raise Cancelado()
         for b in altos[i + 1:]:
             comuns = itens_por_alto[a] & itens_por_alto[b]
             rede.adiciona_aresta(a, b, float(len(comuns)))

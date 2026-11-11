@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 
 from .projeto import EXTENSAO, e_projeto
+from .texto import termo_legivel
 
 TIPOS = {
     "palavra": ("Word", "WordGroup", "idWord", "idWordGroup",
@@ -102,6 +103,9 @@ def resume(caminho: str | Path) -> dict:
             }[tabela]
             grupos[chave] = [
                 {"id": linha["id"], "nome": linha["nome"],
+                 # Só a exibição muda; `nome` é o dado guardado (e o que se renomeia).
+                 "exibicao": (termo_legivel(linha["nome"]) if chave == "palavra"
+                              else linha["nome"]),
                  "parada": bool(linha["parada"]),
                  "itens": linha["itens"], "documentos": linha["documentos"]}
                 for linha in conexao.execute(

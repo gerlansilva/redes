@@ -18,6 +18,7 @@ import math
 import re
 import unicodedata
 
+from ..texto import rotulo_legivel
 from .sankey import FONTE, PALETA
 
 LARGURA = 1100
@@ -182,7 +183,8 @@ def _rotulos_novos(rotulos) -> dict[int, str]:
             continue
         if isinstance(valor, dict):
             valor = valor.get("rotulo")
-        texto = limpa(valor)
+        # Os termos do rótulo vêm em minúsculas: inicial maiúscula e siglas em cada um.
+        texto = rotulo_legivel(limpa(valor))
         if texto:
             saida[indice] = texto
     return saida

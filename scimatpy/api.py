@@ -10,10 +10,12 @@ from __future__ import annotations
 import atexit
 import csv
 import json
+import math
 import re
 import secrets
 import shutil
 import sqlite3
+import sys
 import tempfile
 import threading
 import traceback
@@ -28,11 +30,14 @@ from . import pivos as modulo_pivos
 from . import qualidade as modulo_qualidade
 from . import rotulos as modulo_rotulos
 from .grade import UNIDADES as UNIDADES_GRADE, grade as combinacoes_grade
+from .network import Cancelado as _Cancelado
 from .ies import COMPONENTE_MINIMO_PADRAO, tabela_variantes
 from .kb import ProjetoScimat
 from .mappers import MAPEADORES
-from .pipeline import Configuracao, executa_periodo
+from .pipeline import (Configuracao, MENSAGEM_MAPEADOR_ACOPLAMENTO,
+                       executa_periodo)
 from .projeto import EXTENSAO, NOME_PADRAO, e_projeto, nome_de_projeto
+from .texto import exibe_termo, rotulo_legivel, siglas as siglas_conhecidas, termo_legivel
 from .viz.halo import UNIDADE_TITULO, halo_svg, layout_halo
 from .viz.mapa import (colaboracao_do_periodo, dados_mapa as mapa_interativo,
                        mapa_svg)
@@ -251,6 +256,8 @@ def _config(dados: dict) -> Configuracao:
     desconhecidos = [m for m in mapeadores if m not in MAPEADORES]
     if desconhecidos:
         raise ErroApi(f"mapeador inválido: {desconhecidos[0]}")
+    if "acoplamento" in mapeadores and matriz != "BasicCoupling":
+        raise ErroApi(MENSAGEM_MAPEADOR_ACOPLAMENTO.format(matriz=matriz))
 
     palavras = dados["palavras"] if dados.get("palavras") is not None else [
         "autor", "fonte"]
@@ -280,6 +287,9 @@ def _config(dados: dict) -> Configuracao:
             raise ErroApi(
                 f"\"corte\" precisa ser numérico (recebido: {bruto_corte!r})"
             ) from None
+        if not math.isfinite(corte):
+            raise ErroApi(
+                f"\"corte\" precisa ser um número finito (recebido: {bruto_corte!r})")
     if corte < 0:
         raise ErroApi("\"corte\" não pode ser negativo")
 
@@ -694,7 +704,7 @@ def analisa(dados: dict) -> dict:
         faixas[quadrante] += 1
         saida_grupos.append({
             "selo": indice,
-            "rotulo": grupo.rotulo,
+            "rotulo": grupo.exibicao,
             **_campos_novos(grupo, posicao_original.get(id(grupo)), qual,
                             rotulos_novos, anos),
             "itens": len(grupo.nos),
@@ -921,7 +931,7 @@ def _campos_novos(grupo, original, qual, rotulos_novos, anos) -> dict:
     except Exception:
         anos_grupo = []
     return {
-        "rotulo_novo": r.get("rotulo") if r else None,
+        "rotulo_novo": rotulo_legivel(r.get("rotulo")) if r else None,
         "rotulo_novo_curto": texto_rotulo_novo(r) if r else None,
         "rotulo_indicativo": bool(r.get("indicativo")) if r else None,
         "silhueta": None if silhueta is None else round(silhueta, 3),
@@ -969,6 +979,18 @@ def _avisos(resultado, config, saida_grupos) -> tuple[list[dict], list[dict]]:
                 "frequencia_sugerida": sugerida,
             })
 
+    if (config.matriz == "AggregatedCouplingBasedOnJournal"
+            and resultado.agregado is not None
+            and len(resultado.agregado.lista_alto_nivel()) <= 1):
+        avisos.append({
+            "codigo": "um_periodico",
+            "mensagem": (
+                "O corpus tem um só periódico neste período, então o "
+                "acoplamento agregado por periódico não forma rede nem "
+                "agrupamentos (é preciso pelo menos dois). Use outra matriz "
+                "ou outro período."),
+        })
+
     genericos = []
     if total_docs >= 10:
         original = resultado.dataset_original
@@ -976,7 +998,7 @@ def _avisos(resultado, config, saida_grupos) -> tuple[list[dict], list[dict]]:
             frequencia = original.frequencia_item(item_id)
             if frequencia / total_docs >= LIMITE_GENERICO:
                 genericos.append({
-                    "rotulo": original.rotulo_item(item_id),
+                    "rotulo": exibe_termo(config.unidade, original.rotulo_item(item_id)),
                     "documentos": frequencia,
                     "proporcao": round(frequencia / total_docs, 3),
                 })
@@ -1071,7 +1093,10 @@ def exportar(token: str, tipo: str) -> tuple[bytes, str, str]:
             texto = exports.grupos_xml(kb.conexao)
         return texto.encode("utf-8"), "grupos.xml", "application/xml"
 
-    rotulos = resultado.dataset.itens
+    # Palavras-chave do SciMAT saem em forma legível; o dado guardado não muda.
+    unidade_do_resultado = resultado.configuracao.unidade
+    rotulos = {no: exibe_termo(unidade_do_resultado, nome)
+               for no, nome in resultado.dataset.itens.items()}
     if tipo == "rede-pajek":
         texto = exports.pajek(resultado.rede, rotulos)
         return texto.encode("utf-8"), "rede.net", "text/plain"
@@ -1223,7 +1248,7 @@ def _edita_base(dados: dict) -> dict:
                                   dados.get("de", ""), dados.get("para", ""))
         if acao == "desfazer":
             return edit.desfaz(projeto)
-    except (KeyError, TypeError, ValueError, sqlite3.IntegrityError) as erro:
+    except (KeyError, TypeError, ValueError, OverflowError, sqlite3.IntegrityError) as erro:
         raise ErroApi(str(erro)) from None
     raise ErroApi(f"ação de edição desconhecida: {acao}")
 
@@ -1375,7 +1400,8 @@ def gera_relatorio_completo(dados: dict) -> dict:
             token_voltar = report._VOLTAR.set("../index.html")
             try:
                 resumo = report.gera_html(destino / pasta, kb, periodos, config, False, medida,
-                                          com_bibliometria=False, devolve_resultados=True)
+                                          com_bibliometria=False, devolve_resultados=True,
+                                          resultados=resultados_previos)
             finally:
                 report._VOLTAR.reset(token_voltar)
             nota = ""
@@ -1518,7 +1544,8 @@ def _executa_grade(trabalho: Trabalho, dados: dict) -> None:
                         if trabalho.cancelado:
                             raise _Cancelado()
                         resultado = executa_periodo(
-                            kb, periodo.id, periodo.nome, config)
+                            kb, periodo.id, periodo.nome, config,
+                            cancelado=lambda: trabalho.cancelado)
                         escritor.writerow(_linha(resultado, eixo, mapeador, medida))
                         trabalho.feito += 1
                         trabalho.mensagem = (
@@ -1544,10 +1571,6 @@ def _executa_grade(trabalho: Trabalho, dados: dict) -> None:
         trabalho.estado = "erro"
         trabalho.erro = f"falha interna: {erro}"
         trabalho.mensagem = "Falha na execução"
-
-
-class _Cancelado(Exception):
-    pass
 
 
 def inicia_grade(dados: dict) -> dict:
@@ -1723,8 +1746,17 @@ def lista_projetos(workspace: Path) -> list[dict]:
 
 # -------------------------------------------------------------------- servidor
 
+# Cliente que fecha a aba ou cancela o download no meio da resposta.
+ABORTOS_DE_CONEXAO = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
+
+
 class ServidorWeb(ThreadingHTTPServer):
     daemon_threads = True
+
+    def handle_error(self, request, client_address) -> None:
+        if isinstance(sys.exc_info()[1], ABORTOS_DE_CONEXAO):
+            return
+        super().handle_error(request, client_address)
 
     def __init__(self, endereco, workspace: Path):
         super().__init__(endereco, Manipulador)
@@ -1749,6 +1781,13 @@ class Manipulador(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(corpo)
+
+    def _json_seguro(self, codigo: int, dados) -> None:
+        """Como `_json`, mas sem erro quando o cliente já foi embora."""
+        try:
+            self._json(codigo, dados)
+        except ABORTOS_DE_CONEXAO:
+            pass
 
     def _arquivo(self, dados: bytes, nome: str, tipo: str, download: bool) -> None:
         self.send_response(200)
@@ -1820,6 +1859,7 @@ class Manipulador(BaseHTTPRequestHandler):
                 self._json(200, {
                     "workspace": str(self.server.workspace),
                     "projetos": lista_projetos(self.server.workspace),
+                    "siglas": sorted(siglas_conhecidas()),
                 })
             elif rota == "/api/projeto":
                 caminho = _valida_projeto(
@@ -1985,13 +2025,15 @@ class Manipulador(BaseHTTPRequestHandler):
                 self.end_headers()
             else:
                 self.send_error(404)
+        except ABORTOS_DE_CONEXAO:
+            return                    # o cliente desistiu; não há a quem responder
         except ErroExpirado as erro:
-            self._json(410, {"erro": str(erro), "expirada": True})
+            self._json_seguro(410, {"erro": str(erro), "expirada": True})
         except ErroApi as erro:
-            self._json(400, {"erro": str(erro)})
+            self._json_seguro(400, {"erro": str(erro)})
         except Exception as erro:  # noqa: BLE001
             traceback.print_exc()
-            self._json(500, {"erro": f"falha interna: {erro}"})
+            self._json_seguro(500, {"erro": f"falha interna: {erro}"})
 
     def do_POST(self) -> None:  # noqa: N802
         analisado = urlparse(self.path)
@@ -2044,13 +2086,15 @@ class Manipulador(BaseHTTPRequestHandler):
                                         autores_ref, repetidos))
             else:
                 self.send_error(404)
+        except ABORTOS_DE_CONEXAO:
+            return                    # o cliente desistiu; não há a quem responder
         except ErroExpirado as erro:
-            self._json(410, {"erro": str(erro), "expirada": True})
+            self._json_seguro(410, {"erro": str(erro), "expirada": True})
         except ErroApi as erro:
-            self._json(400, {"erro": str(erro)})
+            self._json_seguro(400, {"erro": str(erro)})
         except Exception as erro:  # noqa: BLE001
             traceback.print_exc()
-            self._json(500, {"erro": f"falha interna: {erro}"})
+            self._json_seguro(500, {"erro": f"falha interna: {erro}"})
 
 
 def cria_servidor(porta: int = 8765, workspace: str | Path | None = None,

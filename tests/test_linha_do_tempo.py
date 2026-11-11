@@ -251,7 +251,8 @@ class RajadaEAtividadeTest(unittest.TestCase):
         finally:
             pasta.cleanup()
         permitidos = {r["termo"] for r in top if r["documentos"] >= 3}
-        self.assertTrue({r["rotulo"] for r in raj} <= permitidos)
+        from scimatpy.text_utils import chave
+        self.assertTrue({chave(r["rotulo"]) for r in raj} <= {chave(p) for p in permitidos})
         self.assertLessEqual(len(raj), 10)
 
     def test_referencia_sem_linha_de_atividade_nem_tracos(self):

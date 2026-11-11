@@ -31,6 +31,11 @@ def _curto(texto: str, limite: int) -> str:
 
 # ---------------------------------------------------------------- rajadas
 
+def _nome(linha: dict) -> str:
+    """Termo para mostrar: a forma legível quando a análise a trouxe."""
+    return linha.get("termo_exibicao") or linha["termo"]
+
+
 def rajadas_svg(dados: dict, titulo: str, rotulo_termo: str = "Termo",
                 limite_texto: int = 44) -> str:
     """Tabela de rajadas no estilo do CiteSpace, com a barra de anos."""
@@ -39,7 +44,7 @@ def rajadas_svg(dados: dict, titulo: str, rotulo_termo: str = "Termo",
         return ""
     primeiro, ultimo = dados["anos"]
     n_anos = ultimo - primeiro + 1
-    larg_termo = min(520, max(220, 7.4 * max(len(_curto(r["termo"], limite_texto)) for r in linhas)))
+    larg_termo = min(520, max(220, 7.4 * max(len(_curto(_nome(r), limite_texto)) for r in linhas)))
     x_ano = 24 + larg_termo + 16
     colunas = {"ano": x_ano, "forca": x_ano + 100, "inicio": x_ano + 170, "fim": x_ano + 234}
     x_barra = x_ano + 284
@@ -63,7 +68,7 @@ def rajadas_svg(dados: dict, titulo: str, rotulo_termo: str = "Termo",
         y = topo + i * passo
         meio = y + passo / 2
         partes.append(f'<text x="24" y="{meio + 4}" font-size="12.5" fill="{TINTA}">'
-                      f'<title>{_esc(r["termo"])}</title>{_esc(_curto(r["termo"], limite_texto))}</text>')
+                      f'<title>{_esc(_nome(r))}</title>{_esc(_curto(_nome(r), limite_texto))}</text>')
         partes.append(f'<text x="{colunas["ano"]}" y="{meio + 4}" font-size="12.5" fill="{FRACA}">{r["primeiro_ano"]}</text>')
         forca = f'{r["forca"]:.2f}'.replace(".", ",")
         partes.append(f'<text x="{colunas["forca"]}" y="{meio + 4}" font-size="12.5" fill="{TINTA}">{forca}</text>')
@@ -77,7 +82,7 @@ def rajadas_svg(dados: dict, titulo: str, rotulo_termo: str = "Termo",
         x_i = x_barra + (r["inicio"] - primeiro) * passo_ano
         x_f = x_barra + (r["fim"] - primeiro + 1) * passo_ano
         partes.append(f'<rect x="{x_i:.1f}" y="{meio - 5}" width="{max(3.0, x_f - x_i):.1f}" height="10" rx="2" '
-                      f'fill="#E5252A"><title>{_esc(r["termo"])}: {r["inicio"]}–{r["fim"]}</title></rect>')
+                      f'fill="#E5252A"><title>{_esc(_nome(r))}: {r["inicio"]}–{r["fim"]}</title></rect>')
     partes.append("</svg>")
     return "".join(partes)
 

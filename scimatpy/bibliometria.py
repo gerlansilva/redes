@@ -12,6 +12,8 @@ import math
 from collections import Counter, defaultdict
 from itertools import combinations
 
+from .texto import termo_legivel
+
 LIMITE = 20
 
 
@@ -302,7 +304,8 @@ def calcula(conexao) -> dict:
                                               key=lambda par: (-par[1], par[0]))[:LIMITE]],
         "paises": _ranking(cont_paises, cit_paises),
         "instituicoes": _ranking(cont_ies, cit_ies),
-        "palavras": _ranking(cont_palavras, cit_palavras),
+        "palavras": [{**linha, "nome": termo_legivel(linha["nome"])}
+                     for linha in _ranking(cont_palavras, cit_palavras)],
         "mais_citados": [{"titulo": d["titulo"], "ano": d["ano"],
                           "autores": d["autores_texto"], "citacoes": d["citacoes"]}
                          for d in mais_citados],

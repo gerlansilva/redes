@@ -14,6 +14,8 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
+from .texto import termo_legivel
+
 S_PADRAO = 2.0
 GAMA_PADRAO = 1.0
 MINIMO_DOCUMENTOS = 3
@@ -135,7 +137,10 @@ def calcula(conexao, tipo: str = "palavras", limite: int = 20,
         existente = [i for i, c in enumerate(contagens) if c]
         for inicio, fim, forca in kleinberg(contagens, totais, s, gama):
             resultado.append({
-                "termo": nome, "primeiro_ano": anos[existente[0]],
+                "termo": nome,
+                # O termo guardado serve de chave; a exibição passa por `termo_legivel`.
+                "termo_exibicao": termo_legivel(nome) if tipo == "palavras" else nome,
+                "primeiro_ano": anos[existente[0]],
                 "forca": round(forca, 2), "inicio": anos[inicio], "fim": anos[fim],
                 "documentos": total,
             })

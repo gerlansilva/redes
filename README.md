@@ -392,8 +392,7 @@ A auditoria original e o que foi corrigido estão em
 [pendencias.md](docs/pendencias.md). O que resta é de produto, não de
 paridade: distribuição desktop (Tauri), edição de sinônimos e stopwords na
 interface, e algumas arestas das análises novas (selo quase sempre "Atenção",
-termos em maiúsculas do SciMAT que perdem a caixa, estresse completo no corpus
-SERJ).
+estresse completo no corpus SERJ).
 
 ## Próximos passos
 

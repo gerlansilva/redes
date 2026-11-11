@@ -43,7 +43,7 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
     novo = _novo_do_grupo(resultado, grupo, rotulos)
     subtitulo = None
     if novo:
-        subtitulo = (grupo.rotulo or "Sem grupo")
+        subtitulo = (grupo.exibicao or "Sem grupo")
         titulo = f"{resultado.periodo} — {novo}"
     nos = list(grupo.nos)
     limite_titulo = max(20, int((largura - 24) / 7.4))
@@ -63,8 +63,7 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
     cx, cy = largura / 2, altura / 2 - 6 + desloca / 2
     raio = min(largura * 0.30, altura * 0.36)
     # No acoplamento os nós são documentos: o rótulo vem de `resultado.rotulos`.
-    nomes_nos = {no: resultado.dataset.itens.get(no) or getattr(resultado, "rotulos", {}).get(no)
-                 or str(no) for no in nos}
+    nomes_nos = {no: resultado.item(no) for no in nos}
     # Os rótulos (até 28 caracteres) ficam fora do círculo: reserva espaço
     # para o mais longo caber na lateral sem ser cortado.
     maior_rotulo = max(min(len(r), 28) for r in nomes_nos.values())
@@ -274,7 +273,7 @@ def rede_de_agrupamentos_svg(resultado, titulo: str,
             f'font-size="{min(11.0, r / 2 + 7):.1f}" font-weight="700" '
             f'fill="{cor}">{ordem[i] + 1}</text>')
         novo = novos.get(ordem[i])
-        rotulo = (novo[:1].upper() + novo[1:]) if novo else (grupo.rotulo or "Sem grupo")
+        rotulo = (novo[:1].upper() + novo[1:]) if novo else (grupo.exibicao or "Sem grupo")
         if len(rotulo) > 26:
             rotulo = rotulo[:24] + "…"
         partes.append(

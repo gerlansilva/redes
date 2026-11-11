@@ -20,6 +20,7 @@ from __future__ import annotations
 import numpy as np
 
 from .clustering import louvain
+from .texto import rotulo_legivel
 
 NIVEIS = ("ok", "atencao", "ruim", "indefinido")
 MINIMO_NOS = 15
@@ -379,12 +380,13 @@ def tabela_grupos(resultado, rotulos: dict | None = None, *, kb=None,
         if rotulos and i in rotulos:
             r = rotulos[i]
             novo = r.get("rotulo") if isinstance(r, dict) else str(r)
+            novo = rotulo_legivel(novo) if novo else novo
         docs = g.documentos_nucleo
         ys = [anos[d] for d in docs if anos and d in anos]
         linhas.append({
             "posicao": posicao,
             "indice": i,
-            "rotulo": g.rotulo,
+            "rotulo": g.exibicao,
             "rotulo_novo": novo,
             "itens": len(g.nos),
             "silhueta": por_grupo.get(i),

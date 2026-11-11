@@ -169,7 +169,7 @@ def indices_tsv(resultado) -> str:
                        else _num(grupo.medidas.get(prefixo + nome, 0.0))
                        for nome in nomes]
             linhas.append("\t".join(
-                [str(selo), grupo.rotulo, mapeador] + valores))
+                [str(selo), grupo.exibicao, mapeador] + valores))
     return "\n".join(linhas) + "\n"
 
 

@@ -65,7 +65,7 @@ class QaTest(unittest.TestCase):
         resposta = api.analisa({"projeto": str(caminho), "unidade": "Words"})
         codigos = [a["codigo"] for a in resposta["avisos"]]
         self.assertIn("termo_generico", codigos)
-        self.assertEqual("ESTATISTICA", resposta["termos_genericos"][0]["rotulo"])
+        self.assertEqual("Estatistica", resposta["termos_genericos"][0]["rotulo"])   # exibição legível
 
         depois = api.analisa({"projeto": str(caminho), "unidade": "Words",
                               "ignorar": ["Estatística"]})

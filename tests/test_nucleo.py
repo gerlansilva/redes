@@ -142,7 +142,10 @@ class ConfiguracaoTest(unittest.TestCase):
 
     def test_acoplamento_aceito(self):
         self.assertIn("acoplamento", MAPEADORES)
-        Configuracao(mapeadores=("acoplamento",)).valida()
+        Configuracao(matriz="BasicCoupling", mapeadores=("acoplamento",)).valida()
+        # Fora do acoplamento básico os nós não são documentos: rejeitado.
+        with self.assertRaises(ValueError):
+            Configuracao(mapeadores=("acoplamento",)).valida()
 
     def test_origem_invalida_rejeitada(self):
         with self.assertRaises(ValueError):

@@ -18,20 +18,29 @@ A ordem das etapas é a de `DoAnalysisWorker.doPeriod`:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 from . import measures
 from .aggregate import Agregado
-from .clustering import ALGORITMOS, ConjuntoDeAgrupamentos
+from .clustering import ALGORITMOS, ConjuntoDeAgrupamentos, _verifica
 from .dataset import Dataset
 from .kb import ProjetoScimat
 from .mappers import MAPEADORES, k_core
+from .texto import exibe_termo, termo_legivel
 from .network import (Rede, rede_acoplamento, rede_acoplamento_agregado,
                       rede_coocorrencia)
 from .similarity import normaliza_acoplamento, normaliza_coocorrencia
 
 MATRIZES = ("CoOccurrence", "BasicCoupling", "AggregatedCouplingBasedOnAuthor",
             "AggregatedCouplingBasedOnJournal")
+
+
+MENSAGEM_MAPEADOR_ACOPLAMENTO = (
+    "O mapeador \"acoplamento\" só vale com a matriz de acoplamento básico "
+    "(BasicCoupling), em que os nós são documentos; com a matriz {matriz} os "
+    "nós são itens. Escolha outro mapeador (núcleo, interseção, união, "
+    "secundários ou k-core).")
 
 
 @dataclass
@@ -69,10 +78,12 @@ class Configuracao:
         for mapeador in self.mapeadores:
             if mapeador not in MAPEADORES:
                 raise ValueError(f"mapeador inválido: {mapeador}")
+        if "acoplamento" in self.mapeadores and self.matriz != "BasicCoupling":
+            raise ValueError(MENSAGEM_MAPEADOR_ACOPLAMENTO.format(matriz=self.matriz))
         for origem in self.palavras:
             if origem not in ("autor", "fonte", "adicionada"):
                 raise ValueError(f"origem de palavra inválida: {origem}")
-        if self.corte < 0:
+        if not math.isfinite(self.corte) or self.corte < 0:
             raise ValueError(f"corte inválido: {self.corte}")
         if self.k_core < 1:
             raise ValueError(f"k-core inválido: {self.k_core}")
@@ -93,6 +104,14 @@ class Grupo:
     densidade_faixa: float = 0.0
     documentos: dict[str, set[int]] = field(default_factory=dict)
     medidas: dict[str, float] = field(default_factory=dict)
+    # Só palavras-chave em co-ocorrência: o rótulo é um termo do SciMAT, que se
+    # exibe em forma legível (o `rotulo` guardado não muda).
+    legivel: bool = False
+
+    @property
+    def exibicao(self) -> str:
+        """Rótulo para mostrar: `termo_legivel` nas palavras-chave, o texto como veio nas demais."""
+        return termo_legivel(self.rotulo) if self.legivel else self.rotulo
 
     @property
     def documentos_nucleo(self) -> set[int]:
@@ -116,13 +135,39 @@ class ResultadoPeriodo:
     ies: dict | None = None
 
     def rotulo(self, no: int) -> str:
-        """Rótulo de um nó: título do documento ou nome do item."""
-        return self.rotulos.get(no) or self.dataset.itens.get(no, str(no))
+        """Rótulo de um nó para exibição: título do documento ou nome do item.
+
+        O nome do item (palavra-chave do SciMAT em caixa alta) sai em forma
+        legível; o dado guardado em `dataset.itens` não muda.
+        """
+        titulo = self.rotulos.get(no)
+        if titulo:
+            return titulo
+        return exibe_termo(self.configuracao.unidade, self.dataset.itens.get(no, str(no)))
+
+    def exibe(self, texto) -> str:
+        """Forma de exibição de um termo desta análise (só palavras-chave em co-ocorrência)."""
+        cfg = self.configuracao
+        if cfg.matriz != "CoOccurrence":
+            return "" if texto is None else str(texto)
+        return exibe_termo(cfg.unidade, texto)
+
+    def item(self, no: int) -> str:
+        """Como `rotulo`, mas com o nome do item na frente do título (nós que são itens)."""
+        nome = self.dataset.itens.get(no)
+        if nome:
+            return exibe_termo(self.configuracao.unidade, nome)
+        return self.rotulos.get(no) or str(no)
 
 
 def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
-                    config: Configuracao) -> ResultadoPeriodo:
-    """Executa a análise de um período inteiro."""
+                    config: Configuracao, cancelado=None) -> ResultadoPeriodo:
+    """Executa a análise de um período inteiro.
+
+    `cancelado` é um callback sem argumentos; quando devolve verdadeiro a
+    análise para na próxima verificação (entre as etapas e dentro do
+    agrupamento) levantando `clustering.Cancelado`.
+    """
     config.valida()
 
     original = projeto.dataset(config.unidade, periodo_id, config.palavras)
@@ -141,10 +186,11 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
     if config.matriz == "CoOccurrence":
         rede = rede_coocorrencia(dataset)
     elif config.matriz == "BasicCoupling":
-        rede = rede_acoplamento(dataset)
+        rede = rede_acoplamento(dataset, cancelado)
     else:
-        rede = rede_acoplamento_agregado(agregado, dataset)
+        rede = rede_acoplamento_agregado(agregado, dataset, cancelado)
 
+    _verifica(cancelado)
     rede.filtra_por_valor(config.minimo_coocorrencia)
 
     if config.matriz == "CoOccurrence":
@@ -153,8 +199,10 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
         normaliza_acoplamento(dataset if agregado is None else agregado,
                               rede, config.similaridade)
 
+    _verifica(cancelado)
     conjunto = ALGORITMOS[config.algoritmo](rede, config.tamanho_minimo,
-                                            config.tamanho_maximo, config.corte)
+                                            config.tamanho_maximo, config.corte,
+                                            cancelado=cancelado)
     info_ies = None
     if config.unidade == "Institutions":
         conjunto, pequenos = _descarta_componentes_pequenos(
@@ -180,9 +228,11 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
             nos=list(agrupamento.nos),
             principal=agrupamento.principal,
             rotulo=_rotulo(dataset, agrupamento.principal, rotulos),
+            legivel=(config.unidade == "Words" and config.matriz == "CoOccurrence"),
         ))
 
     for grupo in grupos:
+        _verifica(cancelado)
         grupo.centralidade = measures.centralidade_callon(rede, grupo.nos)
         grupo.densidade = measures.densidade_callon(rede, grupo.nos)
 
@@ -193,6 +243,7 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
             setattr(grupo, campo, faixa)
 
     for grupo in grupos:
+        _verifica(cancelado)
         _mapeia_documentos(rede, dataset, agregado, grupo, config)
         _calcula_indices(dataset, grupo, config)
 

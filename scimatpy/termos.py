@@ -12,6 +12,7 @@ import re
 from collections import Counter, defaultdict
 
 from .text_utils import mesmo_termo, sem_acentos
+from .texto import termo_legivel
 
 # --------------------------------------------------------------- palavras vazias
 
@@ -161,7 +162,7 @@ def nuvem_dados(conexao, fonte: str = "palavras", ocultar=(), limite: int = 70,
     if fonte == "palavras":
         por_termo: Counter = Counter()
         for _, nome in set(conexao.execute(_SQL_PALAVRAS_AUTOR)):
-            legivel = _rotulo_legivel(nome or "")
+            legivel = termo_legivel(nome or "")
             if legivel and _normaliza(legivel) not in ocultos:
                 por_termo[legivel] += 1
         termos = ordena(por_termo, limite)

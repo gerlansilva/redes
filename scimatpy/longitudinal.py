@@ -100,7 +100,7 @@ def constroi(kb, config: Configuracao, periodos, medida: str = "EquivalenceIndex
                         key=lambda g: (-len(g.nos), g.rotulo or ""))
         for selo, grupo in enumerate(grupos, start=1):
             mapa.nos.append(No(
-                periodo=indice, selo=selo, rotulo=grupo.rotulo,
+                periodo=indice, selo=selo, rotulo=grupo.exibicao,
                 itens=set(grupo.nos), principal=grupo.principal,
                 tamanho=len(grupo.nos)))
 

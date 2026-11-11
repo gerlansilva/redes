@@ -313,8 +313,9 @@ class PivosProjetoRealTest(unittest.TestCase):
     def test_palavras_descritor(self):
         res, r = self._roda("Words")
         nomes = [t["rotulo"] for t in r["termos_descritores"]]
-        self.assertIn("STATISTICS-EDUCATION-RESEARCH", nomes)
-        self.assertNotIn("STATISTICS-EDUCATION-RESEARCH", [p["rotulo"] for p in r["pivos"]])
+        # Exibição legível; o dado guardado segue em caixa alta.
+        self.assertIn("Statistics education research", nomes)
+        self.assertNotIn("Statistics education research", [p["rotulo"] for p in r["pivos"]])
         self.assertFalse(r["suficiente"])       # ~24 nós por período
 
     def test_banco_original_intacto(self):
