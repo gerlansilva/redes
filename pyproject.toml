@@ -1,5 +1,5 @@
 [project]
-name = "scimatpy"
+name = "redes"
 version = "0.1.0"
 description = "Redes: mapeamento científico (bibliometria) inspirado no SciMAT, com interface web local em português"
 readme = "README.md"
@@ -23,7 +23,6 @@ ORCID = "https://orcid.org/0000-0002-9996-9983"
 
 [project.scripts]
 redes = "scimatpy.cli:main"
-scimatpy = "scimatpy.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
