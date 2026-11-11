@@ -16,10 +16,10 @@ from unittest import mock
 
 import numpy as np
 
-from scimatpy import api, build, metodo, pipeline, relatorio_unico, report
-from scimatpy.api import ProjetoScimat, _config, cria_servidor
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.viz import densidade
+from redes import api, build, metodo, pipeline, relatorio_unico, report
+from redes.api import ProjetoScimat, _config, cria_servidor
+from redes.loaders.base import DocumentoFonte
+from redes.viz import densidade
 
 UI = Path(api.__file__).with_name("ui")
 
@@ -293,7 +293,7 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(400, st)
 
     def test_poucos_itens_viram_mensagem(self):
-        with mock.patch("scimatpy.viz.densidade.MINIMO_NOS", 10 ** 6):
+        with mock.patch("redes.viz.densidade.MINIMO_NOS", 10 ** 6):
             st, corpo, _ = self.pede("/api/densidade", self.pedido())
         self.assertEqual(400, st)
         self.assertIn("Poucos itens", json.loads(corpo)["erro"])
@@ -334,7 +334,7 @@ class RelatoriosTest(unittest.TestCase):
         html = self.unico(unidade="References", matriz="BasicCoupling", mapeadores=["acoplamento"])
         self.assertNotIn("Mapa de densidade (corpus completo)", html)
         self.assertIn("Dendrograma (agrupamento hierárquico)", html)
-        with mock.patch("scimatpy.report.densidade_do_corpus", side_effect=RuntimeError("x")):
+        with mock.patch("redes.report.densidade_do_corpus", side_effect=RuntimeError("x")):
             html = self.unico(unidade="Words", tamanho_maximo=5)
         self.assertNotIn("Mapa de densidade (corpus completo)", html)
         self.assertIn("Linha do tempo (corpus completo)", html)

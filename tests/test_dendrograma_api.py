@@ -11,9 +11,9 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from scimatpy.api import cria_servidor
-from scimatpy.build import constroi
-from scimatpy.loaders.base import DocumentoFonte
+from redes.api import cria_servidor
+from redes.build import constroi
+from redes.loaders.base import DocumentoFonte
 
 TEMAS = [["estatistica", "probabilidade", "ensino", "graficos", "media"],
          ["formacao", "professores", "docencia", "curriculo", "pratica"],

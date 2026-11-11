@@ -27,7 +27,7 @@ frequentes que ficaram de fora, para você conferir e corrigir.
 
 ### Corrigir ou ampliar as áreas
 
-As áreas e os termos ficam em `scimatpy/areas.py` (lista `AREAS`). Sintaxe dos termos,
+As áreas e os termos ficam em `redes/areas.py` (lista `AREAS`). Sintaxe dos termos,
 sem considerar acento nem caixa:
 
 | Termo | Casa com |
@@ -64,14 +64,14 @@ Sem mexer no código, aponte a variável de ambiente `REDES_AREAS` para um JSON:
 
 | Parte | Arquivo |
 |---|---|
-| Classificação por palavras (configurável) | `scimatpy/areas.py` |
-| Cálculo (puro) | `scimatpy/duplo_mapa.py` (`calcula`, `le_citacoes`) |
-| SVG | `scimatpy/viz/duplo_mapa.py` |
+| Classificação por palavras (configurável) | `redes/areas.py` |
+| Cálculo (puro) | `redes/duplo_mapa.py` (`calcula`, `le_citacoes`) |
+| SVG | `redes/viz/duplo_mapa.py` |
 | Rota | `GET`/`POST /api/duplo-mapa` |
 | Tela | aba **Duplo mapa** (modo avançado, depois de "Densidade") |
 | Exportar | menu Exportar → "Duplo mapa de áreas (SVG)" |
 | Relatórios | seção "Duplo mapa de áreas das revistas (corpus completo)" (pasta e arquivo único); no arquivo único aparece uma vez, na primeira análise |
-| Método | item numerado em `scimatpy/metodo.py` (`_texto_duplo_mapa`) |
+| Método | item numerado em `redes/metodo.py` (`_texto_duplo_mapa`) |
 
 ## Rota `/api/duplo-mapa`
 

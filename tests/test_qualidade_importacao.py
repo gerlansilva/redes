@@ -13,15 +13,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy.build import Construtor, constroi
-from scimatpy.clustering import ConjuntoDeAgrupamentos, centros_simples
-from scimatpy.loaders import detecta_formato, le_corpus, ris, zotero
-from scimatpy.loaders.base import (DocumentoFonte, decodifica_latex,
+from redes.build import Construtor, constroi
+from redes.clustering import ConjuntoDeAgrupamentos, centros_simples
+from redes.loaders import detecta_formato, le_corpus, ris, zotero
+from redes.loaders.base import (DocumentoFonte, decodifica_latex,
                                    remove_duplicatas)
-from scimatpy.network import Rede
-from scimatpy.paises import pais_da_afiliacao
-from scimatpy.references import converte_referencia
-from scimatpy.text_utils import mesmo_termo, normaliza_palavra
+from redes.network import Rede
+from redes.paises import pais_da_afiliacao
+from redes.references import converte_referencia
+from redes.text_utils import mesmo_termo, normaliza_palavra
 
 
 def _doc(titulo, **campos):
@@ -343,7 +343,7 @@ class ZoteroTest(unittest.TestCase):
             "  author = {Lopes, Celi Espasandin and Jos{\\'e}, M{\\\"u}ller},\n"
             "  journal = {Boletim de Educa{\\c{c}}{\\~a}o Matem{\\'a}tica},\n"
             "  year = {2021},\n  keywords = {educa{\\c{c}}{\\~a}o, estat{\\'i}stica}\n}\n"))
-        from scimatpy.loaders import bibtex
+        from redes.loaders import bibtex
         documento = bibtex.le(caminho)[0]
         self.assertEqual("Educação estatística", documento.titulo)
         self.assertEqual("Boletim de Educação Matemática", documento.periodico)

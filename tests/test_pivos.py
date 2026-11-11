@@ -7,9 +7,9 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest import mock
 
-from scimatpy import measures, pipeline, pivos, rajadas
-from scimatpy.api import ProjetoScimat, _config
-from scimatpy.network import Rede
+from redes import measures, pipeline, pivos, rajadas
+from redes.api import ProjetoScimat, _config
+from redes.network import Rede
 
 SERJ = Path("/home/claude/t/serj_auto.redes")
 TAM = 20            # nós por bloco

@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scimatpy.viz.mapa import colaboracao, mapa_svg  # noqa: E402
+from redes.viz.mapa import colaboracao, mapa_svg  # noqa: E402
 
 
 def metricas(dados: dict) -> list[tuple[str, str]]:

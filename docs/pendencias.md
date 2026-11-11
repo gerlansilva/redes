@@ -22,7 +22,7 @@ computador (sem aplicativo desktop).
 
 ## O que foi fechado
 
-1. **Esquema `.redes`** — `scimatpy/schema.py` traz o DDL completo, versão
+1. **Esquema `.redes`** — `redes/schema.py` traz o DDL completo, versão
    `v1_03`: 31 tabelas, 87 índices e 34 gatilhos, incluindo afiliações,
    categorias de assunto e as tabelas da unidade Países. Um projeto importado
    com 489 afiliações abre no verificador Java do fork e devolve os mesmos
@@ -137,7 +137,7 @@ computador (sem aplicativo desktop).
     análise traz parâmetros adotados, algoritmo em linguagem simples,
     indicadores por período, e as seções de qualidade, rótulos, linha do tempo,
     densidade, pontos de virada e IES, com as constantes lidas do código.
-26. **Termos em maiúsculas do SciMAT** — `scimatpy/texto.py` (`termo_legivel`) é
+26. **Termos em maiúsculas do SciMAT** — `redes/texto.py` (`termo_legivel`) é
     a única função de apresentação: `STATISTICAL-REASONING` sai como
     "Statistical reasoning", `E-LEARNING` como "E-learning", e as siglas da lista
     (`SPSS`, `PISA`, `ICME`, `TIMSS`, configurável por `registra_siglas` ou
@@ -295,7 +295,7 @@ Depende de decisão do usuário:
 ## Verificação
 
 ```bash
-cd ~/Documents/scimatpy
+cd ~/Documents/redes
 python3 -m unittest discover -s tests -t . -q     # mais de 400 casos, OK
 python3 scripts/grade.py completo                 # 162 análises, 135 comparações, 0 divergências
 python3 scripts/grade.py periodos                 # 162 análises, 405 comparações, 0 divergências

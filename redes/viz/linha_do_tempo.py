@@ -1,6 +1,6 @@
 """Linha do tempo dos agrupamentos em SVG próprio (sem JavaScript).
 
-Recebe o dicionário de ``scimatpy.linha_do_tempo.constroi``: uma faixa por
+Recebe o dicionário de ``redes.linha_do_tempo.constroi``: uma faixa por
 agrupamento, eixo x em anos, nós no ano do item, tamanho = frequência, arcos de
 ligação e o rótulo da faixa à esquerda. Tema claro, como os outros SVGs (as
 variáveis CSS ``--sk-*`` valem na interface; fora dela valem as cores claras).

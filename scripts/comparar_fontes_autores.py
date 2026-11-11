@@ -5,7 +5,7 @@ Uso:
     python3 scripts/comparar_fontes_autores.py \
         ~/Desktop/sourcebatanero.csv.json \
         ~/Desktop/autoresbatanero.csv.json \
-        ~/scimatpy-projetos/batanero-auditoria/dados.redes
+        ~/redes-projetos/batanero-auditoria/dados.redes
 """
 
 from __future__ import annotations

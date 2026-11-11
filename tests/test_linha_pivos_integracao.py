@@ -13,10 +13,10 @@ import urllib.request
 from pathlib import Path
 from unittest import mock
 
-from scimatpy import api, build, metodo, pipeline, relatorio_unico, report
-from scimatpy.api import ProjetoScimat, _config, cria_servidor
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.viz.halo import halo_svg
+from redes import api, build, metodo, pipeline, relatorio_unico, report
+from redes.api import ProjetoScimat, _config, cria_servidor
+from redes.loaders.base import DocumentoFonte
+from redes.viz.halo import halo_svg
 
 UI = Path(api.__file__).with_name("ui")
 
@@ -143,7 +143,7 @@ class RotasTest(unittest.TestCase):
         vazio = {"unidade": "Words", "faixas": [], "ligacoes": [], "anos": [],
                  "atividade": True, "avisos": ["Nenhum item dos agrupamentos tem ano."],
                  "omitidos": {"itens": 0, "agrupamentos": 0, "sem_ano": 3}}
-        with mock.patch("scimatpy.report.linha_do_tempo_do_corpus", return_value=(vazio, {})):
+        with mock.patch("redes.report.linha_do_tempo_do_corpus", return_value=(vazio, {})):
             st, corpo, _ = self.pede("/api/linha-do-tempo", self.pedido())
         self.assertEqual(400, st)
         self.assertIn("tem ano", json.loads(corpo)["erro"])
@@ -169,7 +169,7 @@ class RotasTest(unittest.TestCase):
         self.assertFalse(p["tem_sigma"])
 
     def test_analise_nao_quebra_se_pivos_falhar(self):
-        with mock.patch("scimatpy.api.modulo_pivos.pontos_de_virada",
+        with mock.patch("redes.api.modulo_pivos.pontos_de_virada",
                         side_effect=RuntimeError("falha de teste")):
             d = self.analisa()
         # a falha não derruba a análise, mas aparece como aviso (e não como "sem pivôs")
@@ -250,18 +250,18 @@ class RelatoriosTest(unittest.TestCase):
             self.assertIn("Dendrograma (agrupamento hierárquico)", html)
 
     def test_unico_nao_quebra_se_a_linha_do_tempo_falhar(self):
-        with mock.patch("scimatpy.report.linha_do_tempo_do_corpus", side_effect=RuntimeError("x")):
+        with mock.patch("redes.report.linha_do_tempo_do_corpus", side_effect=RuntimeError("x")):
             html = self.unico(unidade="Words", tamanho_maximo=5)
         self.assertNotIn("Linha do tempo (corpus completo)", html)
 
     def test_unico_nao_quebra_se_pivos_falhar(self):
-        with mock.patch("scimatpy.pivos.pontos_de_virada", side_effect=RuntimeError("x")):
+        with mock.patch("redes.pivos.pontos_de_virada", side_effect=RuntimeError("x")):
             html = self.unico(unidade="Words", tamanho_maximo=7)
         self.assertNotIn("Pontos de virada de ", html)
         self.assertIn("Linha do tempo (corpus completo)", html)
 
     def test_metodo_traz_as_duas_secoes_com_constantes_dos_modulos(self):
-        from scimatpy import linha_do_tempo, pivos
+        from redes import linha_do_tempo, pivos
         config = _config({"unidade": "Words"})
         texto = metodo.algoritmo_html(config, None, 2)
         self.assertIn("Linha do tempo.", texto)

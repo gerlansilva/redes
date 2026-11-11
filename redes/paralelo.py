@@ -3,7 +3,7 @@
 O gargalo do relatório completo é o desenho (halo, diagrama, agrupamentos,
 densidade, linha do tempo) e o que o alimenta (pontos de virada, rótulos). Cada
 análise é independente, então cada uma vai para um processo trabalhador
-(`scimatpy.trabalhador`, processos que ficam vivos entre as análises), que recebe os resultados já calculados, produz tudo
+(`redes.trabalhador`, processos que ficam vivos entre as análises), que recebe os resultados já calculados, produz tudo
 no cache compartilhado (`cache_figuras`) e devolve as entradas criadas. O
 processo principal as incorpora e monta o documento depois, só com acertos.
 
@@ -73,7 +73,7 @@ class _Trabalhador:
         ambiente["PYTHONPATH"] = raiz + os.pathsep + ambiente.get("PYTHONPATH", "")
         ambiente["REDES_PARALELO"] = "0"          # o trabalhador nunca abre outros
         self.processo = subprocess.Popen(
-            [sys.executable, "-m", "scimatpy.trabalhador"],
+            [sys.executable, "-m", "redes.trabalhador"],
             env=ambiente, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL, text=True, bufsize=1)
 

@@ -41,6 +41,6 @@ O Redes segue a mesma lógica do bibliometrix até a matriz documento × item. D
 - A visão geral descritiva já entra no relatório HTML, mas as tabelas ainda não têm botão de CSV.
 - As rajadas contam documentos do corpus, não citações recebidas como no CiteSpace, e ficam instáveis em corpora com menos de 100 documentos.
 - O Zotero não exporta referências, então cocitação e frentes de pesquisa só funcionam com CSV da Scopus.
-- Não há instalador para o Mac: o Redes roda pelo Terminal com `python3 -m scimatpy web`.
+- Não há instalador para o Mac: o Redes roda pelo Terminal com `python3 -m redes web`.
 
 A figura é gerada por `gera_fluxo.py` (`python3 gera_fluxo.py fluxo-redes.svg`), e o arquivo `.svg` pode ser editado em qualquer programa de desenho.

@@ -8,9 +8,9 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from scimatpy import edit, exports
-from scimatpy.build import constroi
-from scimatpy.loaders.base import DocumentoFonte
+from redes import edit, exports
+from redes.build import constroi
+from redes.loaders.base import DocumentoFonte
 
 
 def _projeto(destino: Path) -> Path:

@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from scimatpy import api, build, metodo, pipeline, rajadas, relatorio_unico, report
-from scimatpy.api import ProjetoScimat, _config
-from scimatpy.loaders.base import DocumentoFonte
+from redes import api, build, metodo, pipeline, rajadas, relatorio_unico, report
+from redes.api import ProjetoScimat, _config
+from redes.loaders.base import DocumentoFonte
 
 
 def _docs():

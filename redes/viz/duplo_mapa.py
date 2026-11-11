@@ -3,7 +3,7 @@ publicam o corpus (esquerda) e das revistas citadas (direita).
 
 Cada coluna reúne as revistas por **área** (bloco com barra colorida e nome da área);
 as faixas entre as colunas ligam uma área da esquerda a uma área da direita e a
-largura é o número de citações. Recebe o dicionário de `scimatpy.duplo_mapa.calcula`;
+largura é o número de citações. Recebe o dicionário de `redes.duplo_mapa.calcula`;
 é puro e devolve o mesmo texto para os mesmos dados.
 
 A classificação das áreas é aproximada (palavras do nome da revista) e a própria

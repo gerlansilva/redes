@@ -3,9 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy import build, fluxos
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.viz import sankey
+from redes import build, fluxos
+from redes.loaders.base import DocumentoFonte
+from redes.viz import sankey
 
 
 def _projeto(documentos):
@@ -173,7 +173,7 @@ class SvgTest(unittest.TestCase):
 
 class RotaTest(unittest.TestCase):
     def test_rota_devolve_dados_e_svg_e_valida_parametros(self):
-        from scimatpy import api
+        from redes import api
         with tempfile.TemporaryDirectory() as pasta:
             destino = Path(pasta) / "p.redes"
             build.constroi(_com_ligacao_por_autor(), destino, None)

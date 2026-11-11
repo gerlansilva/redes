@@ -1,7 +1,7 @@
 # Unidade Instituições (IES)
 
-Código em `scimatpy/ies.py` e no passo de componentes de
-`scimatpy/pipeline.py`. Análise "Colaboração entre instituições (IES)":
+Código em `redes/ies.py` e no passo de componentes de
+`redes/pipeline.py`. Análise "Colaboração entre instituições (IES)":
 instituições que assinam os mesmos documentos.
 
 ## União de variantes

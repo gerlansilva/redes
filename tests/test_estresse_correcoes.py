@@ -1,7 +1,7 @@
 """Correções do teste de estresse: equivalência das versões rápidas, cancelamento e validações.
 
 As implementações literais (lentas) do agrupamento ficam aqui como referência:
-as versões de `scimatpy.clustering` precisam dar exatamente o mesmo resultado.
+as versões de `redes.clustering` precisam dar exatamente o mesmo resultado.
 """
 
 from __future__ import annotations
@@ -17,14 +17,14 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from scimatpy import api, clustering
-from scimatpy.build import constroi
-from scimatpy.clustering import (Cancelado, _arestas_internas, _divide,
+from redes import api, clustering
+from redes.build import constroi
+from redes.clustering import (Cancelado, _arestas_internas, _divide,
                                  _no_principal, centros_simples,
                                  ConjuntoDeAgrupamentos)
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.network import Rede
-from scimatpy.pipeline import (MATRIZES, Configuracao, executa_periodo)
+from redes.loaders.base import DocumentoFonte
+from redes.network import Rede
+from redes.pipeline import (MATRIZES, Configuracao, executa_periodo)
 
 PASTA_T = Path("/home/claude/t")
 
@@ -249,10 +249,10 @@ class LigacaoEquivalenciaTest(unittest.TestCase):
 
     @unittest.skipUnless((PASTA_T / "segat.redes").exists(), "projeto de teste ausente")
     def test_equivalente_em_projeto_real(self):
-        from scimatpy.kb import ProjetoScimat
-        from scimatpy.aggregate import Agregado  # noqa: F401 - garante importação
-        from scimatpy.network import rede_coocorrencia
-        from scimatpy.similarity import normaliza_coocorrencia
+        from redes.kb import ProjetoScimat
+        from redes.aggregate import Agregado  # noqa: F401 - garante importação
+        from redes.network import rede_coocorrencia
+        from redes.similarity import normaliza_coocorrencia
         with ProjetoScimat(PASTA_T / "segat.redes") as kb:
             periodo = kb.periodos()[0]
             for unidade in ("Words", "Authors", "ReferenceSources"):
@@ -382,7 +382,7 @@ class CancelamentoTest(unittest.TestCase):
     def test_pipeline_levanta_cancelado(self):
         workspace = Path(tempfile.mkdtemp())
         projeto = _projeto_pequeno(workspace)
-        from scimatpy.kb import ProjetoScimat
+        from redes.kb import ProjetoScimat
         with ProjetoScimat(projeto) as kb:
             periodo = kb.periodos()[0]
             config = Configuracao(unidade="Words", minimo_frequencia=1)

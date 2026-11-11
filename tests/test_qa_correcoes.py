@@ -9,15 +9,15 @@ import xml.dom.minidom
 from collections import OrderedDict
 from pathlib import Path
 
-from scimatpy import api, exports
-from scimatpy.build import constroi
-from scimatpy.kb import ProjetoScimat
-from scimatpy.loaders import ris
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.pipeline import Configuracao, executa_periodo
-from scimatpy.references import nome_do_grupo
-from scimatpy.viz.halo import halo_svg
-from scimatpy.viz.strategic import diagrama_svg
+from redes import api, exports
+from redes.build import constroi
+from redes.kb import ProjetoScimat
+from redes.loaders import ris
+from redes.loaders.base import DocumentoFonte
+from redes.pipeline import Configuracao, executa_periodo
+from redes.references import nome_do_grupo
+from redes.viz.halo import halo_svg
+from redes.viz.strategic import diagrama_svg
 
 
 def _projeto(pasta: Path, palavras_por_doc, nome="dados.redes") -> Path:
@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
 class PeriodosAutomaticosTest(unittest.TestCase):
     def test_divide_por_volume(self):
-        from scimatpy.build import sugere_periodos
+        from redes.build import sugere_periodos
         anos = list(range(2011, 2026)) * 12
         faixas = sugere_periodos(anos)
         self.assertGreaterEqual(len(faixas), 2)
@@ -140,9 +140,9 @@ class PeriodosAutomaticosTest(unittest.TestCase):
             self.assertEqual(inicio, fim + 1)
 
     def test_corpus_pequeno_fica_em_um_periodo(self):
-        from scimatpy.build import sugere_periodos
+        from redes.build import sugere_periodos
         self.assertEqual(len(sugere_periodos([2020, 2021, 2021, 2023])), 1)
 
     def test_quantidade_pedida(self):
-        from scimatpy.build import sugere_periodos
+        from redes.build import sugere_periodos
         self.assertEqual(len(sugere_periodos(list(range(2005, 2026)) * 10, 3)), 3)

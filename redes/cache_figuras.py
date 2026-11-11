@@ -77,7 +77,7 @@ def digesto_de_constantes() -> str:
     itens = []
     for nome_modulo in _MODULOS_DO_CALCULO:
         try:
-            modulo = importlib.import_module(f"scimatpy.{nome_modulo}")
+            modulo = importlib.import_module(f"redes.{nome_modulo}")
         except Exception:  # noqa: BLE001
             continue
         for nome, valor in list(vars(modulo).items()):

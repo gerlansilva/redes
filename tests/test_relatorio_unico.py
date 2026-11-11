@@ -3,9 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy import api, build, pipeline, relatorio_unico
-from scimatpy.api import ProjetoScimat, _config
-from scimatpy.loaders.base import DocumentoFonte
+from redes import api, build, pipeline, relatorio_unico
+from redes.api import ProjetoScimat, _config
+from redes.loaders.base import DocumentoFonte
 
 
 def _docs():

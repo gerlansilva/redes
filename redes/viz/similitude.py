@@ -1,6 +1,6 @@
 """Figura da análise de similitude: grafo em halos por bloco, no estilo do IRaMuTeQ.
 
-Recebe o dicionário de `scimatpy.similitude.analisa_documentos` e devolve um SVG:
+Recebe o dicionário de `redes.similitude.analisa_documentos` e devolve um SVG:
 cada palavra é um círculo (área ~ frequência) com o rótulo ao lado; a árvore máxima
 é desenhada em linhas cheias e as arestas extras em tracejado cinza; cada bloco
 (comunidade de Louvain) ganha cor e uma mancha translúcida.

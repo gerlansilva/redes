@@ -1,4 +1,4 @@
-"""Leitura de um projeto .redes (SQLite) para o modelo do scimatpy.
+"""Leitura de um projeto .redes (SQLite) para o modelo do redes.
 
 Usa as mesmas consultas do Bibliomapa, inclusive a ordem de leitura: a ordem
 dos documentos e dos itens determina os identificadores dos nós e, portanto, o

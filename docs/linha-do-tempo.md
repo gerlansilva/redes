@@ -1,7 +1,7 @@
 # Linha do tempo e pontos de virada
 
-Código em `scimatpy/linha_do_tempo.py`, `scimatpy/viz/linha_do_tempo.py` e
-`scimatpy/pivos.py`. Aba **Linha do tempo** (modo avançado), rota
+Código em `redes/linha_do_tempo.py`, `redes/viz/linha_do_tempo.py` e
+`redes/pivos.py`. Aba **Linha do tempo** (modo avançado), rota
 `/api/linha-do-tempo`, e seções no relatório.
 
 ## Linha do tempo (estilo CiteSpace)

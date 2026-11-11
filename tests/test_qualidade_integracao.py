@@ -10,13 +10,13 @@ import unittest
 import urllib.request
 from pathlib import Path
 
-from scimatpy import api, metodo, qualidade, rotulos
-from scimatpy.api import cria_servidor
-from scimatpy.build import constroi
-from scimatpy.kb import ProjetoScimat
-from scimatpy.texto import rotulo_legivel
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.pipeline import executa_periodo
+from redes import api, metodo, qualidade, rotulos
+from redes.api import cria_servidor
+from redes.build import constroi
+from redes.kb import ProjetoScimat
+from redes.texto import rotulo_legivel
+from redes.loaders.base import DocumentoFonte
+from redes.pipeline import executa_periodo
 
 SERJ = Path("/home/claude/t/serj_auto.redes")
 RAIZ = Path(__file__).resolve().parents[1]
@@ -50,7 +50,7 @@ class LimiaresTest(unittest.TestCase):
     """O texto do método repete limiares que moram em `qualidade.avalia`."""
 
     def test_limiares_do_texto_iguais_aos_do_codigo(self):
-        fonte = (RAIZ / "scimatpy" / "qualidade.py").read_text(encoding="utf-8")
+        fonte = (RAIZ / "redes" / "qualidade.py").read_text(encoding="utf-8")
         lim = metodo.LIMIARES_QUALIDADE
         esperado = {
             "q_ruim": r"if q < ([0-9.]+):",
@@ -70,7 +70,7 @@ class LimiaresTest(unittest.TestCase):
         self.assertEqual(qualidade.GRUPO_GRANDE, lim["grupo_grande"])
 
     def test_texto_cita_constantes(self):
-        from scimatpy.pipeline import Configuracao
+        from redes.pipeline import Configuracao
         texto = metodo._texto_qualidade(Configuracao(unidade="Authors"))
         self.assertIn(f"{rotulos.MINIMO_DOCUMENTOS} documentos", texto)
         self.assertIn(f"menos de {qualidade.MINIMO_NOS} itens", texto)
@@ -207,8 +207,8 @@ class SerjTest(unittest.TestCase):
         self.assertIn("selo-q", indice)
 
     def test_diagramas_usam_rotulo_novo_e_padrao_se_mantem(self):
-        from scimatpy.viz.halo import halo_svg
-        from scimatpy.viz.strategic import diagrama_svg
+        from redes.viz.halo import halo_svg
+        from redes.viz.strategic import diagrama_svg
         with ProjetoScimat(SERJ) as kb:
             p = kb.periodos()[0]
             config = api._config({"unidade": "Words", "minimo_frequencia": 2})

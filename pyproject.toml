@@ -22,14 +22,14 @@ teste = ["playwright>=1.40"]
 ORCID = "https://orcid.org/0000-0002-9996-9983"
 
 [project.scripts]
-redes = "scimatpy.cli:main"
+redes = "redes.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["scimatpy*"]
+include = ["redes*"]
 
 [tool.setuptools.package-data]
-scimatpy = ["ui/*.html", "ui/*.css", "ui/*.js", "ui/*.svg", "assets/*"]
+redes = ["ui/*.html", "ui/*.css", "ui/*.js", "ui/*.svg", "assets/*"]

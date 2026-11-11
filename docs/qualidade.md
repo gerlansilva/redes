@@ -1,6 +1,6 @@
 # Qualidade do mapa e rótulos dos agrupamentos
 
-Código em `scimatpy/qualidade.py` e `scimatpy/rotulos.py`. Vale para cada
+Código em `redes/qualidade.py` e `redes/rotulos.py`. Vale para cada
 período de uma análise e aparece no cartão da tela, nas tabelas de
 agrupamentos e no relatório (seção "Qualidade do mapa" e "Rótulos dos
 agrupamentos" do método).

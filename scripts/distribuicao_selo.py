@@ -22,9 +22,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scimatpy import api, qualidade  # noqa: E402
-from scimatpy.kb import ProjetoScimat  # noqa: E402
-from scimatpy.pipeline import executa_periodo  # noqa: E402
+from redes import api, qualidade  # noqa: E402
+from redes.kb import ProjetoScimat  # noqa: E402
+from redes.pipeline import executa_periodo  # noqa: E402
 
 LIMITE_NOS = 1500        # redes maiores não entram na grade (lentas e fora do uso comum)
 

@@ -4,11 +4,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy import api, cli, metodo
-from scimatpy.build import constroi
-from scimatpy.kb import ProjetoScimat
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.pipeline import Configuracao, executa_periodo
+from redes import api, cli, metodo
+from redes.build import constroi
+from redes.kb import ProjetoScimat
+from redes.loaders.base import DocumentoFonte
+from redes.pipeline import Configuracao, executa_periodo
 
 T = Path("/home/claude/t")
 

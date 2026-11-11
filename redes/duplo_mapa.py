@@ -3,7 +3,7 @@
 À esquerda ficam as revistas que **publicam** os documentos do corpus (as ``N`` que
 mais citam) e à direita as revistas **citadas** por elas (as ``M`` mais citadas por
 esse conjunto). Cada revista pertence a uma área, inferida por palavras do **nome**
-(`scimatpy.areas`: aproximada, configurável e conferível na tabela devolvida). As
+(`redes.areas`: aproximada, configurável e conferível na tabela devolvida). As
 faixas entre as colunas somam as citações de uma área da esquerda para uma área da
 direita, só entre as revistas desenhadas.
 

@@ -258,20 +258,20 @@ A Scopus muda o nome de algumas colunas entre versões e entre exportações:
 
 ## O que o Redes faz hoje
 
-- `scimatpy/loaders/scopus.py`: detecta codificação e separador, lê o CSV,
+- `redes/loaders/scopus.py`: detecta codificação e separador, lê o CSV,
   remove IDs de autores e converte as referências.
-- `scimatpy/loaders/__init__.py`: detecta o formato pelo conteúdo, não pela
+- `redes/loaders/__init__.py`: detecta o formato pelo conteúdo, não pela
   extensão. Um `scopus.csv` não cai mais no leitor CSV do SciMAT; um arquivo
   Scopus salvo como `.txt` também é reconhecido.
-- `scimatpy/api.py`: corrige o formato genérico `csv` para Scopus quando o
+- `redes/api.py`: corrige o formato genérico `csv` para Scopus quando o
   conteúdo é Scopus e devolve `formato` no resultado da importação.
-- `scimatpy/ui/app.js`: envia o formato escolhido ou `auto`; o servidor decide
+- `redes/ui/app.js`: envia o formato escolhido ou `auto`; o servidor decide
   pelo conteúdo e a interface mostra o formato reconhecido.
-- `scimatpy/paises.py`: reconhece o país no fim das afiliações, no `Country` do
+- `redes/paises.py`: reconhece o país no fim das afiliações, no `Country` do
   OpenAlex e nos endereços do WoS/RIS, e grava o nome canônico em português.
-- `scimatpy/references.py`: separa referências por `);`, divide campos por
+- `redes/references.py`: separa referências por `);`, divide campos por
   vírgulas fora de parênteses e monta os seis campos fixos.
-- `scimatpy/build.py`: converte as referências, agrupa autores, fontes e
+- `redes/build.py`: converte as referências, agrupa autores, fontes e
   palavras e grava o projeto `.redes`.
 
 Testes que cobrem esses casos:

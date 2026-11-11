@@ -6,9 +6,9 @@ import math
 import unittest
 from pathlib import Path
 
-from scimatpy.viz.cluster import rede_de_agrupamentos_svg
-from scimatpy.viz.halo import geometria_legenda
-from scimatpy.viz.strategic import dados_diagrama
+from redes.viz.cluster import rede_de_agrupamentos_svg
+from redes.viz.halo import geometria_legenda
+from redes.viz.strategic import dados_diagrama
 
 
 class LegendaTest(unittest.TestCase):
@@ -77,10 +77,10 @@ class RedeAgrupamentosTest(unittest.TestCase):
 
     def _resultado(self):
         import tempfile
-        from scimatpy.build import constroi
-        from scimatpy.kb import ProjetoScimat
-        from scimatpy.loaders.base import DocumentoFonte
-        from scimatpy.pipeline import Configuracao, executa_periodo
+        from redes.build import constroi
+        from redes.kb import ProjetoScimat
+        from redes.loaders.base import DocumentoFonte
+        from redes.pipeline import Configuracao, executa_periodo
 
         documentos = [
             DocumentoFonte(titulo="A", autores=["Silva, A."], ano="2020",

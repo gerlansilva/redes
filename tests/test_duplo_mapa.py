@@ -15,11 +15,11 @@ from collections import Counter
 from pathlib import Path
 from unittest import mock
 
-from scimatpy import api, areas, build, cache_figuras, duplo_mapa, metodo, pipeline, relatorio_unico, report
-from scimatpy.api import ProjetoScimat, _config, cria_servidor
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.viz import duplo_mapa as viz
-from scimatpy.viz.linha_do_tempo import largura as largura_texto
+from redes import api, areas, build, cache_figuras, duplo_mapa, metodo, pipeline, relatorio_unico, report
+from redes.api import ProjetoScimat, _config, cria_servidor
+from redes.loaders.base import DocumentoFonte
+from redes.viz import duplo_mapa as viz
+from redes.viz.linha_do_tempo import largura as largura_texto
 
 UI = Path(api.__file__).with_name("ui")
 NS = "{http://www.w3.org/2000/svg}"
@@ -429,7 +429,7 @@ class RelatoriosTest(unittest.TestCase):
         self.assertNotIn("Duplo mapa de áreas das revistas.", html)
         self.assertIn("Dendrograma (agrupamento hierárquico)", html)
         cache_figuras.limpa()          # o cache de figuras é do processo; sem isso o mock não vale
-        with mock.patch("scimatpy.duplo_mapa.calcula_do_banco", side_effect=RuntimeError("x")):
+        with mock.patch("redes.duplo_mapa.calcula_do_banco", side_effect=RuntimeError("x")):
             html = self.unico()
         cache_figuras.limpa()          # o resultado vazio da falha não pode ficar para os outros testes
         self.assertNotIn(report.TITULO_SECAO_DUPLO + "</h3>", html)

@@ -10,10 +10,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from scimatpy import api, build, cache_figuras, measures, metodo, paralelo, pipeline, report
-from scimatpy.api import ProjetoScimat, _config
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.network import Rede
+from redes import api, build, cache_figuras, measures, metodo, paralelo, pipeline, report
+from redes.api import ProjetoScimat, _config
+from redes.loaders.base import DocumentoFonte
+from redes.network import Rede
 
 SERJ = Path("/home/claude/t/serj_auto.redes")
 
@@ -159,7 +159,7 @@ class ImpressaoTest(unittest.TestCase):
         self.assertNotEqual(cache_figuras.base(a), cache_figuras.base(d))
 
     def test_siglas_registradas_mudam_a_chave(self):
-        from scimatpy import texto
+        from redes import texto
         r = self.resultado()
         antes = cache_figuras.base(r)
         try:
@@ -170,7 +170,7 @@ class ImpressaoTest(unittest.TestCase):
         self.assertEqual(antes, cache_figuras.base(r))
 
     def test_halo_cacheado_igual_ao_direto(self):
-        from scimatpy.viz.halo import halo_svg
+        from redes.viz.halo import halo_svg
         r = self.resultado()
         novos = metodo.rotulos_do_resultado(self.kb, r)
         direto = halo_svg(r, f"Rede completa — {r.periodo}", rotulos=novos,
@@ -196,7 +196,7 @@ class ImpressaoTest(unittest.TestCase):
             self.assertEqual(falhas, cache_figuras.estatisticas()["falhas"])
 
     def test_constante_alterada_esvazia_o_cache_e_fora_do_escopo_nao_guarda(self):
-        from scimatpy import pivos
+        from redes import pivos
         cache_figuras.limpa()
         with cache_figuras.escopo():
             cache_figuras.obtem(("k",), lambda: "v")
@@ -210,7 +210,7 @@ class ImpressaoTest(unittest.TestCase):
         self.assertFalse(cache_figuras.tem(("fora",)))
 
     def test_rajadas_em_cache_devolvem_copia(self):
-        from scimatpy import rajadas
+        from redes import rajadas
         cache_figuras.limpa()
         with cache_figuras.escopo():
             um = rajadas.calcula(self.kb.conexao, "palavras", limite=5, minimo_documentos=1)

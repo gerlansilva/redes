@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy import bibliometria, build, edit, sugestoes
-from scimatpy.loaders.base import DocumentoFonte
+from redes import bibliometria, build, edit, sugestoes
+from redes.loaders.base import DocumentoFonte
 
 
 def _projeto():
@@ -111,7 +111,7 @@ class AgrupamentoTest(unittest.TestCase):
 
 class PluralELacunasTest(unittest.TestCase):
     def test_plural_analysis_analyses(self):
-        from scimatpy.text_utils import mesmo_termo
+        from redes.text_utils import mesmo_termo
         self.assertTrue(mesmo_termo("BIBLIOMETRIC-ANALYSIS", "BIBLIOMETRIC-ANALYSES"))
         self.assertTrue(mesmo_termo("ANALYSIS", "ANALYSES"))
         self.assertFalse(mesmo_termo("BOIS", "BOES"))  # radical curto demais
@@ -127,7 +127,7 @@ class PluralELacunasTest(unittest.TestCase):
 
 class RelatorioCompletoTest(unittest.TestCase):
     def test_gera_secoes_e_explica_o_que_falta(self):
-        from scimatpy import api
+        from redes import api
         docs = [DocumentoFonte(
             titulo=f"Doc {i}", ano=str(2015 + i % 6), periodico="R",
             autores=[f"Autor {i % 5} A.", f"Autor {i % 3 + 5} B.", "Autor Z Z."],

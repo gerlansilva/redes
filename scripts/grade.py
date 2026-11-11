@@ -11,11 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import collections
 
-from scimatpy.kb import ProjetoScimat
-from scimatpy.pipeline import Configuracao, executa_periodo
+from redes.kb import ProjetoScimat
+from redes.pipeline import Configuracao, executa_periodo
 
 RAIZ = Path("/tmp/demo/celii")
-from scimatpy.grade import grade  # noqa: E402
+from redes.grade import grade  # noqa: E402
 
 
 def le_referencia(arquivo: Path):

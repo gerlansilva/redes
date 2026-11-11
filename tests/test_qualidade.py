@@ -11,9 +11,9 @@ from unittest import mock
 
 import networkx as nx
 
-from scimatpy import qualidade
-from scimatpy.network import Rede
-from scimatpy.pipeline import Grupo
+from redes import qualidade
+from redes.network import Rede
+from redes.pipeline import Grupo
 
 SERJ = Path("/home/claude/t/serj_auto.redes")
 
@@ -398,9 +398,9 @@ class TabelaTest(unittest.TestCase):
 class ProjetoRealTest(unittest.TestCase):
 
     def test_serj_auto(self):
-        from scimatpy import api
-        from scimatpy.kb import ProjetoScimat
-        from scimatpy.pipeline import executa_periodo
+        from redes import api
+        from redes.kb import ProjetoScimat
+        from redes.pipeline import executa_periodo
         with ProjetoScimat(SERJ) as kb:
             periodo = kb.periodos()[0]
             cfg = api._config({"unidade": "References", "matriz": "CoOccurrence",

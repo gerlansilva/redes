@@ -1,6 +1,6 @@
 """Processo trabalhador da geração paralela (ver `paralelo.py`).
 
-Uso interno: ``python -m scimatpy.trabalhador``. Lê da entrada padrão linhas
+Uso interno: ``python -m redes.trabalhador``. Lê da entrada padrão linhas
 "ENTRADA.pkl<TAB>SAIDA.pkl"; cada entrada traz a análise (configuração e
 resultados por período) já calculada pelo processo principal. Produz as figuras
 e os cálculos no cache compartilhado, grava as entradas novas em SAIDA.pkl e

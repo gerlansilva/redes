@@ -1,7 +1,7 @@
 # Redes
 
 **Redes** é a ferramenta de mapeamento e análise da produção científica. O
-pacote Python que a executa chama-se `scimatpy` internamente: ele reimplementa
+pacote Python que a executa chama-se `redes` internamente: ele reimplementa
 o fluxo do SciMAT, com as mesmas decisões algorítmicas do programa original e
 figuras no estilo do atlas
 [relimeARS](https://github.com/gerlansilva/relimeARS) — halos por agrupamento,
@@ -87,8 +87,8 @@ python3 -m venv ~/venv_redes
 ~/venv_redes/bin/redes --help                            # analisa, constroi, grade, web
 ```
 
-`redes` é o ponto de entrada do pacote (`scimatpy` continua valendo como
-sinônimo, e `python3 -m scimatpy web` também). A instalação inclui a interface
+`redes` é o ponto de entrada do pacote (`redes` continua valendo como
+sinônimo, e `python3 -m redes web` também). A instalação inclui a interface
 (`ui/`) e os recursos (`assets/`); foi conferida num ambiente virtual limpo, com
 `pip install -e .` e com instalação comum, abrindo a interface e baixando
 `/static/app.js`. Para os testes de interface: `pip install -e ".[teste]"` e
@@ -97,11 +97,11 @@ sinônimo, e `python3 -m scimatpy web` também). A instalação inclui a interfa
 ### Interface web
 
 ```bash
-python3 -m scimatpy web
+python3 -m redes web
 ```
 
 Abre `http://127.0.0.1:8765` no navegador, com os projetos em
-`~/scimatpy-projetos` (mude com `--projetos`). A tela permite abrir um `.redes`
+`~/redes-projetos` (mude com `--projetos`). A tela permite abrir um `.redes`
 pelo caminho, importar um corpus novo e pré-visualizar qualquer configuração.
 A grade completa roda em segundo plano, com progresso e cancelamento, e o TSV
 fica disponível em "Baixar grade". Nada sai da máquina: o servidor escuta
@@ -260,12 +260,12 @@ diagrama estratégico por mapeador e medida. Não há relatório em LaTeX.
 ### Linha de comando
 
 ```bash
-python3 -m scimatpy analisa dados.redes \
+python3 -m redes analisa dados.redes \
     --unidade Words --min-freq 1 \
     --halo figuras/halo-{periodo}.svg \
     --estrategico figuras/estrategico-{periodo}.svg
 
-python3 -m scimatpy grade dados.redes --saida analises.tsv
+python3 -m redes grade dados.redes --saida analises.tsv
 ```
 
 Sem `--saida`, o TSV vai para a saída padrão. Cada linha traz documentos,
@@ -286,12 +286,12 @@ Arquivos `.redes` são o padrão desta ferramenta. Projetos antigos `.scimat`
 continuam abrindo, sem conversão obrigatória.
 
 ```bash
-python3 -m scimatpy constroi corpus.csv \
+python3 -m redes constroi corpus.csv \
     --formato csv --saida dados.redes --periodos 2008-2014,2015-2020
 
-python3 -m scimatpy constroi export.ris --formato ris --saida dados.redes
-python3 -m scimatpy constroi referencias.bib --formato bibtex --saida dados.redes
-python3 -m scimatpy constroi openalex.csv --formato openalex \
+python3 -m redes constroi export.ris --formato ris --saida dados.redes
+python3 -m redes constroi referencias.bib --formato bibtex --saida dados.redes
+python3 -m redes constroi openalex.csv --formato openalex \
     --saida dados.redes --sinonimos sinonimos.txt
 ```
 
@@ -354,7 +354,7 @@ período usa travessão en dash (`2008–2014`).
 ## Estrutura
 
 ```
-scimatpy/
+redes/
   dataset.py     documentos, itens, citações, filtros
   kb.py          leitura do projeto .redes (SQLite)
   build.py       importação e gravação do .redes nativo
@@ -430,9 +430,9 @@ O relatório completo tem dois formatos. O **arquivo único** gera só o
 `relatorio-completo.html` (antes regenerava a pasta inteira, mais de mil
 arquivos, e descartava). Em bases com 120 documentos ou mais as figuras e os
 cálculos pesados de cada análise vão para processos trabalhadores
-(`scimatpy/paralelo.py`, até 4, um por núcleo), enquanto o principal analisa a
+(`redes/paralelo.py`, até 4, um por núcleo), enquanto o principal analisa a
 próxima; os desenhos e cálculos ficam num cache de conteúdo
-(`scimatpy/cache_figuras.py`) compartilhado entre o relatório em pastas, o
+(`redes/cache_figuras.py`) compartilhado entre o relatório em pastas, o
 arquivo único e uma repetição da geração. A saída é idêntica à do processo
 único sem cache (os testes comparam o HTML); qualquer falha de um trabalhador
 só faz o principal calcular aquela análise sozinho. Interruptores:
@@ -469,7 +469,7 @@ Autor – País – IES.
 ## Teste rápido dos carregadores
 
 ```bash
-python3 -m scimatpy constroi /tmp/demo/teste.bib --formato bibtex \
+python3 -m redes constroi /tmp/demo/teste.bib --formato bibtex \
     --saida /tmp/demo/teste.redes --periodos 2015-2026
-python3 -m scimatpy analisa /tmp/demo/teste.redes --unidade Words --min-freq 1
+python3 -m redes analisa /tmp/demo/teste.redes --unidade Words --min-freq 1
 ```

@@ -2,7 +2,7 @@
 """Verificação de paridade em lote contra todos os relatórios gerados.
 
 Percorre as combinações projeto × unidade × período dos relatórios do CELII e
-confere cada GraphML com o scimatpy.
+confere cada GraphML com o redes.
 """
 
 from __future__ import annotations

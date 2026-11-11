@@ -8,12 +8,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy.api import importa
-from scimatpy.references import converte_referencia
-from scimatpy.loaders import (bibtex, csv as csv_loader, detecta_formato,
+from redes.api import importa
+from redes.references import converte_referencia
+from redes.loaders import (bibtex, csv as csv_loader, detecta_formato,
                               openalex, ris, scopus)
-from scimatpy.paises import pais_da_afiliacao
-from scimatpy.projeto import e_projeto
+from redes.paises import pais_da_afiliacao
+from redes.projeto import e_projeto
 
 
 class ReferenciaTest(unittest.TestCase):
@@ -255,7 +255,7 @@ ER  -
                             "scopus", "2020-2021", "teste")
         self.assertEqual("openalex", resultado["formato"])
         self.assertEqual(1, resultado["resumo"]["documentos"])
-        with __import__("scimatpy.kb", fromlist=["ProjetoScimat"]).ProjetoScimat(
+        with __import__("redes.kb", fromlist=["ProjetoScimat"]).ProjetoScimat(
                 resultado["projeto"]["caminho"]) as projeto:
             autores = projeto.conexao.execute(
                 "SELECT authors FROM Document").fetchone()[0]

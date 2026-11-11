@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compara o scimatpy com as saídas do Bibliomapa/SciMAT.
+"""Compara o redes com as saídas do Bibliomapa/SciMAT.
 
 Lê o GraphML exportado pelo relatório e confere, para o mesmo projeto e a mesma
 configuração: conjunto de nós e rótulos, arestas, partição em agrupamentos,
@@ -16,8 +16,8 @@ import networkx as nx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scimatpy.kb import ProjetoScimat
-from scimatpy.pipeline import Configuracao, executa_periodo
+from redes.kb import ProjetoScimat
+from redes.pipeline import Configuracao, executa_periodo
 
 
 def carrega_graphml(caminho: Path):
@@ -82,7 +82,7 @@ def compara(projeto: Path, unidade: str, periodo_indice: int, graphml: Path,
         print(f"  FALHA agrupamentos: {len(divergentes)} divergem de {len(chaves)}")
         for chave in divergentes[:4]:
             print(f"        {chave!r}: ref {len(grupos_ref.get(chave, set()))}, "
-                  f"scimatpy {len(meus_grupos.get(chave, set()))}")
+                  f"redes {len(meus_grupos.get(chave, set()))}")
     else:
         print(f"  ok   agrupamentos: {len(chaves)}")
 

@@ -55,8 +55,8 @@ período.
 ## Uso
 
 ```python
-from scimatpy import dendrograma
-from scimatpy.viz.dendrograma import svg
+from redes import dendrograma
+from redes.viz.dendrograma import svg
 
 res = dendrograma.constroi(resultado.rede, ligacao="media",
                            nomes={no: resultado.rotulo(no) for no in resultado.rede.nos},

@@ -3,9 +3,9 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from scimatpy import dendrograma as dg
-from scimatpy.network import Rede
-from scimatpy.viz.dendrograma import svg
+from redes import dendrograma as dg
+from redes.network import Rede
+from redes.viz.dendrograma import svg
 
 SERJ = Path("/home/claude/t/serj.redes")
 
@@ -171,8 +171,8 @@ class SvgTest(unittest.TestCase):
 @unittest.skipUnless(SERJ.exists(), "projeto de exemplo ausente")
 class RedeRealTest(unittest.TestCase):
     def test_serj_palavras(self):
-        from scimatpy.kb import ProjetoScimat
-        from scimatpy.pipeline import Configuracao, executa_periodo
+        from redes.kb import ProjetoScimat
+        from redes.pipeline import Configuracao, executa_periodo
 
         with ProjetoScimat(SERJ) as kb:
             periodo = kb.periodos()[0]

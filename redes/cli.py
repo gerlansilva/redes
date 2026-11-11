@@ -1,4 +1,4 @@
-"""Linha de comando do scimatpy."""
+"""Linha de comando do redes."""
 
 from __future__ import annotations
 
@@ -277,7 +277,7 @@ def monta_parser() -> argparse.ArgumentParser:
 
     web = sub.add_parser("web", help="abre a interface web local")
     web.add_argument("--porta", type=int, default=8765)
-    web.add_argument("--projetos", help="diretório dos projetos (padrão: ~/scimatpy-projetos)")
+    web.add_argument("--projetos", help="diretório dos projetos (padrão: ~/redes-projetos)")
     web.add_argument("--nao-abrir", action="store_true",
                      help="não abre o navegador automaticamente")
     web.set_defaults(funcao=comando_web)

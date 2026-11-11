@@ -12,10 +12,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scimatpy.kb import ProjetoScimat  # noqa: E402
-from scimatpy.pipeline import Configuracao, executa_periodo  # noqa: E402
-from scimatpy.viz.halo import halo_svg  # noqa: E402
-from scimatpy.viz.mapa import colaboracao  # noqa: E402
+from redes.kb import ProjetoScimat  # noqa: E402
+from redes.pipeline import Configuracao, executa_periodo  # noqa: E402
+from redes.viz.halo import halo_svg  # noqa: E402
+from redes.viz.mapa import colaboracao  # noqa: E402
 
 
 def main(argv: list[str]) -> int:

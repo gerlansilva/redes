@@ -18,10 +18,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scimatpy.build import Construtor
-from scimatpy.loaders import detecta_formato
-from scimatpy.loaders import openalex, scopus
-from scimatpy.references import SEPARADOR_REFERENCIA, converte_referencia
+from redes.build import Construtor
+from redes.loaders import detecta_formato
+from redes.loaders import openalex, scopus
+from redes.references import SEPARADOR_REFERENCIA, converte_referencia
 
 CAMPOS = 6
 

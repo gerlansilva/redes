@@ -3,9 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy import build, rajadas, termos
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.viz import descritiva
+from redes import build, rajadas, termos
+from redes.loaders.base import DocumentoFonte
+from redes.viz import descritiva
 
 
 class KleinbergTest(unittest.TestCase):
@@ -104,7 +104,7 @@ class RajadasBancoTest(unittest.TestCase):
 
 class RelatorioTemBibliometriaTest(unittest.TestCase):
     def test_pagina_gerada(self):
-        from scimatpy import api
+        from redes import api
         base = Path("/home/claude/t/eecera59.redes")
         if not base.exists():
             self.skipTest("projeto de exemplo ausente")

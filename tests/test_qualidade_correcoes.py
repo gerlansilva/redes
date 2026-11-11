@@ -14,15 +14,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from scimatpy import api, metodo, qualidade, rotulos
-from scimatpy.kb import ProjetoScimat
-from scimatpy.texto import rotulo_legivel
-from scimatpy.network import Rede
-from scimatpy.pipeline import Configuracao, Grupo, executa_periodo
+from redes import api, metodo, qualidade, rotulos
+from redes.kb import ProjetoScimat
+from redes.texto import rotulo_legivel
+from redes.network import Rede
+from redes.pipeline import Configuracao, Grupo, executa_periodo
 
 SERJ = Path("/home/claude/t/serj_auto.redes")
 RAIZ = Path(__file__).resolve().parents[1]
-UI = RAIZ / "scimatpy" / "ui"
+UI = RAIZ / "redes" / "ui"
 
 
 def _rede(n, arestas):
@@ -67,7 +67,7 @@ class TextoMetodoTest(unittest.TestCase):
         self.assertIn("mais componentes do que a metade dos itens", texto)
         self.assertIn("menos de 2 itens", texto)
         # o código testa exatamente isso
-        fonte = (RAIZ / "scimatpy" / "qualidade.py").read_text(encoding="utf-8")
+        fonte = (RAIZ / "redes" / "qualidade.py").read_text(encoding="utf-8")
         self.assertIn("comp > n_nos / 2", fonte)
 
     def test_limite_de_nos_vem_da_constante(self):
@@ -404,7 +404,7 @@ class RotuloNovoPrincipalTest(unittest.TestCase):
         self.assertEqual((sem.exibicao, None, False), (p2, s2, ind))
 
     def test_rede_de_um_agrupamento_figura(self):
-        from scimatpy.viz.cluster import rede_agrupamento_svg
+        from redes.viz.cluster import rede_agrupamento_svg
         indice, g = self._indice_com_novo()
         titulo = f"{self.r.periodo} — {g.exibicao}"
         padrao = rede_agrupamento_svg(self.r, g, titulo)
@@ -422,7 +422,7 @@ class RotuloNovoPrincipalTest(unittest.TestCase):
                          rede_agrupamento_svg(self.r, sem, t2, rotulos=self.novos))
 
     def test_rede_de_agrupamentos_figura(self):
-        from scimatpy.viz.cluster import rede_de_agrupamentos_svg
+        from redes.viz.cluster import rede_de_agrupamentos_svg
         padrao = rede_de_agrupamentos_svg(self.r, "t")
         self.assertEqual(padrao, rede_de_agrupamentos_svg(self.r, "t", rotulos=None))
         com = rede_de_agrupamentos_svg(self.r, "t", rotulos=self.novos)
@@ -487,7 +487,7 @@ class ChaveDoAgrupamentoTest(unittest.TestCase):
                                api._config({"unidade": "Words", "minimo_frequencia": 2}))
 
     def test_nomes_por_rotulo_chaveia_pelo_indice(self):
-        from scimatpy.viz.halo import nomes_por_rotulo
+        from redes.viz.halo import nomes_por_rotulo
         r = self._resultado()
         for g in r.grupos:
             g.rotulo = "IGUAL"
@@ -496,7 +496,7 @@ class ChaveDoAgrupamentoTest(unittest.TestCase):
         self.assertEqual({0: "Alfa · Beta", 1: "Gama · Delta"}, nomes)
 
     def test_legenda_estrategica_com_rotulos_atuais_repetidos(self):
-        from scimatpy.viz.strategic import diagrama_svg
+        from redes.viz.strategic import diagrama_svg
         r = self._resultado()
         self.assertGreaterEqual(len(r.grupos), 2)
         for g in r.grupos:
@@ -508,7 +508,7 @@ class ChaveDoAgrupamentoTest(unittest.TestCase):
         self.assertIn("Gama · Delta", svg)
 
     def test_halo_rotulo_sem_grupo_repetido_nao_vaza(self):
-        from scimatpy.viz.halo import halo_svg, layout_halo
+        from redes.viz.halo import halo_svg, layout_halo
         r = self._resultado()
         self.assertGreaterEqual(len(r.grupos), 2)
         for g in r.grupos[:2]:
@@ -524,7 +524,7 @@ class ChaveDoAgrupamentoTest(unittest.TestCase):
         self.assertNotIn("Gama · delta", svg)
 
     def test_halo_um_agrupamento_usa_o_novo(self):
-        from scimatpy.viz.halo import halo_svg, layout_halo
+        from redes.viz.halo import halo_svg, layout_halo
         r = self._resultado()
         novos = {0: {"termos": ["alfa", "beta"], "rotulo": "alfa · beta"}}
         dados = layout_halo(r, rotulos=novos)

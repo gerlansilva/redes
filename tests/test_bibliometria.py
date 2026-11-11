@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy import bibliometria, build
-from scimatpy.loaders.base import DocumentoFonte
+from redes import bibliometria, build
+from redes.loaders.base import DocumentoFonte
 
 
 def _corpus():
@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
 class CoresDosGruposTest(unittest.TestCase):
     def test_nenhum_grupo_fica_cinza(self):
-        from scimatpy.viz.halo import CINZA, cor_do_grupo
+        from redes.viz.halo import CINZA, cor_do_grupo
         cores = [cor_do_grupo(i) for i in range(60)]
         self.assertNotIn(CINZA, cores)
         self.assertEqual(len(set(cores)), 60)
@@ -61,7 +61,7 @@ class CoresDosGruposTest(unittest.TestCase):
 
 class RelatorioSomenteHtmlTest(unittest.TestCase):
     def test_latex_recusado(self):
-        from scimatpy import api, report
+        from redes import api, report
         with self.assertRaises(api.ErroApi):
             api.gera_relatorio({"projeto": __file__, "formato": "latex"})
         self.assertFalse(hasattr(report, "gera_latex"))

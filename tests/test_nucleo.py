@@ -5,13 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy import schema
-from scimatpy.build import constroi
-from scimatpy.grade import grade
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.pipeline import Configuracao
-from scimatpy.mappers import MAPEADORES
-from scimatpy.kb import ProjetoScimat
+from redes import schema
+from redes.build import constroi
+from redes.grade import grade
+from redes.loaders.base import DocumentoFonte
+from redes.pipeline import Configuracao
+from redes.mappers import MAPEADORES
+from redes.kb import ProjetoScimat
 
 
 def _projeto(destino: Path) -> Path:
@@ -163,7 +163,7 @@ class AnaliseTest(unittest.TestCase):
         _projeto(caminho)
         with ProjetoScimat(caminho) as kb:
             periodo = kb.periodos()[0]
-            from scimatpy.pipeline import executa_periodo
+            from redes.pipeline import executa_periodo
             sem_corte = executa_periodo(kb, periodo.id, periodo.nome, Configuracao(
                 algoritmo="AverageLink", minimo_frequencia=1, corte=0.0))
             com_corte = executa_periodo(kb, periodo.id, periodo.nome, Configuracao(
@@ -187,7 +187,7 @@ class AnaliseTest(unittest.TestCase):
         _projeto(caminho)
         with ProjetoScimat(caminho) as kb:
             periodo = kb.periodos()[0]
-            from scimatpy.pipeline import executa_periodo
+            from redes.pipeline import executa_periodo
             resultado = executa_periodo(kb, periodo.id, periodo.nome, Configuracao(
                 minimo_frequencia=1, mapeadores=("kcore",), k_core=2))
         self.assertTrue(resultado.grupos)

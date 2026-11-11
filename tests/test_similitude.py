@@ -23,12 +23,12 @@ from unittest import mock
 import networkx as nx
 import numpy as np
 
-from scimatpy import api, build, cache_figuras, metodo, pipeline, relatorio_unico, report
-from scimatpy import similitude as S
-from scimatpy.api import ProjetoScimat, _config, cria_servidor
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.viz import similitude as V
-from scimatpy.viz.linha_do_tempo import largura as largura_base
+from redes import api, build, cache_figuras, metodo, pipeline, relatorio_unico, report
+from redes import similitude as S
+from redes.api import ProjetoScimat, _config, cria_servidor
+from redes.loaders.base import DocumentoFonte
+from redes.viz import similitude as V
+from redes.viz.linha_do_tempo import largura as largura_base
 
 DADOS = Path(__file__).with_name("dados")
 UI = Path(api.__file__).with_name("ui")
@@ -867,7 +867,7 @@ class RelatoriosTest(unittest.TestCase):
         self.assertNotIn("Similitude dos resumos.", html)
         self.assertIn("Dendrograma (agrupamento hierárquico)", html)
         cache_figuras.limpa()
-        with mock.patch("scimatpy.similitude.analisa", side_effect=RuntimeError("x")):
+        with mock.patch("redes.similitude.analisa", side_effect=RuntimeError("x")):
             html = self.unico()
         cache_figuras.limpa()
         self.assertNotIn(report.TITULO_SECAO_SIMILITUDE + "</h3>", html)

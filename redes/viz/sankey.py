@@ -1,6 +1,6 @@
 """Diagrama de Sankey em SVG próprio (sem bibliotecas), em colunas.
 
-Recebe o dicionário de ``scimatpy.fluxos.calcula``: nós por coluna e ligações
+Recebe o dicionário de ``redes.fluxos.calcula``: nós por coluna e ligações
 com valor em documentos. A ordem dos nós em cada coluna é refinada por
 baricentros, mantendo a melhor de várias varreduras (menos cruzamentos de
 ligações). Os nós levam a cor do país que mais pesa neles.

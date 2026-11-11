@@ -5,10 +5,10 @@ from __future__ import annotations
 import math
 import unittest
 
-from scimatpy import mappers, measures, similarity
-from scimatpy.clustering import centros_simples, ligacao_simples
-from scimatpy.dataset import Dataset
-from scimatpy.network import Rede
+from redes import mappers, measures, similarity
+from redes.clustering import centros_simples, ligacao_simples
+from redes.dataset import Dataset
+from redes.network import Rede
 
 
 def _rede() -> Rede:

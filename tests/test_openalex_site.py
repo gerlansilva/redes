@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scimatpy.loaders import detecta_formato, le_corpus
+from redes.loaders import detecta_formato, le_corpus
 
 CSV = (
     "Title,Author,Year,Citation count,Open access,Author IDs,Country,Abstract\n"

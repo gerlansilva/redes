@@ -456,7 +456,7 @@ function prepararApresentacao() {
 }
 
 function ultimoProjeto() {
-  try { return localStorage.getItem("scimatpy.projeto"); } catch (_) { return null; }
+  try { return localStorage.getItem("redes.projeto"); } catch (_) { return null; }
 }
 
 function atualizarContinuar(projetos) {
@@ -569,7 +569,7 @@ function aplicarProjeto(projeto) {
     aba.setAttribute("aria-selected", ativa ? "true" : "false");
   });
   redefinirFrequencia();
-  localStorage.setItem("scimatpy.projeto", projeto.caminho);
+  localStorage.setItem("redes.projeto", projeto.caminho);
 
   $("projetoNome").textContent = projeto.nome;
   $("projetoArquivo").textContent = "· " + nomeArquivo(projeto.caminho);
@@ -1361,7 +1361,7 @@ function caixaAlta(texto) {
   return letras.length > 0 && !letras.some((c) => c !== c.toUpperCase());
 }
 
-// Mesma regra de `scimatpy/texto.py` (`termo_legivel`): só muda o termo inteiramente em
+// Mesma regra de `redes/texto.py` (`termo_legivel`): só muda o termo inteiramente em
 // maiúsculas; "STATISTICAL-REASONING" vira "Statistical reasoning", o hífen entre trechos
 // de 2+ letras vira espaço ("E-LEARNING" fica "E-learning") e as siglas conhecidas ficam.
 function termoLegivel(texto) {

@@ -7,9 +7,9 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from scimatpy import rotulos
-from scimatpy.dataset import Dataset
-from scimatpy.pipeline import Grupo
+from redes import rotulos
+from redes.dataset import Dataset
+from redes.pipeline import Grupo
 
 SERJ = Path("/home/claude/t/serj_auto.redes")
 
@@ -209,9 +209,9 @@ class RotulosTest(unittest.TestCase):
 class ProjetoRealTest(unittest.TestCase):
 
     def test_serj_auto(self):
-        from scimatpy import api
-        from scimatpy.kb import ProjetoScimat
-        from scimatpy.pipeline import executa_periodo
+        from redes import api
+        from redes.kb import ProjetoScimat
+        from redes.pipeline import executa_periodo
         with ProjetoScimat(SERJ) as kb:
             periodo = kb.periodos()[-1]
             for unidade in ("Words", "References"):

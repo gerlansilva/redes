@@ -1,4 +1,4 @@
-"""Servidor local da interface web do scimatpy.
+"""Servidor local da interface web do redes.
 
 Sem dependências além da biblioteca padrão: o navegador só envia parâmetros e
 recebe JSON; toda a análise roda no processo Python, com o mesmo núcleo do CLI.
@@ -61,7 +61,7 @@ QUADRANTES = {
     "basico": "Temas básicos e transversais",
 }
 
-CACHE = Path(tempfile.mkdtemp(prefix="scimatpy-web-"))
+CACHE = Path(tempfile.mkdtemp(prefix="redes-web-"))
 atexit.register(shutil.rmtree, CACHE, ignore_errors=True)
 ANALISES: "OrderedDict[str, dict]" = OrderedDict()
 FIGURAS: dict[str, Path] = {}
@@ -1895,7 +1895,7 @@ class ServidorWeb(ThreadingHTTPServer):
 
 class Manipulador(BaseHTTPRequestHandler):
     server: ServidorWeb
-    server_version = "scimatpy"
+    server_version = "redes"
 
     def log_message(self, formato: str, *args) -> None:  # silêncio no terminal
         return
@@ -2256,7 +2256,7 @@ class Manipulador(BaseHTTPRequestHandler):
 def cria_servidor(porta: int = 8765, workspace: str | Path | None = None,
                   host: str = "127.0.0.1") -> ServidorWeb:
     raiz = Path(workspace).expanduser().resolve() if workspace else (
-        Path.home() / "scimatpy-projetos")
+        Path.home() / "redes-projetos")
     raiz.mkdir(parents=True, exist_ok=True)
     return ServidorWeb((host, porta), raiz)
 
@@ -2275,7 +2275,7 @@ def serve(porta: int = 8765, workspace: str | Path | None = None,
         raise SystemExit("não foi possível abrir uma porta local para a interface")
 
     endereco = f"http://127.0.0.1:{servidor.server_address[1]}/"
-    print(f"scimatpy web em {endereco}")
+    print(f"redes web em {endereco}")
     print(f"projetos em {servidor.workspace}")
     print("Ctrl+C para encerrar")
     if abrir:

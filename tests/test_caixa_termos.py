@@ -1,6 +1,6 @@
 """Caixa dos termos do SciMAT: STATISTICAL-REASONING sai como "Statistical reasoning".
 
-Só a exibição muda (`scimatpy.texto.termo_legivel`): o dado guardado, os ids e as
+Só a exibição muda (`redes.texto.termo_legivel`): o dado guardado, os ids e as
 chaves de agrupamento ficam como o importador os gravou.
 """
 
@@ -15,13 +15,13 @@ import threading
 import unittest
 from pathlib import Path
 
-from scimatpy import api, exports, report, texto
-from scimatpy.build import constroi
-from scimatpy.kb import ProjetoScimat
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.pipeline import Configuracao, executa_periodo
-from scimatpy.viz.halo import halo_svg, layout_halo
-from scimatpy.viz.strategic import diagrama_svg
+from redes import api, exports, report, texto
+from redes.build import constroi
+from redes.kb import ProjetoScimat
+from redes.loaders.base import DocumentoFonte
+from redes.pipeline import Configuracao, executa_periodo
+from redes.viz.halo import halo_svg, layout_halo
+from redes.viz.strategic import diagrama_svg
 
 BRUTO = re.compile(r"\b[A-Z]{3,}-[A-Z]{3,}\b")
 
@@ -195,7 +195,7 @@ class ExibicaoNoProjetoTest(unittest.TestCase):
         self.assertIn("SPSS", texto.siglas())
 
     def test_nuvem_e_bibliometria(self):
-        from scimatpy import bibliometria, rajadas, termos
+        from redes import bibliometria, rajadas, termos
         con = sqlite3.connect(self.caminho)
         try:
             nuvem = termos.nuvem_dados(con, "palavras")

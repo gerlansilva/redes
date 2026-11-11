@@ -7,10 +7,10 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from scimatpy import api, build, linha_do_tempo
-from scimatpy.kb import ProjetoScimat
-from scimatpy.loaders.base import DocumentoFonte
-from scimatpy.viz import linha_do_tempo as viz
+from redes import api, build, linha_do_tempo
+from redes.kb import ProjetoScimat
+from redes.loaders.base import DocumentoFonte
+from redes.viz import linha_do_tempo as viz
 
 SERJ = Path("/home/claude/t/serj_auto.redes")
 NS = "{http://www.w3.org/2000/svg}"
@@ -243,7 +243,7 @@ class RajadaEAtividadeTest(unittest.TestCase):
         raj = [n_ for n_ in _nos(d) if n_["rajada"]]
         self.assertTrue(raj)
         self.assertIn("SURTO", {r["rotulo"].upper() for r in raj})
-        from scimatpy import rajadas
+        from redes import rajadas
         pasta, destino = _projeto(docs)
         try:
             with ProjetoScimat(destino) as kb:
@@ -251,7 +251,7 @@ class RajadaEAtividadeTest(unittest.TestCase):
         finally:
             pasta.cleanup()
         permitidos = {r["termo"] for r in top if r["documentos"] >= 3}
-        from scimatpy.text_utils import chave
+        from redes.text_utils import chave
         self.assertTrue({chave(r["rotulo"]) for r in raj} <= {chave(p) for p in permitidos})
         self.assertLessEqual(len(raj), 10)
 

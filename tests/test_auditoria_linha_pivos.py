@@ -14,10 +14,10 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest import mock
 
-from scimatpy import api, build, linha_do_tempo, metodo, pipeline, pivos, relatorio_unico, report
-from scimatpy.api import ErroApi, ProjetoScimat, _config, cria_servidor
-from scimatpy.pipeline import Configuracao
-from scimatpy.viz import linha_do_tempo as viz
+from redes import api, build, linha_do_tempo, metodo, pipeline, pivos, relatorio_unico, report
+from redes.api import ErroApi, ProjetoScimat, _config, cria_servidor
+from redes.pipeline import Configuracao
+from redes.viz import linha_do_tempo as viz
 
 import test_linha_do_tempo as tlt
 import test_linha_pivos_integracao as tlp
@@ -126,7 +126,7 @@ class RelatorioTest(unittest.TestCase):
 
 class PivosTest(unittest.TestCase):
     def test_rede_acima_do_limite_diz_nao_calculado(self):
-        from scimatpy.network import Rede
+        from redes.network import Rede
         n = pivos.LIMITE_NOS + 1
         rede = Rede(range(n))
         rede.adiciona_aresta(0, 1, 1.0)
@@ -144,7 +144,7 @@ class PivosTest(unittest.TestCase):
         self.assertIsNone(pivos.pontos_de_virada(tpv._resultado())["nao_calculado"])
 
     def test_plural_de_nos_nos_avisos(self):
-        from scimatpy.network import Rede
+        from redes.network import Rede
         self.assertEqual("1 nó", pivos._nos(1))
         self.assertEqual("5 nós", pivos._nos(5))
         rede = Rede([0])
@@ -222,7 +222,7 @@ class ApiTest(unittest.TestCase):
         self.assertIn('const UNIDADES_LINHA_DO_TEMPO = ["Words", "Authors", "References"];', js)
 
     def test_falha_nos_pivos_vira_aviso_visivel(self):
-        with mock.patch("scimatpy.api.modulo_pivos.pontos_de_virada",
+        with mock.patch("redes.api.modulo_pivos.pontos_de_virada",
                         side_effect=RuntimeError("quebrou")):
             st, d = self.pede("/api/analisa", self.pedido())
         self.assertEqual(200, st)
@@ -306,7 +306,7 @@ class LinhaDoTempoDadosTest(unittest.TestCase):
         self.assertEqual(1, texto.count('stroke="#9AA3B2"') - texto.count('stroke="#9AA3B2" stroke-opacity=".7"'))
 
     def test_arestas_nan_nao_entram_nos_dados(self):
-        from scimatpy.network import Rede
+        from redes.network import Rede
         self.assertFalse(linha_do_tempo._finito(float("nan")))
         self.assertFalse(linha_do_tempo._finito(float("inf")))
         self.assertFalse(linha_do_tempo._finito(None))

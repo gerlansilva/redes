@@ -1,6 +1,6 @@
 # Mapa de densidade
 
-Código em `scimatpy/viz/densidade.py`. Aba **Densidade** (modo avançado), rota
+Código em `redes/viz/densidade.py`. Aba **Densidade** (modo avançado), rota
 `/api/densidade`, e seção no relatório. SVG próprio, sem JavaScript; mesmos
 dados dão sempre o mesmo texto.
 

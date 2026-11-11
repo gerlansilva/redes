@@ -1,4 +1,4 @@
-"""Exportações do scimatpy.
+"""Exportações do redes.
 
 Cobre o que o fork oferece em `scimat.api.export` e um pouco mais:
 
@@ -179,7 +179,7 @@ def indices_tsv(resultado) -> str:
 def converte_png(origem: Path, destino: Path, escala: float = 2.0) -> Path:
     """Converte um SVG em PNG usando o primeiro rasterizador disponível.
 
-    Levanta ``RuntimeError`` quando não há nenhum. O scimatpy não depende de
+    Levanta ``RuntimeError`` quando não há nenhum. O redes não depende de
     bibliotecas gráficas: sem rasterizador, o SVG continua sendo a figura
     vetorial oficial.
     """

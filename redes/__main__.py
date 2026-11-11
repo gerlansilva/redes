@@ -1,4 +1,4 @@
-"""Permite `python -m scimatpy`."""
+"""Permite `python -m redes`."""
 
 from .cli import main
 

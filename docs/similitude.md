@@ -6,8 +6,8 @@ fortes e as cores são **blocos temáticos**. Fica na aba **Similitude** (modo a
 de "Duplo mapa"), no menu **Exportar** (SVG, GraphML e CSV) e nos relatórios.
 
 Funciona com resumos em **inglês, português e espanhol**, no mesmo projeto. Roda inteira no
-computador do usuário, sem rede e sem baixar nada. O código está em `scimatpy/similitude.py`
-(cálculo) e `scimatpy/viz/similitude.py` (SVG).
+computador do usuário, sem rede e sem baixar nada. O código está em `redes/similitude.py`
+(cálculo) e `redes/viz/similitude.py` (SVG).
 
 ## Como é calculado
 
