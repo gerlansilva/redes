@@ -36,7 +36,7 @@ class _Kb:
             self.conexao.execute("INSERT INTO Document_Word VALUES (?,?,1)", (i, self._w[p]))
 
 
-def _resultado(ids, grupos):
+def _resultado(ids, grupos, unidade="Words"):
     ds = Dataset()
     for i in ids:
         ds.adiciona_documento(i)
@@ -45,7 +45,8 @@ def _resultado(ids, grupos):
         g = Grupo(nos=[1, 2], principal=1, rotulo="x")
         g.documentos["nucleo"] = set(docs)
         gs.append(g)
-    return SimpleNamespace(dataset_original=ds, grupos=gs, dataset=ds, rede=None, agregado=None)
+    return SimpleNamespace(dataset_original=ds, grupos=gs, dataset=ds, rede=None, agregado=None,
+                           configuracao=SimpleNamespace(unidade=unidade))
 
 
 def _corpus(n_grupo=8, n_resto=12, titulos=None):
@@ -229,3 +230,13 @@ class ProjetoRealTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnidadesTest(unittest.TestCase):
+    def test_tema_so_em_palavras_e_referencias(self):
+        kb, a, b = _corpus()
+        for unidade, esperado in (("Words", True), ("References", True),
+                                  ("Authors", False)):
+            r = _resultado(a + b, [set(a)], unidade)
+            self.assertEqual(bool(rotulos.rotula_grupos(kb, r)), esperado, unidade)
+

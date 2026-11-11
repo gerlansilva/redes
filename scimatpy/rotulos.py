@@ -257,14 +257,23 @@ def _documentos_do_grupo(resultado, grupo) -> set[int]:
     return set(docs)
 
 
+UNIDADES_COM_TEMA = ("Words", "References")
+
+
 def rotula_grupos(kb, resultado, n_termos: int = 3,
                   minimo_documentos: int = MINIMO_DOCUMENTOS) -> dict[int, dict]:
     """Rótulo por termos distintivos para cada agrupamento com base suficiente.
 
     Chave = índice em ``resultado.grupos``. Valor: ``{"termos", "rotulo",
     "indicativo", "documentos"}``. Agrupamentos sem rótulo defensável ficam
-    ausentes. Com menos de 10 documentos o rótulo é só indicativo.
+    ausentes. Só para Words e References (outras unidades devolvem {}). Com menos de 10 documentos o rótulo é só indicativo.
     """
+    # Nome por tema só em redes de palavras-chave e de referências; autores, países e IES mantêm o nome do líder do agrupamento.
+    try:
+        if resultado.configuracao.unidade not in UNIDADES_COM_TEMA:
+            return {}
+    except Exception:
+        return {}
     try:
         universo = list(resultado.dataset_original.lista_documentos())
     except Exception:

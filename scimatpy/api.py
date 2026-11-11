@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import build
+from . import pivos as modulo_pivos
 from . import qualidade as modulo_qualidade
 from . import rotulos as modulo_rotulos
 from .grade import grade as combinacoes_grade
@@ -388,6 +389,137 @@ def dendrograma_do_pedido(pedido: dict) -> dict:
     }
 
 
+MENSAGEM_LT_SEM_SENTIDO = (
+    "A linha do tempo mostra itens (palavras, autores, referências) ao longo dos anos. "
+    "Com acoplamento, os nós são documentos e cada um já tem um só ano; escolha uma "
+    "análise de co-ocorrência para ver a figura.")
+MAX_NOS_LT = (10, 60)
+
+
+def linha_do_tempo_do_pedido(pedido: dict) -> dict:
+    """Linha do tempo do corpus completo (GET e POST). Usa ``token`` de uma análise já
+    calculada ou, sem ele, ``projeto``/``caminho`` + a configuração de /api/analisa."""
+    from . import linha_do_tempo, report
+    from .viz import linha_do_tempo as viz_lt
+    max_nos = _inteiro_limitado(pedido.get("max_nos"), linha_do_tempo.MAX_NOS,
+                                MAX_NOS_LT[0], MAX_NOS_LT[1], "max_nos")
+    token = _token(pedido.get("token"))
+    if token:
+        analise = _analise(token)
+        caminho = Path(analise["projeto"])
+        config = analise["config"]
+        if not caminho.exists():
+            raise ErroExpirado(f"O projeto desta análise não existe mais: {caminho}")
+    else:
+        caminho = _valida_projeto(str(pedido.get("projeto") or pedido.get("caminho") or ""))
+        config = _config(pedido)
+    if config.matriz != "CoOccurrence":
+        raise ErroApi(MENSAGEM_LT_SEM_SENTIDO)
+    with ProjetoScimat(caminho) as kb:
+        dados, rotulos_lt = report.linha_do_tempo_do_corpus(kb, config, max_nos)
+    if not dados["faixas"]:
+        raise ErroApi((dados.get("avisos") or ["Não há o que mostrar na linha do tempo."])[0])
+    titulo = ""
+    if pedido.get("baixar") in ("1", "true"):
+        titulo = report.titulo_linha_do_tempo(config)
+    nos = sum(len(f["nos"]) for f in dados["faixas"])
+    return {
+        "svg": viz_lt.svg(dados, titulo, rotulos=rotulos_lt),
+        "unidade": dados["unidade"],
+        "n_nos": nos,
+        "n_faixas": len(dados["faixas"]),
+        "anos": dados["anos"],
+        "atividade": dados["atividade"],
+        "posicao": dados.get("posicao"),
+        "avisos": dados["avisos"],
+        "omitidos": dados["omitidos"],
+        "max_nos": max_nos,
+        "por_faixa": linha_do_tempo.POR_FAIXA,
+    }
+
+
+# Acima disto, os pontos de virada (intermediação) ficam para quando a tela os pede.
+LIMITE_PIVOS_INLINE = 300
+
+
+def _nomes_dos_grupos(saida_grupos, posicao_original, grupos) -> dict:
+    """Índice original do agrupamento → (selo, nome exibido)."""
+    nomes = {}
+    for saida, grupo in zip(saida_grupos, grupos):
+        original = posicao_original.get(id(grupo))
+        if original is not None:
+            nomes[original] = (saida["selo"], saida.get("rotulo_novo") or saida["rotulo"])
+    return nomes
+
+
+def _numero_ou_none(valor, casas: int):
+    if valor is None or valor != valor or valor in (float("inf"), float("-inf")):
+        return None
+    return round(float(valor), casas)
+
+
+def _pivos_publicos(bruto, nomes: dict) -> dict | None:
+    """Pontos de virada no formato da API (JSON seguro); None se não há cálculo."""
+    if not bruto:
+        return None
+    itens = []
+    for posicao, i in enumerate(bruto.get("pivos") or [], start=1):
+        selo, nome = nomes.get(i.get("grupo"), (None, None))
+        itens.append({
+            "posicao": posicao, "no": int(i["no"]), "rotulo": i["rotulo"],
+            "intermediacao": _numero_ou_none(i["intermediacao"], 6),
+            "grupos_vizinhos": i["grupos_vizinhos"],
+            "grupo_selo": selo, "grupo_rotulo": nome,
+            "frequencia": i.get("frequencia", 0),
+            "rajada": _numero_ou_none(i.get("rajada"), 3),
+            "sigma": _numero_ou_none(i.get("sigma"), 3),
+        })
+    descritores = [{"rotulo": t["rotulo"],
+                    "proporcao_documentos": _numero_ou_none(t.get("proporcao_documentos"), 4),
+                    "motivo": t.get("motivo", "")}
+                   for t in bruto.get("termos_descritores") or []]
+    return {
+        "adiado": False,
+        "n_nos": bruto.get("n_nos", 0),
+        "suficiente": bool(bruto.get("suficiente")),
+        "minimo_nos": modulo_pivos.MINIMO_NOS,
+        "proporcao_descritor": modulo_pivos.PROPORCAO_DESCRITOR,
+        "pivos": itens,
+        "tem_sigma": any(i["sigma"] is not None for i in itens),
+        "termos_descritores": descritores,
+        "avisos": list(bruto.get("avisos") or []),
+    }
+
+
+def _calcula_pivos(kb, resultado):
+    """Pontos de virada brutos; None se falhar ou se a rede for grande (ficam adiados)."""
+    try:
+        if resultado.rede.quantidade_nos() > LIMITE_PIVOS_INLINE:
+            return None
+        return modulo_pivos.pontos_de_virada(resultado, kb)
+    except Exception:
+        return None
+
+
+def pivos_da_analise(token: str) -> dict:
+    """Pontos de virada de uma análise (os adiados por tamanho são calculados aqui)."""
+    analise = _analise(token)
+    publico = analise.get("pivos_pub")
+    if publico and not publico.get("adiado"):
+        return publico
+    with TRAVA_RECALCULO:
+        _recalcula(analise)
+        resultado = analise["resultado"]
+        try:
+            with ProjetoScimat(analise["projeto"]) as kb:
+                bruto = modulo_pivos.pontos_de_virada(resultado, kb)
+        except Exception as erro:
+            raise ErroApi(f"Não foi possível calcular os pontos de virada: {erro}") from None
+        analise["pivos"] = bruto
+        analise["pivos_pub"] = _pivos_publicos(bruto, analise.get("nomes_grupos") or {})
+    return analise["pivos_pub"]
+
+
 def _valida_projeto(caminho: str) -> Path:
     if not caminho:
         raise ErroApi(f"Informe o caminho do projeto ({EXTENSAO}). Abra um "
@@ -466,6 +598,7 @@ def analisa(dados: dict) -> dict:
                   and config.matriz == "CoOccurrence" else None)
         # Qualidade e rótulos novos: falhar aqui nunca derruba a análise.
         qual, rotulos_novos, anos = _qualidade_e_rotulos(kb, resultado)
+        pivos_bruto = _calcula_pivos(kb, resultado)
 
     grupos = sorted(resultado.grupos,
                     key=lambda grupo: (-len(grupo.nos), grupo.rotulo or "Sem grupo"))
@@ -491,6 +624,17 @@ def analisa(dados: dict) -> dict:
             "medidas": _medidas(grupo),
             "nos": [resultado.rotulo(no) for no in grupo.nos],
         })
+
+    nomes_grupos = _nomes_dos_grupos(saida_grupos, posicao_original, grupos)
+    pivos_pub = None
+    try:
+        if pivos_bruto is not None:
+            pivos_pub = _pivos_publicos(pivos_bruto, nomes_grupos)
+        elif resultado.rede.quantidade_nos() > LIMITE_PIVOS_INLINE:
+            pivos_pub = {"adiado": True, "n_nos": resultado.rede.quantidade_nos(),
+                         "pivos": [], "termos_descritores": [], "avisos": []}
+    except Exception:
+        pivos_pub = None
 
     detalhes = {}
     for indice, grupo in enumerate(grupos, start=1):
@@ -533,7 +677,9 @@ def analisa(dados: dict) -> dict:
                            "diagrama": diagrama_dados,
                            "periodo_id": periodo.id,
                            "periodo": periodo.nome, "resultado": resultado,
-                           "config": config, "rotulos": rotulos_novos}
+                           "config": config, "rotulos": rotulos_novos,
+                           "pivos": pivos_bruto, "pivos_pub": pivos_pub,
+                           "nomes_grupos": nomes_grupos}
         while len(ANALISES) > MAXIMO_ANALISES:
             ANALISES.popitem(last=False)
     _poda_pesados()
@@ -553,7 +699,8 @@ def analisa(dados: dict) -> dict:
                 halo_svg(registro["resultado"],
                          f"Rede de {UNIDADE_TITULO.get(unidade, 'itens')} — "
                          f"{periodo_nome}", layout=registro["rede"],
-                         rotulos=registro.get("rotulos")),
+                         rotulos=registro.get("rotulos"),
+                         pivos=(registro.get("pivos") or {}).get("pivos") or None),
                 encoding="utf-8")
 
         figuras["halo"] = f"/figura/{_registra(halo, FIGURAS, gera_halo)}"
@@ -640,6 +787,7 @@ def analisa(dados: dict) -> dict:
         },
         "grupos": saida_grupos,
         "qualidade": _qualidade_publica(qual, grupos, posicao_original),
+        "pivos": pivos_pub,
         "quadrantes": faixas,
         "figuras": figuras,
         "paises": ({
@@ -1624,6 +1772,16 @@ class Manipulador(BaseHTTPRequestHandler):
                                   "image/svg+xml", True)
                 else:
                     self._json(200, dados)
+            elif rota == "/api/linha-do-tempo":
+                pedido = {k: v[0] for k, v in parametros.items() if v}
+                dados = linha_do_tempo_do_pedido(pedido)
+                if pedido.get("baixar") in ("1", "true"):
+                    self._arquivo(dados["svg"].encode("utf-8"), "linha-do-tempo.svg",
+                                  "image/svg+xml", True)
+                else:
+                    self._json(200, dados)
+            elif rota == "/api/pivos":
+                self._json(200, pivos_da_analise(_param(parametros, "token")))
             elif rota == "/api/rajadas":
                 from . import rajadas
                 from .viz import descritiva
@@ -1750,6 +1908,8 @@ class Manipulador(BaseHTTPRequestHandler):
                 self._json(200, fluxo_autor_pais_ies(self._json_pedido()))
             elif rota == "/api/dendrograma":
                 self._json(200, dendrograma_do_pedido(self._json_pedido()))
+            elif rota == "/api/linha-do-tempo":
+                self._json(200, linha_do_tempo_do_pedido(self._json_pedido()))
             elif rota == "/api/analisa":
                 self._json(200, analisa(self._json_pedido()))
             elif rota == "/api/grade":

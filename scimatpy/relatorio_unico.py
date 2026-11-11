@@ -47,6 +47,7 @@ _CSS_EXTRA = """
 h2 { border-bottom:1px solid #D7DBE6; padding-bottom:4px; }
 h3 { color:#0B1F66; margin-top:22px; }
 h4 { color:#1F2A44; margin:20px 0 6px; font-size:14px; }
+h5 { color:#1F2A44; margin:16px 0 6px; font-size:13.5px; }
 figure { margin:14px 0 18px; text-align:center; }
 figure svg { display:block; margin:0 auto; max-width:100%; height:auto; }
 figcaption { font-size:12.5px; color:#475569; margin-top:6px; text-align:left; }
@@ -196,6 +197,22 @@ class _Cache:
         return self.dados[chave]
 
 
+def _linha_do_tempo_partes(kb, config):
+    """(HTML com marcadores de figura, figuras) da linha do tempo, ou None se não se aplica.
+
+    O desenho vai para o cache sem número; a numeração das figuras é feita em cada
+    montagem do documento.
+    """
+    figuras: list[tuple[str, str]] = []
+
+    def figura(svg, legenda):
+        figuras.append((svg, legenda))
+        return f"\x00FIG{len(figuras) - 1}\x00"
+
+    partes = report.linha_do_tempo_html(kb, config, figura, classe_nota="nota")
+    return ("\n".join(partes), figuras) if partes else None
+
+
 def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
                    numero: int, medida_temporal: str, limite) -> tuple[str, int]:
     """HTML de uma análise. Devolve também quantas redes de agrupamento foram omitidas."""
@@ -277,9 +294,22 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
                           "para este período.</p>")
         svg = cache.obtem((chave, indice, "halo"),
                           lambda: halo_svg(r, f"Rede completa — {r.periodo}",
-                                           rotulos=rotulos_novos))
+                                           rotulos=rotulos_novos,
+                                           pivos=metodo.pivos_para_halo(kb, r)))
         if svg:
-            partes.append(doc.figura(svg, f"Rede do período — {rotulo.lower()}, {r.periodo}."))
+            legenda_halo = f"Rede do período — {rotulo.lower()}, {r.periodo}."
+            if "ponto de virada" in svg:
+                legenda_halo += (" Os anéis numerados são os pontos de virada da tabela "
+                                 "seguinte.")
+            partes.append(doc.figura(svg, legenda_halo))
+        # Pontos de virada: depois da rede em halos
+        tabela_pivos = metodo.pivos_html(
+            kb, r, lambda cab, lin, leg, num=(): doc.tabela(cab, lin, leg, num),
+            f"Pontos de virada de {rotulo.lower()}, {r.periodo}.")
+        if tabela_pivos:
+            partes.append(doc.cabecalho(5, f"{numero}.3.{indice + 1}.1", "Pontos de virada",
+                                        f"s{numero}-p{indice}-pivos", no_sumario=False))
+            partes.append(tabela_pivos)
 
         prefixo = f"{mapeador}:"
         cabecalho, linhas, numericas = metodo.tabela_agrupamentos(
@@ -330,8 +360,20 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
         else:
             partes.append('<p class="nota">Os mapas de evolução e sobreposição não '
                           "puderam ser construídos.</p>")
-    # X.5 Dendrograma
-    partes.append(doc.cabecalho(3, f"{numero}.5", "Dendrograma (agrupamento hierárquico)",
+    # X.5 Linha do tempo (só palavras, autores e referências em co-ocorrência)
+    subsecao = 5
+    bloco_lt = cache.obtem((chave, "linha-do-tempo"),
+                           lambda: _linha_do_tempo_partes(kb, config))
+    if bloco_lt:
+        partes.append(doc.cabecalho(3, f"{numero}.{subsecao}", "Linha do tempo (corpus completo)",
+                                    f"s{numero}-linha-do-tempo"))
+        texto_lt, figuras_lt = bloco_lt
+        for i, (svg, legenda) in enumerate(figuras_lt):
+            texto_lt = texto_lt.replace(f"\x00FIG{i}\x00", doc.figura(svg, legenda))
+        partes.append(texto_lt)
+        subsecao += 1
+    # X.6 (ou X.5) Dendrograma
+    partes.append(doc.cabecalho(3, f"{numero}.{subsecao}", "Dendrograma (agrupamento hierárquico)",
                                 f"s{numero}-dendrograma"))
     partes.append(
         "<p>Complementa os agrupamentos da rede: junta, passo a passo, os itens mais "

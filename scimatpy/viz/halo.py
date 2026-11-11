@@ -554,11 +554,15 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
 
 def halo_svg(resultado, titulo: str, subtitulo: str = "", largura: int = 1280,
              altura: int = 780, legenda_largura: int = 300,
-             layout: dict | None = None, rotulos: dict | None = None) -> str:
+             layout: dict | None = None, rotulos: dict | None = None,
+             pivos=None) -> str:
     """Desenha a rede completa de um `ResultadoPeriodo` como SVG.
 
     `rotulos` (opcional): índice em ``resultado.grupos`` → rótulo novo (saída de
     ``rotulos.rotula_grupos``); a legenda usa o novo (2 termos) quando existe.
+    `pivos` (opcional): pontos de virada, em ordem (ids de nó ou dicionários com
+    ``no``, como em ``pivos.pontos_de_virada``); cada um ganha um anel escuro numerado
+    e a legenda "ponto de virada". Sem pivôs (ou ``None``) a saída não muda.
     """
     dados = layout or layout_halo(resultado, largura, altura, legenda_largura)
     unidade = resultado.configuracao.unidade
@@ -649,6 +653,32 @@ def halo_svg(resultado, titulo: str, subtitulo: str = "", largura: int = 1280,
         f'font-family="{FONTE}">{grupo["indice"]}</text>'
         for grupo in grupos)
 
+    aneis_svg = ""
+    marcados = []
+    for item in (pivos or []):
+        no = item.get("no") if isinstance(item, dict) else item
+        if no in nodepos and no in por_no and no not in marcados:
+            marcados.append(no)
+    for numero, no in enumerate(marcados, start=1):
+        x, y = nodepos[no]
+        raio = por_no[no]["raio"] + 3.5
+        aneis_svg += (
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{raio:.1f}" fill="none" '
+            f'stroke="#ffffff" stroke-width="5.2"/>'
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{raio:.1f}" fill="none" '
+            f'stroke="{TINTA}" stroke-width="2.2"/>'
+            f'<text x="{x + raio + 3:.1f}" y="{y - raio + 2:.1f}" font-size="11" '
+            f'font-weight="700" fill="{TINTA}" font-family="{FONTE}" stroke="#ffffff" '
+            f'stroke-width="3" paint-order="stroke">{numero}</text>')
+    legenda_pivos = ""
+    if marcados:
+        legenda_pivos = (
+            f'<circle cx="46" cy="{altura - 40}" r="6.5" fill="none" stroke="{TINTA}" '
+            f'stroke-width="2.2"/>'
+            f'<text x="60" y="{altura - 36}" font-size="11" fill="{TINTA}" '
+            f'font-family="{FONTE}">ponto de virada (liga agrupamentos diferentes; o número '
+            f'é o Nº da tabela)</text>')
+
     entradas = [("grupo", i) for i in range(k)]
     if soltos:
         entradas.append(("soltos", 0))
@@ -711,7 +741,7 @@ def halo_svg(resultado, titulo: str, subtitulo: str = "", largura: int = 1280,
         f'{halos}'
         f'<g fill="none" stroke="{CINZA_LIGACAO}" stroke-linecap="round" '
         f'opacity="0.6">{ligacoes_soltas}</g>'
-        f'{grupos_svg}{soltos_svg}{selos}{legenda_svg}'
+        f'{grupos_svg}{soltos_svg}{aneis_svg}{selos}{legenda_svg}{legenda_pivos}'
         f'<text x="40" y="{altura - 16}" font-size="10" fill="{TINTA_FRACA}" '
         f'font-family="{FONTE}">Redes · '
         f'halo = agrupamento; ponto branco = nó sem agrupamento</text>'

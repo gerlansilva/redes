@@ -1083,6 +1083,21 @@ tbody tr:hover td { background: #FBFCFE; }
 .dendro-frases { margin: 10px 18px 6px; padding-left: 18px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .dendro-frases li { margin-bottom: 4px; }
 
+/* ------------------------------------------------------------ linha do tempo */
+
+.dendro-controles .dendro-grupos:has(#ltNos) { flex: 0 1 360px; }
+.lt-figura { max-width: 100%; overflow-x: auto; border: 1px solid var(--linha); border-radius: 10px; background: var(--branco); }
+.lt-figura svg { display: block; width: 100%; min-width: 960px; max-width: none; height: auto; }
+
+/* --------------------------------------------------------- pontos de virada */
+
+.pivos-bloco { border-bottom: 1px solid var(--linha); margin-bottom: 8px; padding: 14px 18px 12px; }
+.pivos-bloco h3 { margin: 0 0 4px; font-size: 15px; }
+.pivos-nota { margin: 6px 0; font-size: 12.5px; line-height: 1.5; color: var(--tinta-fraca); overflow-wrap: anywhere; }
+.pivos-aviso { margin: 8px 0; padding: 8px 12px; border-radius: 8px; background: #FFF7ED; color: #9A3412; font-size: 12.5px; line-height: 1.45; }
+.pivos-adiado { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 8px 0; font-size: 12.5px; color: var(--tinta-fraca); }
+.pivos-bloco .tabela-scroll { margin: 6px -18px 0; }
+
 /* ------------------------------------------------------------------ modais */
 
 .overlay {

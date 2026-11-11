@@ -119,14 +119,23 @@ function graficoBarras(linhas, campo, cor) {
 }
 
 function graficoLogLog(pontos, x, y, esperada, rotuloX, rotuloY) {
-  const L = 360, A = 230, m = 38;
+  const L = 360, A = 250, mE = 46, mD = 18, mT = 14, mB = 52;
+  const area = { x0: mE, x1: L - mD, y0: mT, y1: A - mB };
   const xs = pontos.map((p) => Math.log10(p[x])), ys = pontos.map((p) => Math.log10(p[y]));
-  const minX = Math.min(...xs), maxX = Math.max(...xs, minX + 0.1);
-  const minY = Math.min(...ys, 0), maxY = Math.max(...ys, minY + 0.1);
-  const px = (v) => m + ((v - minX) / (maxX - minX)) * (L - m - 14);
-  const py = (v) => A - m - ((v - minY) / (maxY - minY)) * (A - m - 14);
+  // Folga de 6% nos dois eixos: nenhum ponto fica em cima do eixo ou da borda.
+  const dominio = (vals, minimo) => {
+    const lo = Math.min(...vals, ...(minimo === undefined ? [] : [minimo]));
+    const hi = Math.max(...vals, lo + 0.1);
+    const folga = (hi - lo) * 0.06;
+    return [lo - folga, hi + folga];
+  };
+  const [minX, maxX] = dominio(xs), [minY, maxY] = dominio(ys);
+  const px = (v) => area.x0 + ((v - minX) / (maxX - minX)) * (area.x1 - area.x0);
+  const py = (v) => area.y1 - ((v - minY) / (maxY - minY)) * (area.y1 - area.y0);
+  const raio = pontos.length > 80 ? 2.6 : pontos.length > 30 ? 3.4 : 4.5;
+  const idClip = "clip" + Math.abs(pontos.length * 31 + Math.round(minX * 100) + Math.round(maxY * 100));
   const pts = pontos.map((p) =>
-    `<circle cx="${px(Math.log10(p[x])).toFixed(1)}" cy="${py(Math.log10(p[y])).toFixed(1)}" r="4.5" fill="#2F2BFF" fill-opacity=".8">` +
+    `<circle cx="${px(Math.log10(p[x])).toFixed(1)}" cy="${py(Math.log10(p[y])).toFixed(1)}" r="${raio}" fill="#2F2BFF" fill-opacity=".75">` +
     `<title>${rotuloX} ${bibNum.format(p[x])}: ${bibNum.format(p[y])}</title></circle>`).join("");
   let teorica = "";
   if (esperada) {
@@ -134,13 +143,36 @@ function graficoLogLog(pontos, x, y, esperada, rotuloX, rotuloY) {
       const valor = Math.log10(esperada(p));
       return `${i ? "L" : "M"}${px(Math.log10(p[x])).toFixed(1)},${py(valor).toFixed(1)}`;
     }).join(" ");
-    teorica = `<path d="${caminho}" fill="none" stroke="#FFC400" stroke-width="2" stroke-dasharray="5 4"/>`;
+    teorica = `<path d="${caminho}" fill="none" stroke="#FFC400" stroke-width="2" stroke-dasharray="5 4" clip-path="url(#${idClip})"/>`;
+  }
+  // Marcas dos eixos nas potências de 10 que cabem no intervalo.
+  const marcas = (lo, hi) => {
+    const out = [];
+    for (let k = Math.ceil(lo); k <= Math.floor(hi); k++) out.push(k);
+    return out;
+  };
+  const rot = (k) => (k >= 0 ? bibNum.format(Math.pow(10, k))
+    : "0," + "0".repeat(-k - 1) + "1");
+  let eixos = "";
+  for (const k of marcas(minX, maxX)) {
+    const cx = px(k).toFixed(1);
+    eixos += `<line x1="${cx}" y1="${area.y1}" x2="${cx}" y2="${area.y1 + 4}" stroke="#B8C2D6"/>` +
+      `<text x="${cx}" y="${area.y1 + 16}" text-anchor="middle" font-size="10" fill="#64748B">${rot(k)}</text>`;
+  }
+  for (const k of marcas(minY, maxY)) {
+    const cy = py(k).toFixed(1);
+    eixos += `<line x1="${area.x0 - 4}" y1="${cy}" x2="${area.x0}" y2="${cy}" stroke="#B8C2D6"/>` +
+      `<line x1="${area.x0}" y1="${cy}" x2="${area.x1}" y2="${cy}" stroke="#EEF1F8"/>` +
+      `<text x="${area.x0 - 7}" y="${(Number(cy) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#64748B">${rot(k)}</text>`;
   }
   return `<svg viewBox="0 0 ${L} ${A}" width="100%" role="img">` +
-    `<line x1="${m}" y1="${A - m}" x2="${L - 10}" y2="${A - m}" stroke="#DCE3F0"/>` +
-    `<line x1="${m}" y1="10" x2="${m}" y2="${A - m}" stroke="#DCE3F0"/>` + teorica + pts +
-    `<text x="${(L + m) / 2}" y="${A - 8}" text-anchor="middle" font-size="11" fill="#64748B">${rotuloX} (log)</text>` +
-    `<text x="12" y="${A / 2}" font-size="11" fill="#64748B" transform="rotate(-90 12 ${A / 2})" text-anchor="middle">${rotuloY} (log)</text></svg>`;
+    `<defs><clipPath id="${idClip}"><rect x="${area.x0}" y="${area.y0}" width="${area.x1 - area.x0}" height="${area.y1 - area.y0}"/></clipPath></defs>` +
+    eixos +
+    `<line x1="${area.x0}" y1="${area.y1}" x2="${area.x1}" y2="${area.y1}" stroke="#DCE3F0"/>` +
+    `<line x1="${area.x0}" y1="${area.y0}" x2="${area.x0}" y2="${area.y1}" stroke="#DCE3F0"/>` +
+    `<g clip-path="url(#${idClip})">${pts}</g>` + teorica +
+    `<text x="${(area.x0 + area.x1) / 2}" y="${A - 8}" text-anchor="middle" font-size="11" fill="#64748B">${rotuloX} (log)</text>` +
+    `<text x="12" y="${(area.y0 + area.y1) / 2}" font-size="11" fill="#64748B" transform="rotate(-90 12 ${(area.y0 + area.y1) / 2})" text-anchor="middle">${rotuloY} (log)</text></svg>`;
 }
 
 /* ---------------------------------------------------------------- tabelas */

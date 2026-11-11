@@ -325,6 +325,7 @@
         <div class="aba" data-aba="indices" role="tab" tabindex="0" aria-selected="false">Índices</div>
         <div class="aba" data-aba="documentos" role="tab" tabindex="0" aria-selected="false">Documentos</div>
         <div class="aba" data-aba="dendrograma" role="tab" tabindex="0" aria-selected="false">Dendrograma</div>
+        <div class="aba" data-aba="linhatempo" role="tab" tabindex="0" aria-selected="false">Linha do tempo</div>
         <div class="aba" data-aba="longitudinal" role="tab" tabindex="0" aria-selected="false">Comparar períodos</div>
       </div>
       <div class="qualidade-caixa" id="qualidadeCaixa" hidden>
@@ -527,6 +528,32 @@
           <div class="espaco"></div>
           <span class="link" id="linkIndices" style="cursor:default">—</span>
         </header>
+        <div class="pivos-bloco" id="pivosBloco" hidden>
+          <h3>Pontos de virada</h3>
+          <p class="pivos-nota" id="pivosIntro">Itens de intermediação alta cujos vizinhos estão em dois ou mais agrupamentos: ligam temas que, sem eles, ficariam mais separados.</p>
+          <div class="pivos-aviso" id="pivosAviso" hidden></div>
+          <div class="pivos-adiado" id="pivosAdiado" hidden>
+            <span id="pivosAdiadoTexto">A rede é grande; o cálculo leva alguns segundos.</span>
+            <button type="button" class="botao" id="pivosCalcular">Calcular pontos de virada</button>
+          </div>
+          <div class="tabela-scroll" id="pivosTabelaCaixa">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:44px">Nº</th>
+                  <th>Item</th>
+                  <th class="num" title="Intermediação normalizada, de 0 a 1">Intermediação</th>
+                  <th class="num" title="Agrupamentos em que o item e seus vizinhos estão">Agrupamentos vizinhos</th>
+                  <th>Grupo</th>
+                  <th class="num">Frequência</th>
+                  <th class="num" id="pivosColSigma" title="(intermediação + 1) elevado à força da rajada" hidden>Sigma</th>
+                </tr>
+              </thead>
+              <tbody id="pivosCorpo"></tbody>
+            </table>
+          </div>
+          <p class="pivos-nota" id="pivosDescritores" hidden></p>
+        </div>
         <div class="tabela-scroll">
           <table>
             <thead>
@@ -630,6 +657,24 @@
         <div class="rodape-tabela" id="rodapeDendrograma">Distância = 1 − similaridade; a linha tracejada marca o corte.</div>
       </section>
 
+      <section class="tabela-bloco" id="blocoLinhaDoTempo" data-bloco="blocoLinhaDoTempo">
+        <header>
+          <h2>Linha do tempo</h2>
+          <span class="meta" id="metaLinhaDoTempo">agrupamentos do corpus completo ao longo dos anos</span>
+        </header>
+        <div class="dendro-controles">
+          <label class="campo-mini dendro-grupos">Nº máximo de nós: <b id="ltNosValor">40</b>
+            <input type="range" id="ltNos" min="10" max="60" step="5" value="40" aria-label="Número máximo de nós da figura">
+          </label>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioLinhaDoTempo">Execute uma análise para ver a linha do tempo.</div>
+          <div class="lt-figura" id="ltFigura" hidden></div>
+        </div>
+        <ul class="dendro-frases" id="ltAvisos"></ul>
+        <div class="rodape-tabela" id="rodapeLinhaDoTempo">Posição = ano médio dos documentos do item (nas referências, o ano da obra); anel vermelho = rajada. Usa o corpus completo, não só o período.</div>
+      </section>
+
       <section class="acoes-finais">
         <div>
           <div class="rotulo-secao">Exportar e compartilhar</div>
@@ -660,6 +705,7 @@
               <button type="button" role="menuitem" tabindex="-1" data-exp="grupos-xml" data-precisa="resultado">Grupos da base (XML)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="documentos-tsv" data-precisa="resultado">Documentos do período (TSV)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="dendrograma-svg" data-precisa="resultado">Dendrograma do período (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="linhatempo-svg" data-precisa="resultado">Linha do tempo (SVG)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="fluxo-svg">Fluxo Autor – País – IES (SVG)</button>
             </div>
             <p class="menu-aviso" id="avisoExportar" hidden>Escolha uma análise no menu lateral para liberar os dados.</p>

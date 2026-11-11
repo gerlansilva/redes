@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import html
 
-from . import bibliometria, qualidade, rajadas, rotulos, termos
+from . import bibliometria, linha_do_tempo, pivos, qualidade, rajadas, rotulos, termos
 from .clustering import ALGORITMOS
 from .similarity import MEDIDAS
 
@@ -206,6 +206,90 @@ def rotulos_do_resultado(kb, resultado) -> dict:
     if kb is None:
         return resultado.__dict__.get("_cache_qualidade", {}).get("rotulos") or {}
     return _guarda(resultado, "rotulos", lambda: rotulos.rotula_grupos(kb, resultado)) or {}
+
+
+TOPO_PIVOS = 10      # pontos de virada listados por período
+
+
+def pivos_do_resultado(kb, resultado) -> dict | None:
+    """`pivos.pontos_de_virada` do período (calculado uma vez); None se falhar."""
+    return _guarda(resultado, "pivos",
+                   lambda: pivos.pontos_de_virada(resultado, kb, topo=TOPO_PIVOS))
+
+
+def pivos_para_halo(kb, resultado) -> list | None:
+    """Pivôs para o parâmetro `pivos=` do halo; None quando não há (a figura não muda)."""
+    dados = pivos_do_resultado(kb, resultado)
+    return list(dados["pivos"]) if dados and dados.get("pivos") else None
+
+
+def _n4(valor) -> str:
+    return "—" if valor is None else f"{valor:.4f}".replace(".", ",")
+
+
+def _lista_nomes(itens: list[str], limite: int = 8) -> str:
+    texto = ", ".join(itens[:limite])
+    return texto + (f" e mais {len(itens) - limite}" if len(itens) > limite else "")
+
+
+def pivos_html(kb, resultado, tabela, legenda: str, classe_nota: str = "nota") -> str:
+    """Tabela "Pontos de virada" de um período, com as notas de leitura.
+
+    `tabela(cabecalho, linhas, legenda, numericas)` aplica a numeração do relatório.
+    A coluna sigma só aparece quando algum pivô tem rajada. Devolve "" se o cálculo
+    falhar; nunca levanta.
+    """
+    dados = pivos_do_resultado(kb, resultado)
+    if not dados:
+        return ""
+    partes: list[str] = []
+    itens = dados.get("pivos") or []
+    if itens:
+        com_sigma = any(i.get("sigma") is not None for i in itens)
+        cabecalho = ["Nº", "Item", "Intermediação", "Agrupamentos vizinhos", "Grupo",
+                     "Frequência"] + (["Sigma"] if com_sigma else [])
+        grupos = list(getattr(resultado, "grupos", []) or [])
+        linhas = []
+        for posicao, i in enumerate(itens, start=1):
+            indice = i.get("grupo")
+            if indice is not None and 0 <= indice < len(grupos):
+                principal = nome_do_grupo(kb, resultado, grupos[indice])[0]
+            else:
+                principal = "—"
+            linha = [str(posicao), _esc(i["rotulo"]), _n4(i["intermediacao"]),
+                     str(i["grupos_vizinhos"]), _esc(principal),
+                     str(i.get("frequencia", 0))]
+            if com_sigma:
+                linha.append(_n2(i.get("sigma"), 3))
+            linhas.append(linha)
+        numericas = (0, 2, 3, 5) + ((6,) if com_sigma else ())
+        partes.append(tabela(cabecalho, linhas, legenda, numericas))
+        partes.append(
+            f'<p class="{classe_nota}">Pontos de virada: itens de intermediação alta (decil '
+            "superior da rede) cujos vizinhos estão em dois ou mais agrupamentos; ligam "
+            "temas que, sem eles, ficariam mais separados. Intermediação normalizada, de 0 a "
+            "1." + (" Sigma = (intermediação + 1) elevado à força da rajada do termo; como "
+                    "a rajada pesa muito, o ranking por sigma quase repete o ranking pela "
+                    "rajada." if com_sigma else "") + "</p>")
+    else:
+        motivos = [a for a in dados.get("avisos", [])
+                   if not a.startswith("Poucos dados") and "fora do ranking" not in a]
+        partes.append(f'<p class="{classe_nota}">Nenhum ponto de virada identificado neste '
+                      "período." + (" " + " ".join(motivos) if motivos else "") + "</p>")
+    termos_fora = dados.get("termos_descritores") or []
+    if termos_fora:
+        nomes = [f"{_esc(t['rotulo'])} ({t['proporcao_documentos']:.0%})" for t in termos_fora]
+        partes.append(
+            f'<p class="{classe_nota}">Termos-descritor excluídos do ranking: '
+            f"{_lista_nomes(nomes)}. Aparecem em mais de {pivos.PROPORCAO_DESCRITOR:.0%} dos "
+            "documentos do período; descrevem o corpus em vez de distinguir temas e ligam "
+            "quase tudo, então não são lidos como pontos de virada.</p>")
+    if not dados.get("suficiente"):
+        partes.append(
+            f'<p class="{classe_nota}"><strong>Poucos dados:</strong> a rede tem '
+            f"{dados.get('n_nos', 0)} nós (o mínimo confiável é {pivos.MINIMO_NOS}); leia os "
+            "pontos de virada como indício.</p>")
+    return "\n".join(partes)
 
 
 def linhas_do_periodo(kb, resultado) -> dict[int, dict]:
@@ -550,9 +634,58 @@ def algoritmo_html(config, medida_temporal: str | None = None,
         "salto entre fusões consecutivas; a correlação cofenética mede o quanto a árvore "
         "preserva as distâncias originais, e ARI e NMI comparam o corte com os "
         "agrupamentos da rede (1 = idêntico).</p>")
+    proximo = 9
+    if config.matriz == "CoOccurrence" and config.unidade in UNIDADES_LINHA_DO_TEMPO:
+        p.append(_texto_linha_do_tempo(config, proximo))
+        proximo += 1
+    p.append(_texto_pivos(config, proximo))
     p.append(_texto_qualidade(config))
     p.append("</div>")
     return "\n".join(p)
+
+
+UNIDADES_LINHA_DO_TEMPO = ("Words", "Authors", "References")
+
+
+def _texto_linha_do_tempo(config, numero: int) -> str:
+    """Método da linha do tempo, com os limites lidos de `linha_do_tempo`/`rajadas`."""
+    lt = linha_do_tempo
+    referencias = config.unidade == "References"
+    return (
+        f"<p><strong>{numero}. Linha do tempo.</strong> Figura complementar sobre o corpus "
+        "completo (todos os documentos do projeto, sem dividir em períodos), com os mesmos "
+        "parâmetros e o mesmo algoritmo desta análise. Cada agrupamento vira uma faixa; só "
+        f"aparecem os {lt.MAX_NOS} itens mais frequentes no total e, no máximo, "
+        f"{lt.POR_FAIXA} por faixa. "
+        + ("Cada referência fica no ano da própria obra. " if referencias else
+           "Cada item fica no seu ano médio, a média dos anos dos documentos em que "
+           "aparece, arredondada; a linha fina atrás do nó vai do primeiro ao último ano "
+           "do item e a atividade anual aparece como traço sob a faixa. ")
+        + "O tamanho do nó segue a frequência. Os arcos mostram as "
+        f"{lt.LIGACOES_POR_NO} ligações mais fortes de cada nó dentro da faixa e as "
+        f"{lt.LIGACOES_CRUZADAS} mais fortes entre faixas. O anel vermelho marca rajadas "
+        f"(Kleinberg): as {lt.RAJADAS_MAXIMAS} mais fortes do corpus, com pelo menos "
+        f"{lt.RAJADA_MIN_DOCUMENTOS} documentos. Itens sem ano ficam de fora, com aviso.</p>")
+
+
+def _texto_pivos(config, numero: int) -> str:
+    """Método dos pontos de virada e do sigma, com as constantes lidas de `pivos`."""
+    return (
+        f"<p><strong>{numero}. Pontos de virada e sigma.</strong> Em cada período, a "
+        "intermediação de cada nó (quantos caminhos mínimos entre outros pares passam por "
+        "ele) é normalizada pelo número de pares possíveis, (n − 1)(n − 2)/2, e vai de 0 a 1. "
+        f"É ponto de virada o nó com intermediação no decil superior (percentil "
+        f"{pivos.PERCENTIL:g} entre os nós com intermediação positiva) <em>e</em> com "
+        "vizinhos em pelo menos dois agrupamentos. Termos presentes em mais de "
+        f"{pivos.PROPORCAO_DESCRITOR:.0%} dos documentos do período (termo-descritor) "
+        "saem do ranking, porque descrevem o corpus em vez de distinguir temas. Com menos "
+        f"de {pivos.MINIMO_NOS} nós, a lista é só indício e o relatório avisa. O sigma, "
+        "como no CiteSpace, é (intermediação + 1) elevado à força da rajada do termo; só "
+        "existe para quem tem rajada (palavras-chave e referências em co-ocorrência) e a "
+        "coluna só aparece quando algum ponto de virada tem rajada. Atenção: como a "
+        "intermediação normalizada fica perto de zero, o fator (intermediação + 1) quase "
+        "não muda, e o sigma praticamente repete o ranking da força da rajada. "
+        f"A tabela lista no máximo {TOPO_PIVOS} pontos de virada.</p>")
 
 
 def _texto_qualidade(config) -> str:

@@ -22,11 +22,12 @@ from contextvars import ContextVar
 import unicodedata
 from pathlib import Path
 
-from . import longitudinal, metodo
+from . import linha_do_tempo, longitudinal, metodo, rotulos
 from .pipeline import executa_periodo
 from . import exports
 from .viz.cluster import rede_agrupamento_svg, rede_de_agrupamentos_svg
 from .viz.halo import halo_svg
+from .viz import linha_do_tempo as viz_linha_do_tempo
 from .viz.strategic import diagrama_svg
 
 ROTULOS_MAPEADOR = {
@@ -301,6 +302,98 @@ def _ligacoes(resultado, grupo) -> tuple[list, list]:
 # --------------------------------------------------------------------- HTML
 
 
+# ------------------------------------------------------- linha do tempo (corpus)
+
+NOTA_LINHA_DO_TEMPO = (
+    "Como ler: cada faixa é um agrupamento da rede do corpus completo (todos os documentos, "
+    "sem dividir em períodos). A posição horizontal de um item é o ano médio dos documentos "
+    "em que ele aparece; nas referências, o ano da própria obra. A linha fina atrás do nó vai "
+    "do primeiro ao último ano do item. O tamanho do nó segue a frequência e o anel vermelho "
+    "marca uma rajada (aumento súbito de uso ou de citação).")
+
+
+def linha_do_tempo_aplicavel(config) -> bool:
+    """A figura só tem sentido para palavras, autores ou referências em co-ocorrência."""
+    return (config.matriz == "CoOccurrence"
+            and config.unidade in metodo.UNIDADES_LINHA_DO_TEMPO)
+
+
+def rotulos_linha_do_tempo(kb, config, dados: dict) -> dict:
+    """Rótulos novos (índice da faixa → rótulo) para a linha do tempo do corpus completo.
+
+    Refaz o agrupamento do corpus completo (determinístico) e só aceita o rótulo de um
+    agrupamento cujo nome atual coincide com o da faixa; qualquer falha devolve {}.
+    """
+    try:
+        resultado = executa_periodo(linha_do_tempo._TodosOsDocumentos(kb), 0, "Corpus", config)
+        novos = rotulos.rotula_grupos(kb, resultado) or {}
+        saida = {}
+        for faixa in dados.get("faixas", []):
+            i = faixa["indice"]
+            if i in novos and i < len(resultado.grupos):
+                atual = (linha_do_tempo.limpa(resultado.grupos[i].rotulo)
+                         or f"Agrupamento {i + 1}")
+                if atual != faixa["rotulo"]:
+                    continue
+                saida[i] = novos[i]
+        return saida
+    except Exception:
+        return {}
+
+
+def linha_do_tempo_do_corpus(kb, config, max_nos: int = linha_do_tempo.MAX_NOS):
+    """(dados, rótulos novos) da linha do tempo do corpus completo."""
+    dados = linha_do_tempo.constroi(kb, config, max_nos=max_nos)
+    rot = rotulos_linha_do_tempo(kb, config, dados) if dados.get("faixas") else {}
+    return dados, rot
+
+
+def titulo_linha_do_tempo(config) -> str:
+    unidade = viz_linha_do_tempo.NOMES_UNIDADE.get(config.unidade, config.unidade)
+    return f"Linha do tempo — {unidade} (corpus completo)"
+
+
+def linha_do_tempo_html(kb, config, figura, classe_nota: str = "nota"):
+    """Partes HTML da seção "Linha do tempo (corpus completo)", ou None.
+
+    None quando a análise não é palavras, autores ou referências em co-ocorrência, ou
+    quando o cálculo falha: quem chama omite a seção. `figura(svg, legenda, dados)` monta
+    a figura numerada (e pode gravar o arquivo). Sem agrupamentos com ano, a seção traz só
+    os avisos, sem figura vazia.
+    """
+    if kb is None or not linha_do_tempo_aplicavel(config):
+        return None
+    try:
+        dados, rot = linha_do_tempo_do_corpus(kb, config)
+        titulo = titulo_linha_do_tempo(config)
+        partes = []
+        if dados.get("faixas"):
+            svg = viz_linha_do_tempo.svg(dados, titulo, rotulos=rot)
+            partes.append(figura(svg, titulo + "."))
+            partes.append(f'<p class="{classe_nota}">{_esc(NOTA_LINHA_DO_TEMPO)}</p>')
+        else:
+            partes.append(f'<p class="{classe_nota}">Não foi possível desenhar a linha do '
+                          "tempo com estes parâmetros.</p>")
+        avisos = [linha_do_tempo.limpa(a) for a in dados.get("avisos", [])]
+        if avisos:
+            partes.append("<ul>" + "".join(f"<li>{_esc(a)}</li>" for a in avisos if a) + "</ul>")
+        return partes
+    except Exception:
+        return None
+
+
+def _bloco_linha_do_tempo_pasta(destino: Path, kb, config) -> str:
+    """HTML da seção para o relatório em pasta (figura em images/); "" se não se aplica."""
+    def figura(svg, legenda):
+        (destino / "images" / "linhaDoTempo.svg").write_text(svg, encoding="utf-8")
+        return (f'<p><img src="images/linhaDoTempo.svg" alt="{_esc(legenda)}" '
+                'width="100%"></p>')
+    partes = linha_do_tempo_html(kb, config, figura, classe_nota="fonte")
+    if not partes:
+        return ""
+    return "\n".join(['<h2 id="linha-do-tempo">Linha do tempo (corpus completo)</h2>'] + partes)
+
+
 def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
               medida_temporal: str = "EquivalenceIndex",
               com_bibliometria: bool = True, devolve_resultados: bool = False) -> dict:
@@ -334,7 +427,8 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
         try:
             (destino / "images" / f"wholeNetwork-period{indice}.svg").write_text(
                 halo_svg(resultado, f"Rede completa — {resultado.periodo}",
-                         rotulos=rotulos_novos),
+                         rotulos=rotulos_novos,
+                         pivos=metodo.pivos_para_halo(kb, resultado)),
                 encoding="utf-8")
         except Exception:
             pass
@@ -379,8 +473,13 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
 
     if com_bibliometria:
         _pagina_bibliometria(destino, kb)
+    try:
+        bloco_lt = _bloco_linha_do_tempo_pasta(destino, kb, config)
+    except Exception:
+        bloco_lt = ""
     _pagina_indice(destino, resultados, mapa, config, estendido, com_bibliometria,
-                   kb=kb, periodos=periodos, medida_temporal=medida_temporal)
+                   kb=kb, periodos=periodos, medida_temporal=medida_temporal,
+                   linha_do_tempo_bloco=bloco_lt)
     resumo = {"html": str(destino), "periodos": len(resultados),
               "agrupamentos": sum(len(r.grupos) for r in resultados)}
     if devolve_resultados:
@@ -402,7 +501,8 @@ def _numerador():
 
 def _pagina_indice(destino, resultados, mapa, config, estendido,
                    com_bibliometria: bool = True, kb=None, periodos=None,
-                   medida_temporal: str = "EquivalenceIndex") -> None:
+                   medida_temporal: str = "EquivalenceIndex",
+                   linha_do_tempo_bloco: str = "") -> None:
     linhas = []
     for indice, resultado in enumerate(resultados):
         linhas.append([
@@ -436,6 +536,8 @@ def _pagina_indice(destino, resultados, mapa, config, estendido,
         f'<p><img class="mapa-sobreposicao" src="images/overlappingMap.svg" '
         f'alt="Mapa de sobreposição"></p>',
     ]
+    if linha_do_tempo_bloco:
+        corpo.append(linha_do_tempo_bloco)
     if estendido:
         corpo.append("<p>Relatório estendido: cada agrupamento lista os "
                      "documentos por mapeador, com citações e referências.</p>")
@@ -644,6 +746,13 @@ def _pagina_periodo(destino, resultado, grupos, indice, kb=None) -> None:
         corpo.append(
             f'<p class="fonte"><a href="misc/wholeNetwork-period{indice}.net">'
             "Rede completa — arquivo Pajek</a></p>")
+        tabela_pivos = metodo.pivos_html(
+            kb, resultado,
+            lambda cab, lin, leg, num=(): _tabela(cab, lin, leg, numericas=num),
+            f"Pontos de virada — {resultado.periodo}", classe_nota="fonte")
+        if tabela_pivos:
+            corpo.append("<h2>Pontos de virada</h2>")
+            corpo.append(tabela_pivos)
     if (imagens / f"clusterGraph-period{indice}.svg").exists():
         corpo.append("<h2>Rede de agrupamentos</h2>")
         corpo.append(
@@ -825,6 +934,9 @@ def gera_pagina_completa(destino: Path, kb, secoes: list[dict], ignoradas: list[
                  _tabela(["Período", "Itens", "Grupos", "Maior grupo"], linhas,
                          f"{posicao}.1 Por período", numericas=(1, 2)),
                  f'<p><a href="{pasta}/index.html">Configuração, mapa de evolução e sobreposição</a></p>']
+        if (destino / pasta / "images" / "linhaDoTempo.svg").exists():
+            bloco.append(f'<p><a href="{pasta}/index.html#linha-do-tempo">Linha do tempo do '
+                         "corpus completo</a></p>")
         figuras = []
         mapeador = secao["config"].mapeadores[0] if secao["config"].mapeadores else "nucleo"
         for indice, r in enumerate(resultados):

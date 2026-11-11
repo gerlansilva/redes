@@ -68,7 +68,7 @@ const CONFIG_ABAS = {
               padrao: "rede", redeRotulo: "Rede de periódicos" },
 };
 const ABAS_TODAS = ["resumo", "rede", "paises", "diagrama", "agrupamentos",
-                    "grupos", "indices", "documentos", "dendrograma", "longitudinal"];
+                    "grupos", "indices", "documentos", "dendrograma", "linhatempo", "longitudinal"];
 // No modo simples só aparecem estas abas; as demais ficam no modo avançado.
 const ABAS_SIMPLES = ["resumo", "rede", "paises", "diagrama", "longitudinal"];
 
@@ -189,6 +189,8 @@ async function iniciar() {
 
 function ligarEventos() {
   ligarDendrograma();
+  ligarLinhaDoTempo();
+  ligarPivos();
   $("fecharBase").addEventListener("click", fecharBase);
   $("modalBase").addEventListener("click", (evento) => {
     if (evento.target === $("modalBase")) fecharBase();
@@ -545,6 +547,7 @@ function aplicarProjeto(projeto) {
   estado.contador = 0;
   estado.token = null;
   dendro.token = null;
+  limparLinhaDoTempo(true);
   document.querySelectorAll(".aba[data-aba]").forEach((aba) => {
     const ativa = aba.dataset.aba === "rede";
     aba.classList.toggle("ativa", ativa);
@@ -629,6 +632,7 @@ function limparResultado() {
 
   $("indicesCorpo").replaceChildren(linhaVazia("Nenhuma análise executada.", 12));
   $("linkIndices").textContent = "—";
+  limparPivos();
   $("documentosCorpo").replaceChildren(linhaVazia("Nenhuma análise executada.", 6));
   $("metaDocumentos").textContent = "—";
   $("rodapeDocumentos").textContent = "—";
@@ -677,6 +681,7 @@ function selecionarAba(chave) {
   mostrarAba(chave);
   if (chave === "longitudinal") compararPeriodos();
   if (chave === "dendrograma") carregarDendrograma();
+  if (chave === "linhatempo") carregarLinhaDoTempo();
 }
 
 function abasDaAnalise(chave) {
@@ -686,9 +691,12 @@ function abasDaAnalise(chave) {
   if (totalPeriodos < 2) abas = abas.filter((aba) => aba !== "longitudinal");
   if (!estado.avancado) abas = abas.filter((aba) => ABAS_SIMPLES.includes(aba));
   // Visão secundária: só no modo avançado, antes de "Comparar períodos".
-  else if (!abas.includes("dendrograma")) {
-    const i = abas.indexOf("longitudinal");
-    abas.splice(i < 0 ? abas.length : i, 0, "dendrograma");
+  else {
+    if (!abas.includes("dendrograma")) {
+      const i = abas.indexOf("longitudinal");
+      abas.splice(i < 0 ? abas.length : i, 0, "dendrograma");
+    }
+    if (!abas.includes("linhatempo")) abas.splice(abas.indexOf("dendrograma") + 1, 0, "linhatempo");
   }
   return abas;
 }
@@ -721,6 +729,7 @@ const BLOCO_POR_ABA = {
   indices: "blocoIndices",
   documentos: "blocoDocumentos",
   dendrograma: "blocoDendrograma",
+  linhatempo: "blocoLinhaDoTempo",
   longitudinal: "blocoLongitudinal",
 };
 
@@ -1081,6 +1090,8 @@ function renderizarResultado(resultado) {
   estado.desatualizada = false;
   dendro.token = null;
   if (abaAtual() === "dendrograma") carregarDendrograma();
+  limparLinhaDoTempo(false);
+  if (abaAtual() === "linhatempo") carregarLinhaDoTempo();
   $("seloPrevia").textContent = "Prévia sob demanda";
   $("seloPrevia").classList.remove("alerta");
   fecharDrawer();
@@ -1211,6 +1222,7 @@ function renderizarResultado(resultado) {
 
   renderizarTabela(resultado);
   renderizarIndices(resultado);
+  renderizarPivos(resultado);
   renderizarQualidade(resultado);
   atualizarMenuExportar();
   estado.docsToken = null;
@@ -2816,12 +2828,46 @@ function desenharRede() {
   ctx.fill();
   ctx.stroke();
 
+  desenharPivosRede(ctx, escala, visiveis);
+
   ctx.restore();
 
   desenharSelos();
   desenharRotulos(visiveis);
 
   if (redeUI.dica) desenharDestaque(redeUI.dica);
+}
+
+// Anel escuro e numerado nos pontos de virada (mesma marca do SVG em viz/halo.py).
+function desenharPivosRede(ctx, escala, visiveis) {
+  const p = estado.resultado && estado.resultado.pivos;
+  if (!p || !p.pivos || !p.pivos.length || !(escala > 0)) return;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  ctx.font = `700 ${11 / escala}px Inter, Arial, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  for (const item of p.pivos) {
+    const no = redeUI.posicao.get(item.no);
+    if (!no || (visiveis && !visiveis.has(item.no))) continue;
+    const raio = no.raio + 3.5 / escala;
+    ctx.beginPath();
+    ctx.arc(no.x, no.y, raio, 0, Math.PI * 2);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 5.2 / escala;
+    ctx.stroke();
+    ctx.strokeStyle = "#14204A";
+    ctx.lineWidth = 2.2 / escala;
+    ctx.stroke();
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3 / escala;
+    ctx.strokeText(String(item.posicao), no.x + raio + 2 / escala, no.y - raio);
+    ctx.fillStyle = "#14204A";
+    ctx.fillText(String(item.posicao), no.x + raio + 2 / escala, no.y - raio);
+  }
+  ctx.restore();
 }
 
 function desenharSelos() {
@@ -3241,6 +3287,9 @@ function atualizarMenuExportar() {
       faltaResultado = true;
     }
     else if (precisa === "grade" && !temGrade) motivo = MOTIVO_EXPORTAR.grade;
+    else if (item.dataset.exp === "linhatempo-svg" && !linhaDoTempoAplicavel()) {
+      motivo = MOTIVO_LINHA_DO_TEMPO;
+    }
     else if (item.dataset.exp === "fluxo-svg" && !fluxoDisponivel()) {
       motivo = "A base não traz afiliação nem país; não há fluxo Autor – País – IES.";
     }
@@ -3279,6 +3328,7 @@ function executarExportacao(tipo) {
   else if (tipo === "grade") { if (estado.download) window.location.href = estado.download; }
   else if (tipo === "fluxo-svg") baixarFluxo();
   else if (tipo === "dendrograma-svg") baixarDendrograma();
+  else if (tipo === "linhatempo-svg") baixarLinhaDoTempo();
   else exportar(tipo);
 }
 
@@ -3428,6 +3478,221 @@ async function baixarDendrograma() {
   } catch (erro) {
     mostrarToast(erro.message, true);
   }
+}
+
+/* ------------------------------------------------------------ linha do tempo */
+
+const MOTIVO_LINHA_DO_TEMPO =
+  "A linha do tempo mostra itens ao longo dos anos; com acoplamento os nós são documentos. " +
+  "Escolha uma análise de co-ocorrência.";
+const lt = { token: null, seq: 0, tempo: null, max: null };
+
+function linhaDoTempoAplicavel() {
+  const p = estado.resultado && estado.resultado.parametros;
+  return !p || p.matriz === "CoOccurrence";
+}
+
+function urlLinhaDoTempo(extra = {}) {
+  const q = new URLSearchParams({ token: estado.token, max_nos: $("ltNos").value, ...extra });
+  return `/api/linha-do-tempo?${q}`;
+}
+
+function mensagemLinhaDoTempo(texto) {
+  $("vazioLinhaDoTempo").hidden = false;
+  $("vazioLinhaDoTempo").textContent = texto;
+  $("ltFigura").hidden = true;
+  $("ltFigura").replaceChildren();
+  $("ltAvisos").replaceChildren();
+}
+
+// Esquece a figura (e ignora respostas em andamento) quando a análise ou o projeto muda.
+function limparLinhaDoTempo(novoProjeto) {
+  lt.token = null;
+  lt.seq += 1;
+  clearTimeout(lt.tempo);
+  if (novoProjeto) {
+    $("ltNos").value = "40";
+    $("ltNosValor").textContent = "40";
+  }
+  mensagemLinhaDoTempo("Execute uma análise para ver a linha do tempo.");
+  $("metaLinhaDoTempo").textContent = "agrupamentos do corpus completo ao longo dos anos";
+}
+
+async function carregarLinhaDoTempo(forcar) {
+  if (!estado.token) {
+    mensagemLinhaDoTempo("Execute uma análise para ver a linha do tempo.");
+    return;
+  }
+  if (!forcar && lt.token === estado.token && !$("ltFigura").hidden) return;
+  if (!linhaDoTempoAplicavel()) {
+    lt.token = null;
+    mensagemLinhaDoTempo(MOTIVO_LINHA_DO_TEMPO);
+    return;
+  }
+  const seq = ++lt.seq;
+  const token = estado.token;
+  if (!forcar) mensagemLinhaDoTempo("calculando a linha do tempo…");
+  try {
+    const d = await api(urlLinhaDoTempo());
+    if (seq !== lt.seq || token !== estado.token) return;
+    lt.token = token;
+    $("ltFigura").innerHTML = d.svg;
+    const svg = $("ltFigura").querySelector("svg");
+    if (svg) { svg.removeAttribute("height"); svg.style.height = "auto"; }
+    $("ltFigura").hidden = false;
+    $("vazioLinhaDoTempo").hidden = true;
+    $("ltAvisos").replaceChildren(...d.avisos.map((aviso) => {
+      const li = document.createElement("li");
+      li.textContent = aviso;
+      return li;
+    }));
+    const anos = d.anos && d.anos.length ? ` · ${d.anos[0]}–${d.anos[1]}` : "";
+    $("metaLinhaDoTempo").textContent =
+      `${plural(d.n_nos, "item", "itens")} · ${plural(d.n_faixas, "faixa", "faixas")}${anos}`;
+  } catch (erro) {
+    if (seq !== lt.seq) return;
+    lt.token = null;
+    mensagemLinhaDoTempo(erro.message);
+    mostrarToast(erro.message, true);
+  }
+}
+
+function ligarLinhaDoTempo() {
+  $("ltNos").addEventListener("input", () => {
+    $("ltNosValor").textContent = $("ltNos").value;
+    clearTimeout(lt.tempo);
+    lt.tempo = setTimeout(() => carregarLinhaDoTempo(true), 250);
+  });
+}
+
+async function baixarLinhaDoTempo() {
+  if (!estado.token) return;
+  try {
+    const resposta = await fetch(urlLinhaDoTempo({ baixar: "1" }));
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(corpo.erro || "Não há dados para a linha do tempo.");
+    }
+    const blob = await resposta.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "linha-do-tempo.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  } catch (erro) {
+    mostrarToast(erro.message, true);
+  }
+}
+
+/* ---------------------------------------------------------- pontos de virada */
+
+function limparPivos() {
+  $("pivosBloco").hidden = true;
+  $("pivosCorpo").replaceChildren();
+}
+
+function renderizarPivos(resultado) {
+  const p = resultado.pivos;
+  limparPivos();
+  // Sem agrupamentos ou sem cálculo (falhou no servidor): a seção nem aparece.
+  if (!p || !resultado.grupos || !resultado.grupos.length) return;
+  $("pivosBloco").hidden = false;
+  const aviso = $("pivosAviso");
+  const adiado = $("pivosAdiado");
+  const desc = $("pivosDescritores");
+  aviso.hidden = true;
+  desc.hidden = true;
+  adiado.hidden = !p.adiado;
+  $("pivosTabelaCaixa").hidden = Boolean(p.adiado);
+  if (p.adiado) {
+    $("pivosAdiadoTexto").textContent =
+      `A rede tem ${nf.format(p.n_nos)} nós; o cálculo da intermediação leva alguns segundos.`;
+    $("pivosCalcular").disabled = false;
+    return;
+  }
+  const comSigma = Boolean(p.tem_sigma);
+  $("pivosColSigma").hidden = !comSigma;
+  const corpo = $("pivosCorpo");
+  const colunas = comSigma ? 7 : 6;
+  if (!p.pivos.length) {
+    const linha = document.createElement("tr");
+    const celula = document.createElement("td");
+    celula.colSpan = colunas;
+    celula.style.color = "#8A94A6";
+    celula.textContent = "Nenhum ponto de virada identificado nesta análise.";
+    linha.append(celula);
+    corpo.append(linha);
+  }
+  for (const item of p.pivos) {
+    const linha = document.createElement("tr");
+    const valores = [
+      String(item.posicao), item.rotulo,
+      item.intermediacao == null ? "—" : item.intermediacao.toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 }),
+      String(item.grupos_vizinhos), item.grupo_rotulo || "—", nf.format(item.frequencia),
+    ];
+    if (comSigma) {
+      valores.push(item.sigma == null ? "—" : item.sigma.toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
+    }
+    valores.forEach((valor, indice) => {
+      const celula = document.createElement("td");
+      if ([0, 2, 3, 5, 6].includes(indice)) celula.className = "num";
+      celula.textContent = valor;
+      linha.append(celula);
+    });
+    if (item.grupo_selo) {
+      linha.style.cursor = "pointer";
+      linha.addEventListener("click", () => abrirGrupo(item.grupo_selo));
+    }
+    corpo.append(linha);
+  }
+  const avisos = [];
+  if (!p.suficiente) {
+    avisos.push(`Poucos dados: a rede tem ${nf.format(p.n_nos)} nós (o mínimo confiável é ${p.minimo_nos}); leia os pontos de virada como indício.`);
+  }
+  if (!p.pivos.length) {
+    for (const texto of p.avisos || []) {
+      if (!texto.startsWith("Poucos dados") && !texto.includes("fora do ranking")) avisos.push(texto);
+    }
+  }
+  aviso.textContent = avisos.join(" ");
+  aviso.hidden = avisos.length === 0;
+  const termos = p.termos_descritores || [];
+  if (termos.length) {
+    const nomes = termos.slice(0, 8).map((t) =>
+      `${t.rotulo} (${Math.round(t.proporcao_documentos * 100)}%)`).join(", ");
+    desc.textContent = `Termos-descritor excluídos do ranking: ${nomes}` +
+      (termos.length > 8 ? ` e mais ${termos.length - 8}` : "") +
+      `. Aparecem em mais de ${Math.round(p.proporcao_descritor * 100)}% dos documentos do período; ` +
+      "descrevem o corpus em vez de distinguir temas, então não entram como pontos de virada.";
+    desc.hidden = false;
+  }
+  if (comSigma) {
+    desc.hidden = false;
+    desc.textContent += (termos.length ? " " : "") +
+      "Sigma = (intermediação + 1) elevado à força da rajada; como a rajada pesa muito, o ranking por sigma quase repete o ranking pela rajada.";
+  }
+}
+
+function ligarPivos() {
+  $("pivosCalcular").addEventListener("click", async () => {
+    if (!estado.token || !estado.resultado) return;
+    const token = estado.token;
+    const botao = $("pivosCalcular");
+    botao.disabled = true;
+    $("pivosAdiadoTexto").textContent = "calculando os pontos de virada…";
+    try {
+      const p = await api(`/api/pivos?token=${encodeURIComponent(token)}`);
+      if (token !== estado.token) return;
+      estado.resultado.pivos = p;
+      renderizarPivos(estado.resultado);
+      if (redeUI.dados) agendarDesenho();
+    } catch (erro) {
+      botao.disabled = false;
+      $("pivosAdiadoTexto").textContent = erro.message;
+    }
+  });
 }
 
 async function baixarFluxo() {
