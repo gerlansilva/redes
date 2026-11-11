@@ -58,7 +58,8 @@ class LimiaresTest(unittest.TestCase):
             "razao": r'out\["razao"\] < ([0-9.]+)',
             "silhueta_atencao": r"elif sm < ([0-9.]+):",
             "pct_negativos": r"pn > ([0-9.]+)",
-            "pct_agrupados": r'out\["pct_agrupados"\] < ([0-9.]+)',
+            "pct_grupos_ruim": r"if pu < ([0-9.]+):",
+            "pct_grupos_ok": r"elif pu < ([0-9.]+):",
         }
         for chave, padrao in esperado.items():
             achado = re.search(padrao, fonte)
@@ -66,6 +67,7 @@ class LimiaresTest(unittest.TestCase):
             self.assertAlmostEqual(float(achado.group(1)), lim[chave], msg=chave)
         self.assertIn("if sm < 0:", fonte)
         self.assertEqual(0.0, lim["silhueta_ruim"])
+        self.assertEqual(qualidade.GRUPO_GRANDE, lim["grupo_grande"])
 
     def test_texto_cita_constantes(self):
         from scimatpy.pipeline import Configuracao

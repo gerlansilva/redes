@@ -122,7 +122,10 @@ class IndicadoresTest(unittest.TestCase):
         grupos = [nos[i:i + 15] for i in range(0, n, 15)]
         a = qualidade.avalia(_res(rede, grupos))
         self.assertLess(abs(a["q"]), 0.05)
-        self.assertEqual(a["nivel"], "ruim")
+        # Q ~ 0 é só uma nota de nitidez: os 4 grupos têm 15 itens, então o selo é OK
+        self.assertEqual(a["nivel"], "ok")
+        self.assertTrue(any("muito fraca" in t for t in a["avisos"]), a["avisos"])
+        self.assertIn(qualidade.NOTA_NITIDEZ, a["avisos"])
 
     def test_silhueta_aleatoria_igual_a_independente(self):
         rnd = random.Random(11)
@@ -199,10 +202,12 @@ class IndefinidoTest(unittest.TestCase):
 
 
 class LimiaresTest(unittest.TestCase):
-    """Níveis a partir de Q, razão e silhueta, com os números injetados."""
+    """Selo = estrutura (itens em grupos de 5+, fragmentação, coautoria); Q, razão e silhueta
+    viram notas de nitidez e não mudam o selo."""
 
-    def _avalia(self, q, ql=None, sil=None):
-        rede, grupos = _blocos()
+    def _avalia(self, q, ql=None, sil=None, grupos=None):
+        rede, blocos = _blocos()
+        grupos = blocos if grupos is None else grupos
         ql = q if ql is None else ql
         sequencia = iter([q, ql])
         if sil is None:
@@ -216,51 +221,107 @@ class LimiaresTest(unittest.TestCase):
                 mock.patch.object(qualidade, "_silhuetas_validas", lambda *_: sil_ret):
             return qualidade.avalia(_res(rede, grupos))
 
-    def test_q(self):
-        self.assertEqual(self._avalia(0.14)["nivel"], "ruim")
-        self.assertEqual(self._avalia(0.15)["nivel"], "atencao")
-        self.assertEqual(self._avalia(0.29)["nivel"], "atencao")
-        self.assertEqual(self._avalia(0.30)["nivel"], "ok")
+    @staticmethod
+    def _tem(a, trecho):
+        return any(trecho in t for t in a["avisos"])
 
-    def test_razao(self):
+    def test_q_so_gera_nota(self):
+        for q in (0.0, 0.14, 0.15, 0.29, 0.30, 0.9):
+            self.assertEqual(self._avalia(q)["nivel"], "ok", q)
+        self.assertTrue(self._tem(self._avalia(0.14), "muito fraca"))
+        self.assertTrue(self._tem(self._avalia(0.15), "moderada"))
+        self.assertTrue(self._tem(self._avalia(0.29), "moderada"))
+        self.assertEqual(self._avalia(0.30)["avisos"], [])
+
+    def test_razao_so_gera_nota(self):
         a = self._avalia(0.4, ql=0.8)       # 0,5
-        self.assertEqual(a["nivel"], "atencao")
-        self.assertEqual(self._avalia(0.4, ql=0.6)["nivel"], "ok")   # 0,67
+        self.assertEqual(a["nivel"], "ok")
+        self.assertTrue(self._tem(a, "divisão bem mais nítida"))
+        self.assertEqual(self._avalia(0.4, ql=0.6)["avisos"], [])      # 0,67
         self.assertIsNone(self._avalia(0.4, ql=0.0)["razao"])
         self.assertEqual(self._avalia(0.4, ql=0.0)["nivel"], "ok")
 
-    def test_silhueta(self):
-        self.assertEqual(self._avalia(0.5, sil=[-0.05] * 20)["nivel"], "ruim")
-        self.assertEqual(self._avalia(0.5, sil=[0.04] * 20)["nivel"], "atencao")
-        self.assertEqual(self._avalia(0.5, sil=[0.05] * 20)["nivel"], "ok")     # limiar: < 0,05
-        self.assertEqual(self._avalia(0.5, sil=[0.2] * 20)["nivel"], "ok")
+    def test_silhueta_so_gera_nota(self):
+        for sil in (-0.05, 0.04, 0.05, 0.2):
+            self.assertEqual(self._avalia(0.5, sil=[sil] * 20)["nivel"], "ok", sil)
+        self.assertTrue(self._tem(self._avalia(0.5, sil=[-0.05] * 20), "mais perto de outros"))
+        self.assertTrue(self._tem(self._avalia(0.5, sil=[0.04] * 20), "pouco coesos"))
+        self.assertEqual(self._avalia(0.5, sil=[0.05] * 20)["avisos"], [])   # limiar: < 0,05
+        self.assertEqual(self._avalia(0.5, sil=[0.2] * 20)["avisos"], [])
 
     def test_muitas_silhuetas_negativas(self):
         sil = [0.6] * 13 + [-0.1] * 7           # 35% negativos, média > 0,05
         a = self._avalia(0.5, sil=sil)
-        self.assertEqual(a["nivel"], "atencao")
+        self.assertEqual(a["nivel"], "ok")
+        self.assertTrue(self._tem(a, "35%"))
         self.assertAlmostEqual(a["pct_silhueta_negativa"], 35.0)
 
-    def test_pouco_agrupados(self):
+    def test_nota_de_nitidez_so_aparece_com_nota(self):
+        self.assertNotIn(qualidade.NOTA_NITIDEZ, self._avalia(0.5)["avisos"])
+        self.assertIn(qualidade.NOTA_NITIDEZ, self._avalia(0.1)["avisos"])
+
+    def test_cobertura_util_define_ruim_atencao_e_ok(self):
+        # 20 itens; "grande" = grupo de 5 ou mais itens
+        def nivel(*tamanhos):
+            nos, grupos = 0, []
+            for t in tamanhos:
+                grupos.append(list(range(nos, nos + t)))
+                nos += t
+            return self._avalia(0.5, grupos=grupos)
+
+        self.assertEqual(nivel(10, 10)["pct_em_grupos_grandes"], 100.0)
+        self.assertEqual(nivel(10, 10)["nivel"], "ok")
+        self.assertEqual(nivel(8, 8, 2, 2)["pct_em_grupos_grandes"], 80.0)
+        self.assertEqual(nivel(8, 8, 2, 2)["nivel"], "ok")             # limiar: < 80
+        self.assertEqual(nivel(8, 7, 3, 2)["nivel"], "atencao")        # 75%
+        self.assertEqual(nivel(10, 4, 3, 3)["nivel"], "atencao")       # 50%
+        self.assertEqual(nivel(9, 4, 4, 3)["nivel"], "ruim")           # 45%
+        self.assertEqual(nivel(2, 2, 2, 2, 2, 2, 2, 2, 2, 2)["nivel"], "ruim")
+        self.assertEqual(nivel(2, 2, 2, 2, 2, 2, 2, 2, 2, 2)["pct_em_grupos_grandes"], 0.0)
+        # grupo de exatamente 5 itens já conta
+        self.assertEqual(nivel(5, 5, 5, 5)["pct_em_grupos_grandes"], 100.0)
+        self.assertEqual(nivel(4, 4, 4, 4, 4)["pct_em_grupos_grandes"], 0.0)
+
+    def test_cobertura_util_conta_item_sem_grupo_como_fora(self):
         rede, grupos = _blocos(tam=10, blocos=2)
-        g60 = [grupos[0][:6], grupos[1][:6]]              # 12 de 20 = 60%: sem aviso
-        self.assertFalse(any("entraram em agrupamentos" in t
-                             for t in qualidade.avalia(_res(rede, g60))["avisos"]))
-        grupos = [grupos[0][:5], grupos[1][:6]]           # 55%
-        a = qualidade.avalia(_res(rede, grupos))
-        self.assertIn(a["nivel"], ("atencao", "ruim"))
-        self.assertTrue(any("55%" in t and "entraram em agrupamentos" in t
-                            for t in a["avisos"]), a["avisos"])
+        a = qualidade.avalia(_res(rede, [grupos[0][:6], grupos[1][:6]]))   # 12 de 20 = 60%
+        self.assertAlmostEqual(a["pct_em_grupos_grandes"], 60.0)
+        self.assertAlmostEqual(a["pct_agrupados"], 60.0)
+        self.assertEqual(a["nivel"], "atencao")
+        self.assertTrue(self._tem(a, "60% dos itens estão em agrupamentos de 5 ou mais"))
+        b = qualidade.avalia(_res(rede, [grupos[0][:5], grupos[1][:4]]))   # 5 de 20 = 25%
+        self.assertEqual(b["nivel"], "ruim")
+        self.assertTrue(self._tem(b, "Só 25% dos itens"), b["avisos"])
+
+    def test_aviso_de_cobertura_nao_contradiz_o_selo(self):
+        # 250 itens, 124 em um grupo grande: 49,6% (ruim); o texto não pode dizer "50%"
+        rede, grupos = _blocos(tam=125, blocos=2)
+        a = qualidade.avalia(_res(rede, [grupos[0][:124], grupos[1][:1], grupos[1][1:3]]))
+        self.assertAlmostEqual(a["pct_em_grupos_grandes"], 49.6)
+        self.assertEqual(a["nivel"], "ruim")
+        self.assertTrue(self._tem(a, "49,6%"), a["avisos"])
+        self.assertFalse(self._tem(a, " 50%"))
 
     def test_rede_fragmentada_nunca_e_ok(self):
+        # 10 pares ligados e 30 itens isolados, em 8 grupos de 5 (cobertura útil 100%)
+        arestas = [(2 * i, 2 * i + 1, 0.9) for i in range(10)]
+        rede = _rede(50, arestas)
+        grupos = [list(range(5 * i, 5 * i + 5)) for i in range(10)]
+        a = qualidade.avalia(_res(rede, grupos))
+        self.assertEqual(a["pct_em_grupos_grandes"], 100.0)
+        self.assertGreater(a["componentes"], a["n_nos"] / 2)
+        self.assertEqual(a["nivel"], "atencao")                    # ...mas não é ok
+        self.assertTrue(self._tem(a, "fragmentada"))
+
+    def test_pares_isolados_sao_ruim(self):
         arestas = [(2 * i, 2 * i + 1, 0.9) for i in range(20)]     # 20 pares
         rede = _rede(45, arestas)                                  # + 5 isolados
         grupos = [[2 * i, 2 * i + 1] for i in range(20)]
         a = qualidade.avalia(_res(rede, grupos))
-        self.assertGreater(a["q"], 0.5)                            # Q alto...
-        self.assertGreater(a["componentes"], a["n_nos"] / 2)
-        self.assertEqual(a["nivel"], "atencao")                    # ...mas não é ok
-        self.assertTrue(any("fragmentada" in t for t in a["avisos"]))
+        self.assertGreater(a["q"], 0.5)                            # Q alto, mas...
+        self.assertEqual(a["pct_em_grupos_grandes"], 0.0)
+        self.assertEqual(a["nivel"], "ruim")                       # ...só pares: nada a ler
+        self.assertTrue(self._tem(a, "fragmentada"))
 
     def test_limite_nos_pula_silhueta(self):
         rede, grupos = _blocos()

@@ -15,6 +15,9 @@
     <p class="apresentacao-frase">Mapeie a produção científica de um campo: temas, autores, países e referências, a partir do arquivo exportado da sua base.</p>
     <button type="button" class="botao escuro grande" id="btnComecar">Começar</button>
     <p class="apresentacao-local">Versão local · nenhum dado sai desta máquina</p>
+    <p class="apresentacao-autor">Criada por <b>Gerlan Silva da Silva</b> · Doutorando em Educação, UFSCar<br>
+      <a href="mailto:gerlanmatfis@gmail.com">gerlanmatfis@gmail.com</a> ·
+      <a href="https://orcid.org/0000-0002-9996-9983" target="_blank" rel="noopener noreferrer">ORCID 0000-0002-9996-9983</a></p>
   </div>
 </section>
 
@@ -336,6 +339,7 @@
         <div class="aba" data-aba="linhatempo" role="tab" tabindex="0" aria-selected="false">Linha do tempo</div>
         <div class="aba" data-aba="densidade" role="tab" tabindex="0" aria-selected="false">Densidade</div>
         <div class="aba" data-aba="duplomapa" role="tab" tabindex="0" aria-selected="false">Duplo mapa</div>
+        <div class="aba" data-aba="similitude" role="tab" tabindex="0" aria-selected="false">Similitude</div>
         <div class="aba" data-aba="longitudinal" role="tab" tabindex="0" aria-selected="false">Comparar períodos</div>
       </div>
       <div class="qualidade-caixa" id="qualidadeCaixa" hidden>
@@ -765,6 +769,75 @@
         <div class="rodape-tabela" id="rodapeDuploMapa">Esquerda: revistas que publicam os documentos do corpus; direita: revistas citadas por elas; faixa = citações entre áreas. A área é inferida por palavras do NOME da revista (aproximada): confira a tabela. Usa o corpus completo, não só o período.</div>
       </section>
 
+      <section class="tabela-bloco" id="blocoSimilitude" data-bloco="blocoSimilitude">
+        <header>
+          <h2>Similitude dos resumos</h2>
+          <span class="meta" id="metaSimilitude">palavras dos resumos que aparecem juntas, em blocos temáticos</span>
+        </header>
+        <div class="dendro-controles sm-controles">
+          <label class="campo-mini">Idioma
+            <select id="smIdioma" aria-label="Idioma dos resumos">
+              <option value="todos">todos</option>
+              <option value="en">inglês</option>
+              <option value="pt">português</option>
+              <option value="es">espanhol</option>
+            </select>
+          </label>
+          <label class="campo-mini">Período
+            <select id="smPeriodo" aria-label="Período dos resumos">
+              <option value="todos">todos</option>
+            </select>
+          </label>
+          <label class="campo-mini">Índice
+            <select id="smIndice" aria-label="Índice de associação">
+              <option value="jaccard">Jaccard</option>
+              <option value="cosseno">cosseno</option>
+              <option value="binomial">binomial</option>
+              <option value="cooc">coocorrência</option>
+            </select>
+          </label>
+          <label class="campo-mini">Segmento
+            <select id="smSegmento" aria-label="Segmento de texto">
+              <option value="resumo">resumo inteiro</option>
+              <option value="frase">grupos de frases</option>
+            </select>
+          </label>
+          <label class="campo-mini dendro-grupos">Palavras: <b id="smNValor">60</b>
+            <input type="range" id="smN" min="30" max="100" step="5" value="60" aria-label="Número de palavras no grafo">
+          </label>
+          <label class="campo-mini dendro-grupos">Arestas extras: <b id="smExtrasValor">20%</b>
+            <input type="range" id="smExtras" min="0" max="50" step="5" value="20" aria-label="Porcentagem de arestas extras tracejadas">
+          </label>
+          <label class="campo-mini sm-ignorar">Ignorar
+            <input type="text" id="smIgnorar" maxlength="400" placeholder="palavras separadas por vírgula" aria-label="Palavras a ignorar, separadas por vírgula">
+          </label>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioSimilitude">Execute uma análise para ver a similitude dos resumos.</div>
+          <div class="sm-figura" id="smFigura" hidden></div>
+        </div>
+        <ul class="sm-avisos" id="smAvisos" hidden></ul>
+        <p class="dm-aviso" id="smNota" hidden></p>
+        <div class="tabela-scroll dm-tabela" id="smTabelaCaixa" hidden>
+          <table>
+            <caption>Palavras do grafo: frequência, bloco e grau</caption>
+            <thead>
+              <tr>
+                <th>Palavra</th>
+                <th style="width:70px">Idioma</th>
+                <th class="num" style="width:96px" title="Segmentos (resumos, ou grupos de frases) em que a palavra aparece">Frequência</th>
+                <th class="num" style="width:80px" title="Resumos em que a palavra aparece">Resumos</th>
+                <th class="num" style="width:100px" title="Vezes que a palavra aparece, contando repetições">Ocorrências</th>
+                <th class="num" style="width:64px" title="Bloco temático (comunidade de Louvain)">Bloco</th>
+                <th class="num" style="width:64px" title="Número de ligações desenhadas (árvore e extras)">Grau</th>
+              </tr>
+            </thead>
+            <tbody id="smCorpo"></tbody>
+          </table>
+        </div>
+        <div class="rodape-tabela" id="rodapeSimilitude">Cada ponto é uma palavra dos resumos (forma básica); linha cheia = árvore máxima dos laços mais fortes, tracejada = laços extras; cores = blocos temáticos. O idioma de cada resumo é detectado (en, pt, es) e palavras de idiomas diferentes não se juntam. Usa os resumos do corpus (do período escolhido).</div>
+      </section>
+
       <section class="acoes-finais">
         <div>
           <div class="rotulo-secao">Exportar e compartilhar</div>
@@ -798,6 +871,9 @@
               <button type="button" role="menuitem" tabindex="-1" data-exp="linhatempo-svg" data-precisa="resultado">Linha do tempo (SVG)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="densidade-svg" data-precisa="resultado">Mapa de densidade (SVG)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="duplomapa-svg" data-precisa="resultado">Duplo mapa de áreas (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="similitude-svg" data-precisa="resultado">Similitude dos resumos (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="similitude-graphml" data-precisa="resultado">Similitude dos resumos (GraphML)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="similitude-csv" data-precisa="resultado">Similitude: palavras (CSV)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="fluxo-svg">Fluxo Autor – País – IES (SVG)</button>
             </div>
             <p class="menu-aviso" id="avisoExportar" hidden>Escolha uma análise no menu lateral para liberar os dados.</p>

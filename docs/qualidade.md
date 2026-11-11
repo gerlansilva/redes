@@ -19,19 +19,128 @@ agrupamentos" do método).
 
 ## Selo
 
+O selo responde "o mapa é feito de agrupamentos de verdade?". Depende só da estrutura:
+
 | Selo | Quando |
 |---|---|
-| Ruim | Q abaixo de 0,15 ou silhueta média abaixo de 0 |
-| Atenção | Q abaixo de 0,30; razão abaixo de 0,6; silhueta média abaixo de 0,05; mais de 30% dos itens com silhueta negativa; menos de 60% dos itens em agrupamentos; rede fragmentada (mais componentes do que a metade dos itens); ou unidade Autores (coautoria nunca passa de Atenção) |
+| Ruim | Menos de 50% dos itens em agrupamentos de 5 ou mais itens (o resto está solto ou em pares e trios) |
+| Atenção | De 50% a menos de 80% dos itens em agrupamentos de 5 ou mais; ou rede fragmentada (mais componentes do que a metade dos itens); ou unidade Autores (coautoria nunca passa de Atenção) |
 | Indefinido | Menos de 15 itens, menos de 2 agrupamentos ou rede sem ligação positiva. Nenhum número é mostrado como 0 |
-| OK | Nenhum dos alertas acima |
+| OK | 80% ou mais dos itens em agrupamentos de 5 ou mais, rede não fragmentada e não coautoria |
 
-Leitura prudente, não aprovação: a maioria das redes reais fica em
-"Atenção" e isso não invalida o mapa.
+Indicador novo: `pct_em_grupos_grandes` (% dos itens da rede em agrupamentos de
+`GRUPO_GRANDE` = 5 ou mais itens; item sem agrupamento conta como fora). Aparece no
+cartão, no popover e na tabela de indicadores do relatório.
 
-### Calibração (11/11/2026)
+**Avisos de nitidez (não mudam o selo).** Q abaixo de 0,30 (abaixo de 0,15, "muito
+fraca"), razão abaixo de 0,6, silhueta média abaixo de 0,05 (abaixo de 0, itens mais
+perto de outros grupos) e mais de 30% dos itens com silhueta negativa continuam
+gerando avisos, seguidos de uma nota (`NOTA_NITIDEZ`) que diz que eles descrevem a
+nitidez da divisão e não o selo. Os números seguem visíveis.
 
-Medida com `scripts/distribuicao_selo.py` em serj, serj_auto, novo142 e eecera59:
+Leitura prudente, não aprovação: Atenção não invalida o mapa; Ruim quer dizer que,
+com estes parâmetros, quase nada forma agrupamento de verdade (vale tentar uma
+frequência mínima maior).
+
+### Decisão sobre o selo "Ruim" (11/11/2026)
+
+Pergunta: "Ruim" deve valer "3 ou mais famílias de alerta ao mesmo tempo"? Em vez de
+decidir por simulação de distribuição, comparou-se cada regra com o julgamento visual
+dos mapas (halo e diagrama estratégico, renderizados em PNG com Playwright).
+
+*Método.* 29 períodos sorteados, estratificados pelo selo antigo e pelo número de
+famílias de alerta (serj, serj_auto, novo142, eecera59; sete unidades), mais 14
+períodos de uma segunda amostra sorteada à parte (2 por unidade) e julgada antes de
+escolher a regra. Cada mapa foi visto sem o selo, com um critério fixado antes: **Bom**
+(grupos de verdade, poucos itens soltos), **Regular** (núcleo legível, mas parte do
+mapa em pares, trios ou itens soltos) e **Inutilizável** (menos da metade dos itens em
+grupos de 5 ou mais; muitos nós soltos, grupos triviais ou rede fragmentada). Bom
+deveria receber OK, Regular Atenção e Inutilizável Ruim. Os 43 julgamentos estão
+descritos abaixo; o julgamento é de um só avaliador, então a tabela mede aderência a
+essa leitura, não verdade absoluta.
+
+*Achado central.* O selo antigo estava quase invertido em relação ao que se vê: dos 21
+mapas Bons, 9 saíram Ruim e 11 Atenção (só 1 OK), e dos 12 Inutilizáveis nenhum saiu
+Ruim, 3 saíram OK. Q, razão, silhueta e itens negativos medem a *nitidez*: em redes
+densas (acoplamento, referências; de milhares a mais de 100 mil arestas) ficam baixos
+mesmo com agrupamentos grandes e coesos, e em redes de pares isolados (coautoria,
+instituições) o Q fica alto (0,62 a 0,96 em 10 dos 12 Inutilizáveis) sem nada a ler. A
+fração de itens em agrupamentos de 5 ou mais separou os dois casos: Bons entre 83% e 99%
+(exceto um, com 69%), Regulares entre 51% e 87%, Inutilizáveis entre 0% e 61%.
+
+Selo (linhas) contra julgamento visual, 43 mapas:
+
+| Visual \ selo | Antigo OK | Antigo Atenção | Antigo Ruim | Novo OK | Novo Atenção | Novo Ruim |
+|---|---|---|---|---|---|---|
+| Bom (21) | 1 | 11 | 9 | 20 | 1 | 0 |
+| Regular (10) | 5 | 3 | 2 | 1 | 9 | 0 |
+| Inutilizável (12) | 3 | 9 | 0 | 0 | 2 | 10 |
+| Concordância exata | 4/43 | | | 39/43 | | |
+
+Regras candidatas (concordância exata com Bom=OK, Regular=Atenção, Inutilizável=Ruim;
+"Ruim certo" = Inutilizáveis que a regra acusa; "Ruim falso" = Bons ou Regulares que a
+regra acusa), 43 mapas:
+
+| Regra | Concordância | Ruim certo (de 12) | Ruim falso |
+|---|---|---|---|
+| Antiga (Q < 0,15 ou silhueta < 0) | 4 | 0 | 11 |
+| Só Q (< 0,15 Ruim, < 0,30 Atenção) | 4 | 0 | 11 |
+| Ruim com 3 ou mais famílias de alerta | 5 | 2 | 14 |
+| Ruim com 2 ou mais famílias | 6 | 4 | 23 |
+| Ruim com 4 ou mais famílias | 7 | 1 | 0 |
+| **Nova: itens em grupos de 5+ (Ruim < 50%, OK >= 80%)** | **39** | **10** | **0** |
+
+"Famílias" = força (Q < 0,30), razão (< 0,6), coesão (silhueta < 0,05 ou > 30%
+negativos), cobertura (< 60% agrupados), fragmentação. As regras por famílias não
+funcionam porque os 21 mapas Bons têm de 1 a 3 famílias acesas; qualquer regra que use
+Q, razão ou silhueta como gatilho do selo acusa justamente os mapas bem agrupados de
+redes densas.
+
+*Sensibilidade e sobreajuste.* Limiares testados nos 43 mapas (Ruim abaixo de / OK a
+partir de): 50/80 = 39 acertos; 50/85 = 38; 40/85 = 37; 50/90 = 33; 60/85 = 32. Há um
+platô entre 50 e 85, então os valores redondos (metade dos itens; 4 em cada 5) não são
+um ajuste fino. Os limiares nasceram da primeira amostra (26/29 em 50/85 e em 50/80); na
+segunda, julgada às cegas antes, deram 12/14 (50/85) e 13/14 (50/80); a diferença é um
+só mapa Bom com 83% (ficou 80, redondo, depois de ver isso: um ganho dentro do ruído). Os
+4 erros restantes são casos de fronteira: dois mapas com ~60% dos itens em grupos grandes
+mas centenas de grupos pequenos (Instituições e Palavras), que à vista ficam entre Regular
+e Inutilizável e saem Atenção; um Regular com 87% que sai OK; um Bom com 69% que sai Atenção.
+
+*Distribuição (323 períodos com selo definido, 4 projetos, todas as unidades e matrizes,
+frequências 1 e 2, mais as análises do relatório):*
+
+| Selo | Antes (silhueta < 0,05) | Depois (itens em grupos de 5+) |
+|---|---|---|
+| OK | 45 (14%) | 145 (45%) |
+| Atenção | 214 (66%) | 74 (23%) |
+| Ruim | 64 (20%) | 104 (32%) |
+| Análises do relatório (44 períodos): OK / Atenção / Ruim | 7 / 35 / 2 | 21 / 7 / 16 |
+
+O Ruim sobe de 20% para 32% porque agora acusa o que é visivelmente inútil. Por
+unidade (OK / Atenção / Ruim, períodos com selo): Autores 0 / 1 / 46 e Instituições
+0 / 6 / 35 (redes de pares e trios), Países 11 / 25 / 5, Referências 22 / 18 / 11,
+Palavras 27 / 13 / 7, Autores de referências 40 / 7 / 0, Fontes de referências 45 / 4 / 0.
+Ruim concentra-se em Autores e Instituições (78% dos Ruins). Motivos: 104 períodos
+com menos de 50% em grupos de 5+ (Ruim), 74 com 50% a 80% (Atenção, 73 só por isso), 60 com
+rede fragmentada, 47 coautoria. Os avisos de nitidez seguem acesos em 19% a 42% dos
+períodos (silhueta < 0,05: 42%; mais de 30% negativos: 33%; razão < 0,6: 32%; Q < 0,30:
+24%; Q < 0,15: 19%), sem efeito no selo.
+
+Reproduzir: `python3 scripts/distribuicao_selo.py saida.json projeto.redes ...`
+(grava `pct_em_grupos_grandes`, os motivos do selo e as notas de nitidez).
+
+Limites: um só avaliador, 43 mapas e quatro bases (educação estatística); se o selo
+passar a ser usado em outro domínio, vale repetir o julgamento visual. O critério visual
+(itens em grupos triviais) é próximo do que o indicador mede por construção; o ganho
+não vem de ajuste estatístico, e sim de trocar o gatilho do selo por algo que descreve
+o que o usuário vê.
+
+### Calibração anterior da coesão (11/11/2026, vale agora só para os avisos)
+
+
+Esta calibração mexia no selo; depois ele passou a depender só da estrutura (seção
+acima), e o limiar de coesão 0,05 ficou como limiar do aviso. Medida com
+`scripts/distribuicao_selo.py` em serj, serj_auto, novo142 e eecera59:
 todas as unidades e matrizes, frequências mínimas 1 e 2, mais as análises do
 relatório completo (435 períodos, 323 com selo definido; os demais ficam
 "Indefinido" por terem menos de 15 itens ou menos de 2 agrupamentos).

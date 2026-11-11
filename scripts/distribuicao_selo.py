@@ -6,7 +6,9 @@ Para cada projeto percorre as unidades e matrizes, em duas frequências mínimas
 análises do relatório completo (frequência escolhida como no relatório), avalia cada
 período com `qualidade.avalia` e grava um registro por (análise, período). Serve para
 calibrar os limiares de `qualidade.py` (ver `docs/qualidade.md`) e para conferir o
-efeito de uma mudança: rode antes e depois e compare com `--resumo`.
+efeito de uma mudança: rode antes e depois e compare com `--resumo`. O selo depende só da
+estrutura (itens em agrupamentos de 5 ou mais, fragmentação, coautoria); os sinais de
+nitidez saem em `notas`.
 
     python3 scripts/distribuicao_selo.py --resumo saida.json
 """
@@ -28,30 +30,42 @@ LIMITE_NOS = 1500        # redes maiores não entram na grade (lentas e fora do 
 
 
 def motivos(a: dict, unidade: str) -> list[str]:
-    """Quais critérios de `qualidade.avalia` dispararam (espelha a ordem do código)."""
+    """Quais critérios do selo de `qualidade.avalia` dispararam (espelha o código).
+
+    Só entram os que mexem no selo (estrutura); os sinais de nitidez (Q, razão, coesão,
+    itens negativos) viram notas e vão em `notas`.
+    """
     m = []
-    q = a["q"]
-    if q is not None:
-        if q < 0.15:
-            m.append("q<0,15 (ruim)")
-        elif q < 0.30:
+    pu = a["pct_em_grupos_grandes"]
+    if pu < 50:
+        m.append("<50% em grupos de 5+ (ruim)")
+    elif pu < 80:
+        m.append("<80% em grupos de 5+")
+    if a["componentes"] > a["n_nos"] / 2:
+        m.append("rede fragmentada")
+    if unidade == "Authors":
+        m.append("coautoria")
+    return m
+
+
+def notas(a: dict) -> list[str]:
+    """Sinais de nitidez (não mudam o selo)."""
+    m = []
+    if a["q"] is not None:
+        if a["q"] < 0.15:
+            m.append("q<0,15")
+        elif a["q"] < 0.30:
             m.append("q<0,30")
     if a["razao"] is not None and a["razao"] < 0.6:
         m.append("razão<0,6")
     sm = a["silhueta_media"]
     if sm is not None:
         if sm < 0:
-            m.append("silhueta<0 (ruim)")
+            m.append("silhueta<0")
         elif sm < 0.05:
             m.append("silhueta<0,05")
     if a["pct_silhueta_negativa"] is not None and a["pct_silhueta_negativa"] > 30:
         m.append(">30% silhueta negativa")
-    if a["pct_agrupados"] < 60:
-        m.append("<60% agrupados")
-    if a["componentes"] > a["n_nos"] / 2:
-        m.append("rede fragmentada")
-    if unidade == "Authors":
-        m.append("coautoria")
     return m
 
 
@@ -93,7 +107,9 @@ def coleta(caminho: str) -> list[dict]:
                     "n_nos": a["n_nos"], "n_grupos": a["n_grupos"], "nivel": a["nivel"],
                     "q": a["q"], "razao": a["razao"], "silhueta": a["silhueta_media"],
                     "pct_neg": a["pct_silhueta_negativa"], "pct_agr": a["pct_agrupados"],
-                    "componentes": a["componentes"], "motivos": motivos(a, dados["unidade"])})
+                    "componentes": a["componentes"],
+                    "pct_em_grupos_grandes": a["pct_em_grupos_grandes"],
+                    "motivos": motivos(a, dados["unidade"]), "notas": notas(a)})
     return registros
 
 
@@ -122,9 +138,15 @@ def resumo(registros: list[dict]) -> str:
     definidos = [r for r in registros if r["nivel"] in ("atencao", "ruim")]
     conta = collections.Counter(m for r in definidos for m in r["motivos"])
     unico = collections.Counter(r["motivos"][0] for r in definidos if len(r["motivos"]) == 1)
-    saida.append("Motivos (Atenção/Ruim; um período pode ter vários):")
+    saida.append("Motivos do selo (Atenção/Ruim; um período pode ter vários):")
     for m, n in conta.most_common():
         saida.append(f"  {m}: {n}  (único motivo em {unico.get(m, 0)})")
+    definidos = [r for r in registros if r["nivel"] != "indefinido"]
+    if definidos and "notas" in definidos[0]:
+        cn = collections.Counter(m for r in definidos for m in r["notas"])
+        saida.append("Notas de nitidez (não mudam o selo; todos os períodos com selo):")
+        for m, n in cn.most_common():
+            saida.append(f"  {m}: {n} ({100 * n / len(definidos):.0f}%)")
     return "\n".join(saida)
 
 

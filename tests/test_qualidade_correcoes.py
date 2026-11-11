@@ -161,7 +161,7 @@ class NumeroTest(unittest.TestCase):
         rede, grupos = _blocos()
         with mock.patch.object(qualidade, "modularidade", return_value=0.1496):
             a = qualidade.avalia(_res(rede, grupos))
-        self.assertEqual("ruim", a["nivel"])
+        self.assertEqual("ok", a["nivel"])          # Q é só nota de nitidez
         texto = " ".join(a["avisos"])
         self.assertIn("0,1496", texto)
         self.assertNotIn("0,15)", texto)
@@ -199,8 +199,8 @@ class CoautoriaTest(unittest.TestCase):
 
     def test_autores_ruim_e_indefinido_ficam(self):
         rede, grupos = _blocos()
-        with mock.patch.object(qualidade, "modularidade", return_value=0.05):
-            self.assertEqual("ruim", qualidade.avalia(_res(rede, grupos, "Authors"))["nivel"])
+        pares = [[2 * i, 2 * i + 1] for i in range(10)]            # só pares: cobertura útil 0%
+        self.assertEqual("ruim", qualidade.avalia(_res(rede, pares, "Authors"))["nivel"])
         pequena, g = _blocos(tam=6)
         indef = qualidade.avalia(_res(pequena, g, "Authors"))
         self.assertEqual("indefinido", indef["nivel"])
@@ -607,7 +607,7 @@ class NavegadorTest(unittest.TestCase):
         self.assertLessEqual(r["base"], r["acoes"] + 1)
         self.assertTrue(r["visivel"])
         self.assertIn("coautoria", r["texto"])
-        self.assertIn("Atenção", r["texto"])
+        self.assertRegex(r["texto"], "Atenção|Ruim")
 
     def test_nomes_legiveis_preservam_caixa_dos_dados(self):
         pg = self._abre(1280, 720, "conceitual")

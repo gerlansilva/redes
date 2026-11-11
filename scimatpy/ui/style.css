@@ -1104,6 +1104,16 @@ tbody tr:hover td { background: #FBFCFE; }
 .dm-tabela caption { text-align: left; padding: 8px 12px; font-size: 12px; font-weight: 650; color: var(--azul-escuro); }
 .dm-tabela td { overflow-wrap: anywhere; }
 
+/* ----------------------------------------------------------------- similitude */
+
+.sm-figura { max-width: 100%; overflow-x: auto; border: 1px solid var(--linha); border-radius: 10px; background: var(--branco); }
+.sm-figura svg { display: block; width: 100%; min-width: 760px; max-width: none; height: auto; }
+.sm-controles .campo-mini { white-space: nowrap; }
+.sm-controles .dendro-grupos { flex: 1 1 250px; }
+.sm-controles .sm-ignorar { flex: 1 1 260px; min-width: 200px; }
+.sm-controles .sm-ignorar input { flex: 1; min-width: 0; border: none; background: transparent; outline: none; font-size: 11px; color: #33405E; }
+.sm-avisos { margin: 10px 18px 0; padding-left: 18px; font-size: 13px; line-height: 1.5; color: var(--tinta-suave); overflow-wrap: anywhere; }
+
 /* --------------------------------------------------------- pontos de virada */
 
 .pivos-bloco { border-bottom: 1px solid var(--linha); margin-bottom: 8px; padding: 14px 18px 12px; }
@@ -1907,6 +1917,9 @@ body.tela-aberta { overflow: hidden; }
 .apresentacao-local {
   font-size: 12px; color: var(--tinta-fraca); animation: sobe .7s .6s ease both;
 }
+.apresentacao-autor { margin: 18px 0 0; font-size: 13px; line-height: 1.6; color: var(--tinta-fraca); text-align: center; }
+.apresentacao-autor a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.apresentacao-autor a:hover { color: var(--azul, #2b2bff); }
 .apresentacao.sem-animacao *,
 .apresentacao.sem-animacao { animation: none !important; transition: none !important; }
 @keyframes apareceLogo { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: none; } }

@@ -553,6 +553,75 @@ def duplo_mapa_do_pedido(pedido: dict) -> dict:
     }
 
 
+def similitude_do_pedido(pedido: dict) -> dict:
+    """Análise de similitude dos resumos (GET e POST). Usa ``token`` de uma análise já calculada
+    ou, sem ele, ``projeto``/``caminho``; vale para os resumos do corpus (ou de um ``periodo``),
+    qualquer que seja a configuração da análise. ``baixar`` = svg, graphml, csv ou csv-arestas."""
+    from . import similitude
+    from .viz import similitude as viz_sim
+    n_formas = _inteiro_limitado(pedido.get("n_formas"), similitude.N_FORMAS,
+                                 *similitude.LIMITE_N_FORMAS, "n_formas")
+    extras = _inteiro_limitado(pedido.get("arestas_extras"), similitude.EXTRAS_PADRAO,
+                               *similitude.LIMITE_EXTRAS, "arestas_extras")
+
+    def escolha(nome: str, validos: tuple, padrao: str) -> str:
+        valor = str(pedido.get(nome) or padrao).strip().lower()
+        if valor not in validos:
+            raise ErroApi(f"{nome} precisa ser um destes: {', '.join(validos)} (recebeu {valor!r})")
+        return valor
+
+    indice = escolha("indice", similitude.INDICES, similitude.INDICE_PADRAO)
+    segmento = escolha("segmento", similitude.SEGMENTOS, "resumo")
+    idioma = escolha("idioma", ("todos",) + similitude.IDIOMAS, "todos")
+    ignorar = pedido.get("ignorar") or ()
+    if not isinstance(ignorar, (str, list, tuple)):
+        raise ErroApi("ignorar precisa ser uma lista de palavras ou um texto separado por vírgulas")
+    baixar = str(pedido.get("baixar") or "").strip().lower()
+    if baixar in ("1", "true"):
+        baixar = "svg"
+    if baixar not in ("", "svg", "graphml", "csv", "csv-arestas"):
+        raise ErroApi("baixar precisa ser svg, graphml, csv ou csv-arestas")
+    token = _token(pedido.get("token"))
+    if token:
+        caminho = Path(_analise(token)["projeto"])
+        if not caminho.exists():
+            raise ErroExpirado(f"O projeto desta análise não existe mais: {caminho}")
+    else:
+        caminho = _valida_projeto(str(pedido.get("projeto") or pedido.get("caminho") or ""))
+    with ProjetoScimat(caminho) as kb:
+        bruto = pedido.get("periodo")
+        periodo_id, periodo_nome = None, "todos"
+        if bruto not in (None, "", "todos"):
+            periodo = _periodo(kb, bruto)
+            periodo_id, periodo_nome = periodo.id, periodo.nome
+        try:
+            dados = similitude.analisa(kb.conexao, periodo_id, periodo_nome, n_formas=n_formas,
+                                       indice_nome=indice, segmento=segmento, extras=extras,
+                                       idioma=idioma, ignorar=ignorar)
+        except similitude.SemResumos as erro:
+            raise ErroApi(str(erro)) from None
+    dados["nota"] = similitude.NOTA
+    dados["titulo"] = similitude.TITULO
+    dados["tabela_parametros"] = similitude.descreve_parametros(dados)
+    dados["svg"] = viz_sim.svg(dados, similitude.TITULO if baixar == "svg" else "")
+    dados["_baixar"] = baixar
+    return dados
+
+
+def exportacao_similitude(dados: dict) -> tuple[bytes, str, str]:
+    """Conteúdo, nome e tipo do arquivo pedido em ``baixar`` (já calculado por `similitude_do_pedido`)."""
+    from . import similitude
+    tipo = dados["_baixar"]
+    if tipo == "graphml":
+        return similitude.graphml(dados).encode("utf-8"), "similitude.graphml", "application/xml"
+    if tipo == "csv":
+        return similitude.csv_formas(dados).encode("utf-8"), "similitude-formas.csv", "text/csv; charset=utf-8"
+    if tipo == "csv-arestas":
+        return (similitude.csv_arestas(dados).encode("utf-8"), "similitude-arestas.csv",
+                "text/csv; charset=utf-8")
+    return dados["svg"].encode("utf-8"), "similitude.svg", "image/svg+xml"
+
+
 # Acima disto, os pontos de virada (intermediação) ficam para quando a tela os pede.
 LIMITE_PIVOS_INLINE = 300
 
@@ -1987,6 +2056,15 @@ class Manipulador(BaseHTTPRequestHandler):
                                   "image/svg+xml", True)
                 else:
                     self._json(200, dados)
+            elif rota == "/api/similitude":
+                pedido = {k: v[0] for k, v in parametros.items() if v}
+                dados = similitude_do_pedido(pedido)
+                if dados["_baixar"]:
+                    arquivo, nome, tipo = exportacao_similitude(dados)
+                    self._arquivo(arquivo, nome, tipo, True)
+                else:
+                    dados.pop("_baixar")
+                    self._json(200, dados)
             elif rota == "/api/pivos":
                 self._json(200, pivos_da_analise(_param(parametros, "token")))
             elif rota == "/api/rajadas":
@@ -2123,6 +2201,14 @@ class Manipulador(BaseHTTPRequestHandler):
                 self._json(200, densidade_do_pedido(self._json_pedido()))
             elif rota == "/api/duplo-mapa":
                 self._json(200, duplo_mapa_do_pedido(self._json_pedido()))
+            elif rota == "/api/similitude":
+                dados = similitude_do_pedido(self._json_pedido())
+                if dados["_baixar"]:
+                    arquivo, nome, tipo = exportacao_similitude(dados)
+                    self._arquivo(arquivo, nome, tipo, True)
+                else:
+                    dados.pop("_baixar")
+                    self._json(200, dados)
             elif rota == "/api/analisa":
                 self._json(200, analisa(self._json_pedido()))
             elif rota == "/api/grade":

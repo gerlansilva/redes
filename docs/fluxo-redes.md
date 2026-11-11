@@ -35,7 +35,7 @@ O Redes segue a mesma lógica do bibliometrix até a matriz documento × item. D
 
 ## O que ainda falta neste fluxo
 
-- O selo de qualidade fica quase sempre em "Atenção"; os limiares ainda precisam de revisão.
+- O selo de qualidade (desde 11/11/2026) depende da fração de itens em agrupamentos de 5 ou mais; a justificativa está em `docs/qualidade.md`. Falta repetir o julgamento visual em outros domínios.
 - Rótulos por tema só existem para palavras-chave e referências; autores, países e IES ficam com o nome do líder.
 - A linha do tempo e a densidade usam o corpus completo, não o período, e não valem para acoplamento nem cocitação de documentos.
 - A visão geral descritiva já entra no relatório HTML, mas as tabelas ainda não têm botão de CSV.

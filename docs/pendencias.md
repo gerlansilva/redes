@@ -15,9 +15,10 @@ mais de 560 casos de teste.
 
 As análises novas (qualidade, rótulos, linha do tempo, pontos de virada,
 densidade, dendrograma, IES e Sankey) estão entregues, com arestas conhecidas
-listadas em **O que falta**. Fora isso, falta distribuição: o instalador desktop
-(plataforma alvo e assinatura) e um repositório onde a integração contínua, já
-escrita, possa rodar. São decisões externas ao código, não implementação de análise.
+listadas em **O que falta**. Fora isso, falta distribuição: um repositório onde a
+integração contínua, já escrita, possa rodar. É decisão externa ao código, não
+implementação de análise. O produto é só a interface web no navegador do
+computador (sem aplicativo desktop).
 
 ## O que foi fechado
 
@@ -109,8 +110,10 @@ escrita, possa rodar. São decisões externas ao código, não implementação d
 18. **Qualidade do mapa** — `qualidade.py`: modularidade Q ponderada, Q do
     Louvain como régua (razão), silhueta por agrupamento (grupos com menos de 3
     itens ficam fora; acima de 2000 itens agrupados é dispensada) e selo OK,
-    Atenção, Ruim ou Indefinido. Em coautoria o selo nunca passa de Atenção.
-    Limiares em `docs/qualidade.md`.
+    Atenção, Ruim ou Indefinido. Desde 11/11/2026 o selo depende só da estrutura
+    (itens em agrupamentos de 5 ou mais: Ruim abaixo de 50%, OK a partir de 80%;
+    rede fragmentada; em coautoria nunca passa de Atenção); Q, razão e silhueta
+    viram avisos de nitidez. Limiares e justificativa em `docs/qualidade.md`.
 19. **Rótulos por tema** — `rotulos.py`: termos que distinguem cada
     agrupamento dos demais documentos do período (LLR de Dunning sobre título,
     palavras-chave e bigramas do resumo). Só para palavras-chave e referências;
@@ -239,11 +242,13 @@ suprimida (13 a 14 s no serj_auto).
 `scripts`: corpus completo de `serj.redes` (280 documentos), cada análise de ponta
 a ponta, sem o filtro de frequência do relatório:
 
+(Selo conforme a regra de 11/11/2026, itens em agrupamentos de 5 ou mais.)
+
 | Unidade (freq. 1) | Nós | Agrupamentos | Selo | Qualidade | Rótulos | Pontos de virada | Linha do tempo | Densidade | Halo | Pico de memória |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Palavras | 676 | 132 | OK | 0,03 s | 0,11 s | 1,0 s | 0,06 s | 0,5 s | 4,3 s | 72 MB |
-| Referências | 9.715 | 672 | Atenção | 0,9 s (silhueta dispensada) | 0,12 s | pulado (limite de 800 nós, avisa) | 2,9 s | 0,7 s | 13,2 s | 265 MB |
-| Instituições | 334 | 42 | Atenção | 0,01 s | 0,00 s | 0,01 s | 0,01 s | 0,6 s | 2,7 s | 69 MB |
+| Palavras | 676 | 132 | Atenção | 0,03 s | 0,11 s | 1,0 s | 0,06 s | 0,5 s | 4,3 s | 72 MB |
+| Referências | 9.715 | 672 | OK | 0,9 s (silhueta dispensada) | 0,12 s | pulado (limite de 800 nós, avisa) | 2,9 s | 0,7 s | 13,2 s | 265 MB |
+| Instituições | 334 | 42 | Ruim | 0,01 s | 0,00 s | 0,01 s | 0,01 s | 0,6 s | 2,7 s | 69 MB |
 
 Nenhuma etapa trava nem estoura memória; a mais cara é o desenho do halo da rede
 de referências sem filtro (13 s), que o relatório completo evita ao escolher
@@ -259,28 +264,32 @@ macOS, Playwright opcional, instalação limpa; falta só um repositório onde r
 e empacotamento Python (`pyproject.toml` com o comando `redes`, conferido num
 ambiente virtual limpo, instruções no README).
 
+**Selo "Ruim" decidido em 11/11/2026** (substitui a pergunta sobre "3 ou mais
+famílias de alerta"): o selo agora depende só da estrutura do mapa, e Q, razão e
+silhueta viram avisos de nitidez. Justificativa: em 43 mapas de bases reais vistos
+um a um (halo e diagrama estratégico), o selo antigo concordou com o julgamento
+visual em 4 (9 dos 21 mapas bons saíam Ruim; nenhum dos 12 inutilizáveis saía Ruim),
+as regras por 2, 3 ou 4 famílias em 6, 5 e 7, e a regra nova ("Ruim" com menos de
+50% dos itens em agrupamentos de 5 ou mais; OK a partir de 80%) em 39. Os limiares
+vieram de uma amostra e foram conferidos em outra, julgada às cegas. Distribuição
+nos 323 períodos com selo definido, antes e depois: OK 14% → 45%, Atenção 66% → 23%,
+Ruim 20% → 32% (78% dos Ruins são Autores e Instituições, redes de pares e trios).
+Tabelas, método e limites em `docs/qualidade.md`. Um só avaliador julgou os mapas; se
+o usuário discordar do critério ("Ruim = menos da metade dos itens em grupos de 5 ou
+mais"), basta mexer em `GRUPO_GRANDE` e nos limiares 50/80 de `qualidade.py`.
+
 Depende de decisão do usuário:
 
-1. **Escala do selo.** A calibração acima moveu o OK de 8% para 14% dos períodos
-   com selo definido; o resto da Atenção são sinais reais. O selo ainda junta um
-   alerta isolado e quatro alertas ao mesmo tempo sob "Atenção". Simulação sobre
-   as mesmas bases: se 3 famílias de alerta convergentes (força, divisão melhor
-   do Louvain, coesão, cobertura) valessem "Ruim", a distribuição ficaria OK 12%,
-   Atenção 58%, Ruim 29%. *Pergunta: o selo "Ruim" deve passar a significar
-   "3 ou mais famílias de alerta ao mesmo tempo"?*
-2. **Duplo mapa simplificado.** Só se o usuário quiser uma versão simplificada do
+1. **Duplo mapa simplificado.** Só se o usuário quiser uma versão simplificada do
    mapa ao lado do completo. *Pergunta: quer essa versão? Se sim, simplificada
    como (só os maiores agrupamentos, sem arestas fracas, ou outra regra)?*
-3. **Rótulos por tema fora de palavras-chave e referências.** Autores, países e
+2. **Rótulos por tema fora de palavras-chave e referências.** Autores, países e
    IES seguem com o nome do líder. *Pergunta: aceita o nome do líder também
    nessas unidades, ou há um critério de rótulo (por exemplo, o termo mais
    frequente nos títulos dos documentos do grupo) que prefira?*
-4. **Empacotamento desktop (Tauri) e assinatura.** *Pergunta: macOS, Windows ou
-   ambos? Há identidade de assinatura (Apple Developer ID, certificado Windows)
-   e onde ficará o repositório?* Sem isso só vale a instalação pelo Python.
-5. **Publicação do pacote.** O pacote já se instala (`pip install .`). *Pergunta:
-   PyPI, índice interno ou só distribuição do desktop?*
-6. **Paridade na integração contínua.** `scripts/paridade*.py` e a grade exigem o
+3. **Publicação do pacote.** O pacote já se instala (`pip install .`). *Pergunta:
+   PyPI ou índice interno?*
+4. **Paridade na integração contínua.** `scripts/paridade*.py` e a grade exigem o
    fork Java compilado em `/tmp/demo/celii`. *Pergunta: o fork pode ir para o
    repositório (ou ser publicado como artefato) para a paridade rodar na
    integração contínua?*

@@ -48,11 +48,12 @@ class NumeracaoDoMetodoTest(unittest.TestCase):
         config = Configuracao(unidade="References", matriz="BasicCoupling", mapeadores=("acoplamento",))
         numeros = _numeros_do_metodo(metodo.algoritmo_html(config, None, 2))
         self.assertEqual(1, numeros.count(9))
-        self.assertEqual(list(range(1, 13)), numeros)       # 8 + duplo mapa + pontos de virada + qualidade + rótulos
+        # 8 + duplo mapa + similitude + pontos de virada + qualidade + rótulos
+        self.assertEqual(list(range(1, 14)), numeros)
 
-    def test_palavras_vai_ate_catorze(self):
+    def test_palavras_vai_ate_quinze(self):
         numeros = _numeros_do_metodo(metodo.algoritmo_html(Configuracao(unidade="Words"), None, 2))
-        self.assertEqual(list(range(1, 15)), numeros)
+        self.assertEqual(list(range(1, 16)), numeros)       # inclui a similitude dos resumos
 
 
 class RelatorioTest(unittest.TestCase):

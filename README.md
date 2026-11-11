@@ -41,6 +41,7 @@ normalizar, agrupar, medir, desenhar e relatar, sem depender da interface Java.
 | Linha do tempo dos agrupamentos (estilo CiteSpace), com rajadas | pronto, corpus completo, aba no modo avançado (ver `docs/linha-do-tempo.md`) |
 | Pontos de virada e sigma (intermediação alta, vizinhos em 2 ou mais agrupamentos) | pronto, só co-ocorrência; sigma só para quem tem rajada (ver `docs/linha-do-tempo.md`) |
 | Mapa de densidade (estilo VOSviewer, SVG próprio) | pronto, corpus completo, aba no modo avançado (ver `docs/densidade.md`) |
+| Similitude dos resumos (estilo IRaMuTeQ): árvore máxima, blocos de Louvain, resumos em inglês, português e espanhol | pronto, aba no modo avançado, SVG/GraphML/CSV e seção nos relatórios (ver `docs/similitude.md`) |
 | Unidade Instituições (IES): união de variantes inequívocas do nome e componente mínimo de 3 instituições | pronto (ver `docs/ies.md`) |
 | Parâmetros e método por análise nos relatórios (inclui qualidade, rótulos, linha do tempo, densidade, pontos de virada e IES) | pronto |
 | Carregadores nativos (BibTeX, RIS, CSV, OpenAlex, WoS, Scopus) | pronto |
@@ -216,13 +217,19 @@ acoplamento nem cocitação de documentos, cujos nós são documentos. Detalhes 
 [`docs/dendrograma.md`](docs/dendrograma.md),
 [`docs/linha-do-tempo.md`](docs/linha-do-tempo.md) e
 [`docs/densidade.md`](docs/densidade.md).
+A aba **Similitude** (palavras dos resumos que aparecem juntas, em blocos temáticos; resumos em inglês,
+português e espanhol) tem SVG, GraphML e CSV no menu Exportar e seção nos relatórios; ver
+[`docs/similitude.md`](docs/similitude.md).
 
 **Qualidade e rótulos.** O cartão de cada análise mostra o selo de qualidade
-do mapa: Q (força da divisão, de cerca de 0 a 1), a razão contra o Q do
-Louvain e a silhueta média e por agrupamento. O selo é **OK**, **Atenção**,
-**Ruim** ou **Indefinido** (menos de 15 itens, menos de 2 agrupamentos ou rede
-sem ligações). Na prática, a maioria das redes reais fica em "Atenção", e isso
-não invalida o mapa; em coautoria de autores o selo nunca passa de "Atenção".
+do mapa, com a fração de itens em agrupamentos de 5 ou mais, Q (força da
+divisão, de cerca de 0 a 1), a razão contra o Q do Louvain e a silhueta média e
+por agrupamento. O selo é **OK** (80% ou mais dos itens em agrupamentos de 5 ou
+mais), **Atenção** (de 50% a 80%, rede fragmentada ou coautoria), **Ruim**
+(menos de 50%: o mapa é quase só itens soltos, pares e trios) ou **Indefinido**
+(menos de 15 itens, menos de 2 agrupamentos ou rede sem ligações). Q, razão e
+silhueta viram avisos de nitidez e não mudam o selo; em coautoria de autores o
+selo nunca passa de "Atenção".
 Os agrupamentos de palavras-chave e de referências ganham um **rótulo novo**
 com os termos que os distinguem dos demais documentos do período (razão de
 verossimilhança de Dunning); com 5 a 9 documentos no núcleo o rótulo é só
@@ -409,9 +416,10 @@ batam:
 
 A auditoria original e o que foi corrigido estão em
 [pendencias.md](docs/pendencias.md). O que resta é de produto, não de
-paridade: distribuição desktop (Tauri), edição de sinônimos e stopwords na
-interface, e algumas arestas das análises novas. Em 11/11/2026 foram fechados
-o selo quase sempre "Atenção" (limiar de coesão calibrado, `docs/qualidade.md`),
+paridade: edição de sinônimos e stopwords na interface e algumas arestas das
+análises novas. O Redes é só a interface web, aberta no navegador do computador.
+Em 11/11/2026 foram fechados o selo de qualidade (agora baseado na estrutura do
+mapa: itens em agrupamentos de 5 ou mais; justificativa em `docs/qualidade.md`),
 o estresse completo no SERJ, a integração contínua (`.github/workflows/tests.yml`,
 ainda sem repositório para rodar) e o empacotamento Python (`redes`). O que
 depende de decisão do usuário está, com a pergunta, em `docs/pendencias.md`.
@@ -433,11 +441,10 @@ base pequena), `REDES_TRABALHADORES=N` e `REDES_SEM_CACHE=1`.
 
 ## Próximos passos
 
-1. Distribuição desktop com Tauri, reaproveitando o servidor local.
-2. Editor de sinônimos, stopwords e equivalências na interface.
-3. Rajadas de autores e de países, além de palavras-chave e referências.
-4. Mapas de estabilidade e novidade, além de evolução e sobreposição.
-5. Duplo mapa simplificado (só se o usuário quiser; ver `docs/pendencias.md`).
+1. Editor de sinônimos, stopwords e equivalências na interface.
+2. Rajadas de autores e de países, além de palavras-chave e referências.
+3. Mapas de estabilidade e novidade, além de evolução e sobreposição.
+4. Duplo mapa simplificado (só se o usuário quiser; ver `docs/pendencias.md`).
 
 ## Testes
 

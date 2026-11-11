@@ -10,6 +10,13 @@ Responde, em linguagem simples, se a divisão em grupos "se sustenta" na rede:
 * silhueta: quão mais perto cada item está do seu grupo do que dos demais
   (distância = 1 − similaridade normalizada, como em ``dendrograma``).
 
+O selo (``nivel``) responde a outra pergunta: o mapa é feito de grupos de verdade? Ele
+depende só da *cobertura útil* (``pct_em_grupos_grandes``: % dos itens em agrupamentos de
+``GRUPO_GRANDE`` ou mais itens), da fragmentação da rede e, em coautoria, de um teto em
+"Atenção". Q, razão, silhueta e itens negativos medem a *nitidez* da divisão e ficam como
+notas (``avisos``), sem mexer no selo: em 43 mapas julgados à vista eles não separaram
+mapas úteis de inúteis (docs/qualidade.md).
+
 Tudo é determinístico. A silhueta é O(n²) em memória e tempo (matriz n×n de
 float64: 2000 itens ≈ 32 MB); acima de ``LIMITE_NOS`` itens agrupados ela é pulada.
 
@@ -26,6 +33,7 @@ NIVEIS = ("ok", "atencao", "ruim", "indefinido")
 MINIMO_NOS = 15
 MINIMO_NOS_SILHUETA = 3
 LIMITE_NOS = 2000       # acima disto a silhueta (matriz n×n) é dispensada
+GRUPO_GRANDE = 5        # itens: menos que isto é grupo "trivial" (par, trio, quarteto)
 
 
 # ------------------------------------------------------------------ base
@@ -164,6 +172,12 @@ AVISO_COAUTORIA = (
     "temática. Leia o Q junto com o número de itens por agrupamento.")
 
 
+NOTA_NITIDEZ = (
+    "Os avisos de nitidez acima descrevem o quanto a divisão se destaca na rede; eles não "
+    "mudam o selo. Em redes densas (acoplamento, referências) ficam baixos mesmo quando os "
+    "grupos são grandes e coesos.")
+
+
 def avalia(resultado, limite_nos: int = LIMITE_NOS) -> dict:
     """Indicadores de qualidade dos agrupamentos de um `ResultadoPeriodo`."""
     rede = resultado.rede
@@ -173,10 +187,14 @@ def avalia(resultado, limite_nos: int = LIMITE_NOS) -> dict:
     n_agrupados = sum(1 for no in rede.nos if no in particao)
     n_grupos = len(grupos)
     comp = componentes(rede) if n_nos else 0
+    tamanho_do_grupo = [len(set(g.nos)) for g in grupos]
+    n_em_grandes = sum(1 for no in rede.nos
+                       if no in particao and tamanho_do_grupo[particao[no]] >= GRUPO_GRANDE)
     out: dict = {
         "n_nos": n_nos,
         "n_grupos": n_grupos,
         "pct_agrupados": 100.0 * n_agrupados / n_nos if n_nos else 0.0,
+        "pct_em_grupos_grandes": 100.0 * n_em_grandes / n_nos if n_nos else 0.0,
         "q": None, "q_louvain": None, "razao": None,
         "silhueta_media": None,
         "silhueta_por_grupo": {i: None for i in range(n_grupos)},
@@ -240,7 +258,8 @@ def avalia(resultado, limite_nos: int = LIMITE_NOS) -> dict:
             out["silhueta_media"] = float(valores[validos].mean())
             out["pct_silhueta_negativa"] = float(100.0 * (valores[validos] < 0).mean())
 
-    # Níveis
+    # Selo: estrutura do mapa (cobertura útil, fragmentação, coautoria). Os limiares são
+    # literais, e tests/test_qualidade_integracao.py confere o texto do método com eles.
     ordem = {"ok": 0, "atencao": 1, "ruim": 2}
     nivel = "ok"
 
@@ -249,60 +268,65 @@ def avalia(resultado, limite_nos: int = LIMITE_NOS) -> dict:
         if ordem[novo] > ordem[nivel]:
             nivel = novo
 
-    if q < 0.15:
+    pu = out["pct_em_grupos_grandes"]
+    if pu < 50:
         sobe("ruim")
         avisos.append(
+            f"Só {_num(pu, 0, (50, 80))}% dos itens estão em agrupamentos de "
+            f"{GRUPO_GRANDE} ou mais itens; o resto está solto ou em grupos "
+            "pequenos (pares, trios), e o mapa tem pouco o que ler.")
+    elif pu < 80:
+        sobe("atencao")
+        avisos.append(
+            f"{_num(pu, 0, (50, 80))}% dos itens estão em agrupamentos de "
+            f"{GRUPO_GRANDE} ou mais itens; o resto está solto ou em grupos "
+            "pequenos (pares, trios).")
+    if comp > n_nos / 2:
+        sobe("atencao")
+        avisos.append(
+            "A rede é fragmentada (quase só pares e itens isolados); um valor "
+            "de força alto não indica qualidade.")
+    if getattr(getattr(resultado, "configuracao", None), "unidade", None) == "Authors":
+        sobe("atencao")
+        avisos.append(AVISO_COAUTORIA)
+
+    # Notas sobre a nitidez da divisão: não mudam o selo (ver docstring do módulo).
+    notas: list[str] = []
+    if q < 0.15:
+        notas.append(
             f"A divisão em grupos é muito fraca (força {_num(q, 2, (0.15, 0.30))}): os itens "
             "de um grupo quase não se ligam mais entre si do que com os "
             "outros grupos.")
     elif q < 0.30:
-        sobe("atencao")
-        avisos.append(
+        notas.append(
             f"A divisão em grupos é moderada (força {_num(q, 2, (0.15, 0.30))}); os limites "
             "entre alguns grupos podem ser pouco nítidos.")
     if out["razao"] is not None and out["razao"] < 0.6:
-        sobe("atencao")
-        avisos.append(
+        notas.append(
             "Outro método de agrupamento acha uma divisão bem mais nítida "
             f"nesta rede (a atual alcança só {_num(100 * out['razao'], 0, (60,))}% "
             "dela); vale comparar.")
     sm = out["silhueta_media"]
     if sm is not None:
         if sm < 0:
-            sobe("ruim")
-            avisos.append(
+            notas.append(
                 f"Em média, os itens estão mais perto de outros grupos do que "
                 f"do próprio (coesão {_num(sm, 2, (0.0, 0.05))}).")
         # 0,05 e não 0,10: com a silhueta definida por ligação direta (1 − similaridade), redes
         # esparsas dão valores baixos mesmo na melhor divisão; 0,10 acusava 39% das partições
-        # do próprio Louvain nas bases reais, e 0,05 acusa 21% (como o Q < 0,30, que acusa
-        # 23%). Distribuição e método em docs/qualidade.md.
+        # do próprio Louvain nas bases reais, e 0,05 acusa 21%. Ver docs/qualidade.md.
         elif sm < 0.05:
-            sobe("atencao")
-            avisos.append(
+            notas.append(
                 f"Os grupos são pouco coesos (coesão média {_num(sm, 2, (0.0, 0.05))}): os "
                 "itens ficam quase tão perto de outros grupos quanto do seu.")
     pn = out["pct_silhueta_negativa"]
     if pn is not None and pn > 30:
-        sobe("atencao")
-        avisos.append(
+        notas.append(
             f"{_num(pn, 0, (30,))}% dos itens estão mais perto de outro grupo do que "
             "do seu; talvez estejam mal alocados.")
-    if out["pct_agrupados"] < 60:
-        sobe("atencao")
-        avisos.append(
-            f"Só {_num(out['pct_agrupados'], 0, (60,))}% dos itens entraram em "
-            "agrupamentos; o restante ficou de fora.")
-    if comp > n_nos / 2:
-        avisos.append(
-            "A rede é fragmentada (quase só pares e itens isolados); um valor "
-            "de força alto não indica qualidade.")
-        if nivel == "ok":
-            nivel = "atencao"
-    if getattr(getattr(resultado, "configuracao", None), "unidade", None) == "Authors":
-        avisos.append(AVISO_COAUTORIA)
-        if nivel == "ok":
-            nivel = "atencao"
+    if notas:
+        avisos.extend(notas)
+        avisos.append(NOTA_NITIDEZ)
     out["nivel"] = nivel
     return out
 

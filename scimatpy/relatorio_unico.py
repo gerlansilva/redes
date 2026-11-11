@@ -15,6 +15,7 @@ from pathlib import Path
 from . import cache_figuras, dendro_helper, longitudinal, metodo, report
 from . import areas as _areas_revistas
 from . import duplo_mapa as _duplo_mapa
+from . import similitude as _similitude
 from .report import (ORDEM_MEDIDAS, ROTULOS_MAPEADOR, ROTULOS_MEDIDA, _esc,
                      _quadrante, _tabela)
 from .viz.cluster import rede_agrupamento_svg
@@ -266,6 +267,23 @@ def _duplo_partes(kb):
     return ("\n".join(partes), figuras, tabelas) if partes else None
 
 
+def _similitude_partes(kb):
+    """(HTML com marcadores, figuras, tabelas) da similitude dos resumos, ou None."""
+    figuras: list[tuple[str, str]] = []
+    tabelas: list[tuple] = []
+
+    def figura(svg, legenda):
+        figuras.append((svg, legenda))
+        return f"\x00FIG{len(figuras) - 1}\x00"
+
+    def tabela(cabecalho, linhas, legenda, numericas=()):
+        tabelas.append((cabecalho, linhas, legenda, numericas))
+        return f"\x00TAB{len(tabelas) - 1}\x00"
+
+    partes = report.similitude_html(kb, figura, tabela, classe_nota="nota")
+    return ("\n".join(partes), figuras, tabelas) if partes else None
+
+
 def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
                    numero: int, medida_temporal: str, limite) -> tuple[str, int]:
     """HTML de uma análise. Devolve também quantas redes de agrupamento foram omitidas."""
@@ -290,7 +308,8 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
     partes.append(metodo.metodo_html(
         config, periodos, resultados, None, secao.get("medida_temporal", medida_temporal),
         kb, doc.tabela, rotulo=rotulo.lower(), titulo=titulo,
-        com_duplo=None if numero == 2 else False))
+        com_duplo=None if numero == 2 else False,
+        com_similitude=None if numero == 2 else False))
 
     # X.2 Por período
     partes.append(doc.cabecalho(3, f"{numero}.2", "Por período", f"s{numero}-periodos"))
@@ -457,6 +476,22 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
             texto_m = texto_m.replace(f"\x00TAB{i}\x00",
                                       doc.tabela(cabecalho, linhas, legenda, numericas))
         partes.append(texto_m)
+        subsecao += 1
+    # X.n Similitude dos resumos (corpus completo; igual em todas as análises, só na primeira)
+    bloco_sim = None
+    if numero == 2:
+        bloco_sim = cache.obtem((chave, "similitude", _similitude.N_FORMAS, _similitude.EXTRAS_PADRAO),
+                                lambda: _similitude_partes(kb))
+    if bloco_sim:
+        partes.append(doc.cabecalho(3, f"{numero}.{subsecao}", report.TITULO_SECAO_SIMILITUDE,
+                                    f"s{numero}-similitude"))
+        texto_s, figuras_s, tabelas_s = bloco_sim
+        for i, (svg, legenda) in enumerate(figuras_s):
+            texto_s = texto_s.replace(f"\x00FIG{i}\x00", doc.figura(svg, legenda))
+        for i, (cabecalho, linhas, legenda, numericas) in enumerate(tabelas_s):
+            texto_s = texto_s.replace(f"\x00TAB{i}\x00",
+                                      doc.tabela(cabecalho, linhas, legenda, numericas))
+        partes.append(texto_s)
         subsecao += 1
     # X.n Dendrograma
     partes.append(doc.cabecalho(3, f"{numero}.{subsecao}", "Dendrograma (agrupamento hierárquico)",

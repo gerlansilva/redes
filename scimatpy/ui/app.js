@@ -204,6 +204,7 @@ function ligarEventos() {
   ligarLinhaDoTempo();
   ligarDensidade();
   ligarDuploMapa();
+  ligarSimilitude();
   ligarPivos();
   $("fecharBase").addEventListener("click", fecharBase);
   $("modalBase").addEventListener("click", (evento) => {
@@ -561,6 +562,7 @@ function aplicarProjeto(projeto) {
   limparLinhaDoTempo(true);
   limparDensidade(true);
   limparDuploMapa(true);
+  limparSimilitude(true);
   document.querySelectorAll(".aba[data-aba]").forEach((aba) => {
     const ativa = aba.dataset.aba === "rede";
     aba.classList.toggle("ativa", ativa);
@@ -698,6 +700,7 @@ function selecionarAba(chave) {
   if (chave === "linhatempo") carregarLinhaDoTempo();
   if (chave === "densidade") carregarDensidade();
   if (chave === "duplomapa") carregarDuploMapa();
+  if (chave === "similitude") carregarSimilitude();
 }
 
 function abasDaAnalise(chave) {
@@ -717,6 +720,7 @@ function abasDaAnalise(chave) {
     if (!abas.includes("linhatempo")) abas.splice(abas.indexOf("dendrograma") + 1, 0, "linhatempo");
     if (!abas.includes("densidade")) abas.splice(abas.indexOf("linhatempo") + 1, 0, "densidade");
     if (!abas.includes("duplomapa")) abas.splice(abas.indexOf("densidade") + 1, 0, "duplomapa");
+    if (estado.avancado && !abas.includes("similitude")) abas.splice(abas.indexOf("duplomapa") + 1, 0, "similitude");
   }
   return abas;
 }
@@ -753,6 +757,7 @@ const BLOCO_POR_ABA = {
   linhatempo: "blocoLinhaDoTempo",
   densidade: "blocoDensidade",
   duplomapa: "blocoDuploMapa",
+  similitude: "blocoSimilitude",
   longitudinal: "blocoLongitudinal",
 };
 
@@ -1191,6 +1196,8 @@ function renderizarResultado(resultado) {
   if (abaAtual() === "densidade") carregarDensidade();
   limparDuploMapa(false);
   if (abaAtual() === "duplomapa") carregarDuploMapa();
+  limparSimilitude(false);
+  if (abaAtual() === "similitude") carregarSimilitude();
   $("seloPrevia").textContent = "Prévia sob demanda";
   $("seloPrevia").classList.remove("alerta");
   fecharDrawer();
@@ -1766,12 +1773,14 @@ function numeroOuTraco(valor, casas) {
 
 const NIVEL_QUALIDADE = {
   ok: { texto: "OK", icone: "✓",
-        leitura: "Os agrupamentos se sustentam na rede." },
+        leitura: "O mapa é feito de agrupamentos de verdade: quase todos os itens estão em " +
+                 "agrupamentos de 5 ou mais itens." },
   atencao: { texto: "Atenção", icone: "!",
-             leitura: "Leitura prudente: alguns limites entre agrupamentos podem ser pouco nítidos. " +
-                      "É comum em redes reais e não invalida o mapa." },
+             leitura: "Leitura prudente: parte dos itens está solta ou em grupos pequenos (pares, trios), " +
+                      "ou a rede é fragmentada ou de coautoria; veja os avisos. Não invalida o mapa." },
   ruim: { texto: "Ruim", icone: "✕",
-          leitura: "A divisão em agrupamentos é fraca na rede; use o mapa como exploração, não como conclusão." },
+          leitura: "Menos da metade dos itens está em agrupamentos de 5 ou mais itens; o resto está " +
+                   "solto ou em pares e trios. Use o mapa como exploração, não como conclusão." },
   indefinido: { texto: "Indefinido", icone: "?",
                 leitura: "Não há dados suficientes para avaliar; isso não quer dizer que a qualidade seja zero." },
 };
@@ -1792,9 +1801,10 @@ function renderizarQualidade(resultado) {
   $("sqIcone").dataset.s = info.icone;
   $("sqNivel").textContent = info.texto;
   const indef = nivel === "indefinido";
-  const pctAgrupados = q.n_nos ? `${Math.round(q.pct_agrupados)}% agrup.` : "";
+  const pctGrandes = q.n_nos && q.pct_em_grupos_grandes != null
+    ? `${Math.round(q.pct_em_grupos_grandes)}% em grupos de 5+` : "";
   $("sqResumo").textContent = indef ? "" :
-    `Q ${numeroOuTraco(q.q, 2)} · sil. ${numeroOuTraco(q.silhueta_media, 2)} · ${pctAgrupados}`;
+    `${pctGrandes} · Q ${numeroOuTraco(q.q, 2)} · sil. ${numeroOuTraco(q.silhueta_media, 2)}`;
   botao.title = "Qualidade dos agrupamentos: clique para ver o detalhe";
 
   const pop = $("popQualidade");
@@ -1806,12 +1816,15 @@ function renderizarQualidade(resultado) {
   const linhaStat = (nome, valor) => {
     lista.append(elemento("dt", null, nome), elemento("dd", null, valor));
   };
+  linhaStat("Itens em agrupamentos de 5+ itens (decide o selo)",
+            q.n_nos && !indef && q.pct_em_grupos_grandes != null
+              ? `${numeroOuTraco(q.pct_em_grupos_grandes, 0)}% de ${nf.format(q.n_nos)}` : "—");
+  linhaStat("Itens em qualquer agrupamento",
+            q.n_nos && !(indef && !q.pct_agrupados)
+              ? `${numeroOuTraco(q.pct_agrupados, 0)}% de ${nf.format(q.n_nos)}` : "—");
   linhaStat("Força da divisão (Q)", indef ? "—" : numeroOuTraco(q.q, 2));
   linhaStat("Q do Louvain (referência)", indef ? "—" : numeroOuTraco(q.q_louvain, 2));
   linhaStat("Silhueta média", indef ? "—" : numeroOuTraco(q.silhueta_media, 2));
-  linhaStat("Itens em agrupamentos",
-            q.n_nos && !(indef && !q.pct_agrupados)
-              ? `${numeroOuTraco(q.pct_agrupados, 0)}% de ${nf.format(q.n_nos)}` : "—");
   const filhos = [titulo, elemento("p", "pq-leitura", info.leitura), lista];
   if (q.avisos && q.avisos.length) {
     filhos.push(elemento("h4", null, "Avisos"));
@@ -1820,7 +1833,9 @@ function renderizarQualidade(resultado) {
     filhos.push(ul);
   }
   filhos.push(elemento("p", "pq-rodape",
-    "Q vai de 0 (divisão ao acaso) a perto de 1; a silhueta, de −1 a 1. " +
+    "O selo olha só a estrutura: itens em agrupamentos de 5 ou mais (Ruim abaixo de 50%, " +
+    "OK a partir de 80%), rede fragmentada e coautoria. Q (de 0, divisão ao acaso, a perto de 1) " +
+    "e a silhueta (de −1 a 1) descrevem a nitidez da divisão e não mudam o selo. " +
     "O relatório explica os critérios em “Como funciona”."));
   pop.replaceChildren(...filhos);
 }
@@ -3501,6 +3516,9 @@ function atualizarMenuExportar() {
     else if (item.dataset.exp === "duplomapa-svg" && !duploMapaAplicavel()) {
       motivo = dm.motivo;
     }
+    else if (item.dataset.exp.startsWith("similitude-") && !similitudeAplicavel()) {
+      motivo = sm.motivo;
+    }
     else if (item.dataset.exp === "fluxo-svg" && !fluxoDisponivel()) {
       motivo = "A base não traz afiliação nem país; não há fluxo Autor – País – IES.";
     }
@@ -3542,6 +3560,7 @@ function executarExportacao(tipo) {
   else if (tipo === "linhatempo-svg") baixarLinhaDoTempo();
   else if (tipo === "densidade-svg") baixarDensidade();
   else if (tipo === "duplomapa-svg") baixarDuploMapa();
+  else if (tipo.startsWith("similitude-")) baixarSimilitude(tipo.slice("similitude-".length));
   else exportar(tipo);
 }
 
@@ -4038,6 +4057,180 @@ async function baixarDuploMapa() {
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = "duplo-mapa.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  } catch (erro) {
+    mostrarToast(erro.message, true);
+  }
+}
+
+/* ---------------------------------------------------------------- similitude */
+
+const sm = { token: null, seq: 0, tempo: null, motivo: "" };
+const MENSAGEM_SIMILITUDE_VAZIO = "Execute uma análise para ver a similitude dos resumos.";
+const NOME_IDIOMA_SM = { todos: "todos", en: "inglês", pt: "português", es: "espanhol" };
+const ARQUIVO_SIMILITUDE = { svg: "similitude.svg", graphml: "similitude.graphml", csv: "similitude-formas.csv" };
+
+// A similitude lê os resumos do corpus; só não se aplica quando não há resumos (o servidor avisa).
+function similitudeAplicavel() {
+  return !sm.motivo;
+}
+
+function urlSimilitude(extra = {}) {
+  const q = new URLSearchParams({
+    token: estado.token, n_formas: $("smN").value, arestas_extras: $("smExtras").value,
+    indice: $("smIndice").value, segmento: $("smSegmento").value, idioma: $("smIdioma").value,
+    periodo: $("smPeriodo").value, ignorar: $("smIgnorar").value.trim(), ...extra });
+  return `/api/similitude?${q}`;
+}
+
+function mensagemSimilitude(texto) {
+  $("vazioSimilitude").hidden = false;
+  $("vazioSimilitude").textContent = texto;
+  $("smFigura").hidden = true;
+  $("smFigura").replaceChildren();
+  $("smAvisos").hidden = true;
+  $("smAvisos").replaceChildren();
+  $("smNota").hidden = true;
+  $("smTabelaCaixa").hidden = true;
+  $("smCorpo").replaceChildren();
+}
+
+function rotulosIdiomaSimilitude(contagem) {
+  for (const opcao of $("smIdioma").options) {
+    const n = contagem && contagem[opcao.value];
+    opcao.textContent = NOME_IDIOMA_SM[opcao.value] + (opcao.value !== "todos" && contagem ? ` (${n || 0})` : "");
+    // idioma sem resumos não pode ser escolhido (evita um pedido que só devolveria erro)
+    opcao.disabled = Boolean(contagem) && opcao.value !== "todos" && !n && opcao.value !== $("smIdioma").value;
+  }
+}
+
+function preencherPeriodosSimilitude() {
+  const seletor = $("smPeriodo");
+  seletor.replaceChildren(new Option("todos", "todos"));
+  for (const periodo of (estado.projeto ? estado.projeto.periodos : [])) {
+    seletor.append(new Option(periodo.nome, String(periodo.id)));
+  }
+  seletor.value = "todos";
+}
+
+// Esquece a figura (e ignora respostas em andamento) quando a análise ou o projeto muda.
+function limparSimilitude(novoProjeto) {
+  sm.token = null;
+  sm.seq += 1;
+  sm.motivo = "";
+  clearTimeout(sm.tempo);
+  if (novoProjeto) {
+    $("smN").value = "60";
+    $("smNValor").textContent = "60";
+    $("smExtras").value = "20";
+    $("smExtrasValor").textContent = "20%";
+    $("smIndice").value = "jaccard";
+    $("smSegmento").value = "resumo";
+    $("smIdioma").value = "todos";
+    $("smIgnorar").value = "";
+    preencherPeriodosSimilitude();
+    rotulosIdiomaSimilitude(null);
+  }
+  mensagemSimilitude(MENSAGEM_SIMILITUDE_VAZIO);
+  $("metaSimilitude").textContent = "palavras dos resumos que aparecem juntas, em blocos temáticos";
+}
+
+function desenharTabelaSimilitude(formas) {
+  const corpo = $("smCorpo");
+  corpo.replaceChildren();
+  const ordenadas = [...formas].sort((a, b) =>
+    a.comunidade - b.comunidade || b.frequencia - a.frequencia || a.forma.localeCompare(b.forma));
+  for (const f of ordenadas) {
+    const tr = document.createElement("tr");
+    const textos = [f.forma, f.idioma.toUpperCase(), String(f.frequencia), String(f.resumos),
+      String(f.ocorrencias), String(f.comunidade), String(f.grau)];
+    textos.forEach((texto, i) => {
+      const td = document.createElement("td");
+      if (i >= 2) td.className = "num";
+      td.textContent = texto;
+      tr.append(td);
+    });
+    corpo.append(tr);
+  }
+}
+
+async function carregarSimilitude(forcar) {
+  if (!estado.token) {
+    mensagemSimilitude(MENSAGEM_SIMILITUDE_VAZIO);
+    return;
+  }
+  if (!forcar && sm.token === estado.token && !$("smFigura").hidden) return;
+  const seq = ++sm.seq;
+  const token = estado.token;
+  if (!forcar) mensagemSimilitude("calculando a similitude…");
+  try {
+    const d = await api(urlSimilitude());
+    if (seq !== sm.seq || token !== estado.token) return;
+    sm.token = token;
+    sm.motivo = "";
+    $("smFigura").innerHTML = d.svg;
+    const svg = $("smFigura").querySelector("svg");
+    if (svg) { svg.removeAttribute("height"); svg.style.height = "auto"; }
+    $("smFigura").hidden = false;
+    $("vazioSimilitude").hidden = true;
+    rotulosIdiomaSimilitude(d.docs_por_idioma);
+    $("metaSimilitude").textContent =
+      `${plural(d.n_resumos, "resumo", "resumos")} · ${plural(d.formas.length, "palavra", "palavras")} · `
+      + plural(d.comunidades.length, "bloco", "blocos");
+    const avisos = $("smAvisos");
+    avisos.replaceChildren();
+    for (const aviso of d.avisos) {
+      const li = document.createElement("li");
+      li.textContent = aviso;
+      avisos.append(li);
+    }
+    avisos.hidden = d.avisos.length === 0;
+    $("smNota").textContent = d.nota;
+    $("smNota").hidden = false;
+    desenharTabelaSimilitude(d.formas);
+    $("smTabelaCaixa").hidden = false;
+    atualizarMenuExportar();
+  } catch (erro) {
+    if (seq !== sm.seq) return;
+    sm.token = null;
+    sm.motivo = erro.message;
+    mensagemSimilitude(erro.message);
+    $("metaSimilitude").textContent = "sem resultado com estes parâmetros";
+    atualizarMenuExportar();
+  }
+}
+
+function ligarSimilitude() {
+  const recarrega = () => {
+    clearTimeout(sm.tempo);
+    sm.tempo = setTimeout(() => carregarSimilitude(true), 250);
+  };
+  for (const [campo, rotulo, sufixo] of [["smN", "smNValor", ""], ["smExtras", "smExtrasValor", "%"]]) {
+    $(campo).addEventListener("input", () => {
+      $(rotulo).textContent = $(campo).value + sufixo;
+      recarrega();
+    });
+  }
+  for (const campo of ["smIdioma", "smPeriodo", "smIndice", "smSegmento", "smIgnorar"]) {
+    $(campo).addEventListener("change", recarrega);
+  }
+}
+
+async function baixarSimilitude(tipo) {
+  if (!estado.token) return;
+  try {
+    const resposta = await fetch(urlSimilitude({ baixar: tipo }));
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(corpo.erro || "Não há dados para a similitude.");
+    }
+    const blob = await resposta.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = ARQUIVO_SIMILITUDE[tipo] || "similitude.txt";
     document.body.appendChild(link);
     link.click();
     link.remove();

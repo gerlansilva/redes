@@ -60,9 +60,9 @@ _DIGESTO = [None]
 _MODULOS_DO_CALCULO = (
     "areas", "clustering", "dendro_helper", "dendrograma", "duplo_mapa", "fluxos", "ies",
     "linha_do_tempo", "longitudinal", "measures", "metodo", "network", "pipeline", "pivos",
-    "qualidade", "rajadas", "relatorio_unico", "report", "rotulos", "similarity", "termos",
+    "qualidade", "rajadas", "relatorio_unico", "report", "rotulos", "similarity", "similitude", "termos",
     "text_utils", "texto", "viz.cluster", "viz.dendrograma", "viz.densidade", "viz.duplo_mapa",
-    "viz.halo", "viz.linha_do_tempo", "viz.strategic")
+    "viz.halo", "viz.linha_do_tempo", "viz.similitude", "viz.strategic")
 
 
 def digesto_de_constantes() -> str:

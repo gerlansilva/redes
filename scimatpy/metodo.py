@@ -20,8 +20,10 @@ import html
 from . import bibliometria, cache_figuras, linha_do_tempo, pivos, qualidade, rajadas, rotulos, termos
 from . import areas as _areas_revistas
 from . import duplo_mapa as _duplo_mapa
+from . import similitude as _similitude
 from .viz import densidade as viz_densidade
 from .viz import duplo_mapa as viz_duplo_mapa
+from .viz import similitude as viz_similitude
 from .clustering import ALGORITMOS
 from .similarity import MEDIDAS
 from .texto import rotulo_legivel
@@ -171,7 +173,8 @@ def _plural(n: int, singular: str, plural: str) -> str:
 LIMIARES_QUALIDADE = {
     "q_ruim": 0.15, "q_atencao": 0.30, "razao": 0.6,
     "silhueta_ruim": 0.0, "silhueta_atencao": 0.05,
-    "pct_negativos": 30, "pct_agrupados": 60,
+    "pct_negativos": 30,
+    "grupo_grande": qualidade.GRUPO_GRANDE, "pct_grupos_ruim": 50, "pct_grupos_ok": 80,
 }
 
 NIVEIS_ROTULO = {"ok": "OK", "atencao": "Atenção", "ruim": "Ruim",
@@ -556,7 +559,8 @@ def parametros_html(config, periodos=None, resultados=(), frequencia=None,
 
 
 def algoritmo_html(config, medida_temporal: str | None = None,
-                   n_periodos: int | None = None, com_duplo: bool = True) -> str:
+                   n_periodos: int | None = None, com_duplo: bool = True,
+                   com_similitude: bool = True) -> str:
     """Como o código chega aos agrupamentos, em linguagem simples, para esta configuração."""
     frequencia = config.minimo_frequencia
     unidade = _ITEM_UNIDADE.get(config.unidade, "itens")
@@ -682,6 +686,9 @@ def algoritmo_html(config, medida_temporal: str | None = None,
     if com_duplo:
         p.append(_texto_duplo_mapa(proximo))
         proximo += 1
+    if com_similitude:
+        p.append(_texto_similitude(proximo))
+        proximo += 1
     p.append(_texto_pivos(config, proximo))
     proximo += 1
     p.append(_texto_qualidade(config, proximo))
@@ -779,6 +786,55 @@ def _texto_duplo_mapa(numero: int) -> str:
         "periódico dos documentos ou o periódico das referências.</p>")
 
 
+def _texto_similitude(numero: int) -> str:
+    """Método da similitude dos resumos, com os parâmetros lidos de `similitude`."""
+    s, v = _similitude, viz_similitude
+    pct = f"{s.LIMITE_EXTRAS[0]} a {s.LIMITE_EXTRAS[1]}%"
+    return (
+        f"<p><strong>{numero}. Similitude dos resumos.</strong> Figura complementar, no estilo do "
+        "IRaMuTeQ, sobre os resumos do corpus completo (a tela também aceita um período); não "
+        "depende do tipo de rede da análise. "
+        "<em>Texto:</em> entram os resumos com pelo menos "
+        f"{s.MINIMO_PALAVRAS} palavras, sem avisos de direitos autorais. O idioma (inglês, português ou "
+        "espanhol) é detectado resumo a resumo: cada palavra funcional vale 1 ponto para o idioma "
+        "em que existe (meio ponto se está em dois, como \"de\"), e caracteres e terminações "
+        "típicas (ã, õ, ç, -ção; ñ, -ción; -tion, -ing) somam pontos; vence o idioma com mais pontos "
+        "(inglês no empate sem evidência). Frases longas com idioma claramente diferente, nos resumos "
+        "bilíngues, são desconsideradas. Saem as palavras vazias e os termos genéricos de resumo "
+        "(\"objetivo\", \"results\", \"resultados\") do idioma do resumo, palavras de até 2 letras "
+        "e as que o usuário pedir para ignorar. "
+        "<em>Lematização leve</em>, sem rede e sem bibliotecas externas: plural e gênero, particípios "
+        "e gerúndios (-ando, -ado, -endo/-indo, -iendo), 3ª pessoa do plural e pretérito (-am, -ou, "
+        "-aram, -en), advérbios em -mente e -ly, -ção/-ções, -dade/-dad, -ing/-ed em inglês; só une "
+        "quando a forma mais simples aparece nos resumos (ou quando duas formas apontam para o mesmo "
+        "verbo), e \"estatístico\" se une a \"estatística\" (idem em es e en). Formas de idiomas "
+        "diferentes <strong>nunca</strong> se fundem. "
+        f"<em>Palavras:</em> as {s.N_FORMAS} formas mais frequentes (a tela aceita de "
+        f"{s.LIMITE_N_FORMAS[0]} a {s.LIMITE_N_FORMAS[1]}) que aparecem em ao menos {s.MINIMO_DF} "
+        f"segmentos ({s.MINIMO_DF_POUCOS} quando o idioma tem menos de 12); com vários idiomas, cada "
+        f"um recebe ao menos {s.COTA_MINIMA_IDIOMA} palavras e o resto é dividido pelo número de "
+        f"resumos, e idiomas com menos de {s.MINIMO_RESUMOS_IDIOMA} resumos ficam de fora. "
+        "<em>Segmento:</em> o resumo inteiro (padrão) ou grupos de frases de cerca de "
+        f"{s.FORMAS_POR_SEGMENTO} palavras. "
+        "<em>Índice</em> de associação entre cada par de palavras, a partir dos segmentos em que "
+        "aparecem juntas: Jaccard (padrão, c/(a+b−c)), cosseno (c/√(ab)), binomial (−log10 da "
+        "probabilidade hipergeométrica de ao menos c coocorrências) ou coocorrência bruta. "
+        "<em>Árvore máxima:</em> algoritmo de Kruskal, que escolhe as ligações em ordem decrescente "
+        "de índice sem fechar ciclos (empate decidido pela ordem alfabética), de modo que o grafo "
+        "mantém só os laços mais fortes necessários; palavras que nunca coocorrem ficam em "
+        f"componentes separados. A tela soma <em>arestas extras</em> (padrão {s.EXTRAS_PADRAO}% do "
+        f"número de ligações da árvore, de {pct}), as mais fortes fora da árvore, tracejadas, só "
+        "para a leitura. <em>Blocos:</em> comunidades pelo método de Louvain sobre a árvore, com "
+        f"resolução {s.RESOLUCAO:g} e semente {s.SEMENTE}; o resultado é determinístico. "
+        "<em>Desenho:</em> cada bloco é arrumado sozinho (molas e separação de caixas) e os blocos são "
+        "dispostos entre si sem que as manchas se toquem; o tamanho do ponto cresce com a raiz da "
+        f"frequência (raio de {v.RAIO_MIN:g} a {v.RAIO_MAX:g}); a largura dos rótulos vem de uma tabela "
+        f"embutida de larguras com folga de {round((v.FOLGA_TEXTO - 1) * 100)}%, sem depender de fontes. "
+        "A figura é acompanhada da tabela de parâmetros e da tabela das palavras (frequência, bloco "
+        "e grau). Não é o IRaMuTeQ: não usa etiquetas gramaticais nem o dicionário Lexique; a "
+        "lematização é aproximada e a escolha das palavras, do índice e do segmento muda a figura.</p>")
+
+
 def _texto_pivos(config, numero: int) -> str:
     """Método dos pontos de virada e do sigma, com as constantes lidas de `pivos`."""
     return (
@@ -819,8 +875,11 @@ def _texto_qualidade(config, numero: int = 9) -> str:
     minimo_grupo = rotulos.MINIMO_NO_GRUPO
     p = []
     p.append(
-        f"<p><strong>{numero}. Qualidade do mapa.</strong> Duas medidas dizem se a divisão em "
-        "agrupamentos se sustenta na rede.</p>")
+        f"<p><strong>{numero}. Qualidade do mapa.</strong> O selo diz se o mapa é feito de "
+        f"agrupamentos de verdade: olha quantos itens estão em agrupamentos de "
+        f"{lim['grupo_grande']} ou mais itens e se a rede se partiu em pares e itens "
+        "isolados. Duas medidas, descritas a seguir, dizem se a divisão em agrupamentos "
+        "se destaca na rede (a <em>nitidez</em>).</p>")
     p.append(
         "<ul>"
         "<li><em>Modularidade Q</em> (força da divisão): compara as ligações que ficam "
@@ -838,22 +897,37 @@ def _texto_qualidade(config, numero: int = 9) -> str:
         f"aparecem com “—”. Em redes com mais de {limite_nos} itens agrupados a silhueta "
         "é dispensada, para a análise não ficar lenta.</li></ul>")
     p.append(
-        "<p><strong>Selo de qualidade.</strong> <em>Ruim</em>: Q abaixo de "
-        f"{_n2(lim['q_ruim'])} ou silhueta média abaixo de {_n2(lim['silhueta_ruim'])}. "
-        f"<em>Atenção</em>: Q abaixo de {_n2(lim['q_atencao'])}; razão Q/Q<sub>Louvain</sub> "
-        f"abaixo de {_n2(lim['razao'])}; silhueta média abaixo de "
-        f"{_n2(lim['silhueta_atencao'])}; mais de {lim['pct_negativos']}% dos itens com "
-        f"silhueta negativa; menos de {lim['pct_agrupados']}% dos itens em agrupamentos; "
-        "ou rede fragmentada (há mais componentes do que a metade dos itens, isto é, "
-        "o componente médio tem menos de 2 itens, quase só itens isolados e pares; "
-        "nesse caso um Q alto não indica qualidade). <em>Indefinido</em>: menos de "
-        f"{minimo_nos} itens, menos de 2 agrupamentos ou rede sem ligações com valor "
-        "positivo; nesses casos nenhum número é mostrado como 0, porque não houve "
-        "avaliação. <em>OK</em>: nenhum dos alertas acima.</p>")
+        "<p><strong>Selo de qualidade.</strong> <em>Ruim</em>: menos de "
+        f"{lim['pct_grupos_ruim']}% dos itens em agrupamentos de {lim['grupo_grande']} ou "
+        "mais itens (o resto está solto ou em pares e trios, e há pouco o que ler). "
+        f"<em>Atenção</em>: de {lim['pct_grupos_ruim']}% a menos de {lim['pct_grupos_ok']}% "
+        f"dos itens em agrupamentos de {lim['grupo_grande']} ou mais; ou rede fragmentada "
+        "(há mais componentes do que a metade dos itens, isto é, "
+        "o componente médio tem menos de 2 itens, quase só itens isolados e pares). "
+        f"<em>OK</em>: {lim['pct_grupos_ok']}% ou mais dos itens em agrupamentos de "
+        f"{lim['grupo_grande']} ou mais, e rede não fragmentada. <em>Indefinido</em>: "
+        f"menos de {minimo_nos} itens, menos de 2 agrupamentos ou rede sem ligações com "
+        "valor positivo; nesses casos nenhum número é mostrado como 0, porque não houve "
+        "avaliação.</p>")
     p.append(
-        "<p><strong>Aviso.</strong> A maioria das redes reais fica em “atenção”, e isso "
-        "<em>não invalida o mapa</em>: o selo serve de leitura prudente (quais limites "
-        "entre temas merecem desconfiança), não de aprovação ou reprovação.</p>")
+        "<p><strong>Avisos de nitidez.</strong> Q abaixo de "
+        f"{_n2(lim['q_atencao'])} (abaixo de {_n2(lim['q_ruim'])}, “muito fraca”); razão "
+        f"Q/Q<sub>Louvain</sub> abaixo de {_n2(lim['razao'])}; silhueta média abaixo de "
+        f"{_n2(lim['silhueta_atencao'])} (abaixo de {_n2(lim['silhueta_ruim'])}, os itens "
+        "ficam em média mais perto de outros grupos); e mais de "
+        f"{lim['pct_negativos']}% dos itens com silhueta negativa geram um aviso, mas "
+        "<em>não mudam o selo</em>. Em 43 mapas de bases reais julgados à vista, esses "
+        "sinais ficaram baixos tanto em mapas legíveis quanto em ilegíveis: redes densas "
+        "(acoplamento bibliográfico, referências) dão Q e silhueta baixos mesmo com "
+        "agrupamentos grandes e coesos, e redes de pares isolados dão Q alto sem nada a "
+        "ler. Já a fração de itens em agrupamentos de "
+        f"{lim['grupo_grande']} ou mais separou os dois casos.</p>")
+    p.append(
+        "<p><strong>Aviso.</strong> O selo é uma leitura prudente da estrutura, não uma "
+        "aprovação: <em>Atenção</em> <em>não invalida o mapa</em>, só marca que parte "
+        "dos itens está solta ou em grupos pequenos. <em>Ruim</em> quer dizer que, com "
+        "estes parâmetros, quase nada forma agrupamento de verdade; vale tentar uma "
+        "frequência mínima maior.</p>")
     if config.unidade == "Authors":
         p.append(
             "<p><strong>Atenção com autores.</strong> Em redes de coautoria, um Q alto é "
@@ -1238,6 +1312,13 @@ def indicadores_linhas(dados: list[dict], config, frequencia=None) -> tuple[list
                 return "—"          # indefinido nunca mostra 0
             return _n2(ql["pct_agrupados"], 0) + "%"
 
+        def pct_grandes(x):
+            ql = x.get("qualidade")
+            if (not ql or not ql.get("n_nos") or ql.get("nivel") == "indefinido"
+                    or ql.get("pct_em_grupos_grandes") is None):
+                return "—"          # indefinido nunca mostra 0
+            return _n2(ql["pct_em_grupos_grandes"], 0) + "%"
+
         def nivel(x):
             ql = x.get("qualidade")
             return selo_qualidade(ql["nivel"]) if ql else "—"
@@ -1247,6 +1328,8 @@ def indicadores_linhas(dados: list[dict], config, frequencia=None) -> tuple[list
             ["Q do Louvain (referência)"] + [q(x, "q_louvain") for x in dados],
             ["Silhueta média"] + [q(x, "silhueta_media") for x in dados],
             ["% dos itens em agrupamentos"] + [pct_agrupados(x) for x in dados],
+            [f"% dos itens em agrupamentos de {qualidade.GRUPO_GRANDE}+ itens"]
+            + [pct_grandes(x) for x in dados],
             ["Qualidade do mapa"] + [nivel(x) for x in dados],
         ]
     return cabecalho, [[_esc(l[0])] + l[1:] for l in linhas]
@@ -1293,13 +1376,14 @@ def _avisos_html(dados: list[dict]) -> str:
         return ""
     return ('<div class="avisos-qualidade">' + "".join(blocos)
             + '<p class="fonte">Como ler o selo: veja “Qualidade do mapa e rótulos” em '
-              "“Como funciona”. A maioria das redes reais fica em atenção, e isso não "
-              "invalida o mapa.</p></div>")
+              "“Como funciona”. Atenção não invalida o mapa; os avisos de nitidez "
+              "não mudam o selo.</p></div>")
 
 
 def metodo_html(config, periodos=None, resultados=(), frequencia=None,
                 medida_temporal: str | None = "EquivalenceIndex", kb=None, tabela=None,
-                rotulo: str = "", titulo=None, com_duplo: bool | None = None) -> str:
+                rotulo: str = "", titulo=None, com_duplo: bool | None = None,
+                com_similitude: bool | None = None) -> str:
     """Bloco completo: parâmetros, indicadores e método.
 
     `titulo(texto)` devolve o cabeçalho de cada parte; sem ele, usa `<h4>` sem
@@ -1315,9 +1399,12 @@ def metodo_html(config, periodos=None, resultados=(), frequencia=None,
                                     rotulo)]
     if com_duplo is None:
         com_duplo = True if kb is None else _duplo_mapa.aplicavel(kb.conexao)
+    if com_similitude is None:
+        com_similitude = True if kb is None else _similitude.aplicavel(kb.conexao)
     partes += [titulo("Como funciona"), algoritmo_html(config, medida_temporal,
                                                           len(periodos) if periodos else None,
-                                                          com_duplo=com_duplo)]
+                                                          com_duplo=com_duplo,
+                                                          com_similitude=com_similitude)]
     return "\n".join(partes)
 
 

@@ -556,6 +556,63 @@ def _bloco_duplo_pasta(destino: Path, kb) -> str:
     return "\n".join([f'<h2 id="duplo-mapa">{TITULO_SECAO_DUPLO}</h2>'] + partes)
 
 
+# ------------------------------------------------- similitude dos resumos
+
+TITULO_SECAO_SIMILITUDE = "Similitude dos resumos (palavras que aparecem juntas)"
+
+
+def similitude_html(kb, figura, tabela, classe_nota: str = "nota"):
+    """Partes HTML da seção de similitude dos resumos, ou None quando não há resumos ou o cálculo falha.
+
+    Mesmo contrato de `duplo_mapa_html`: `figura(svg, legenda)` e `tabela(cabecalho, linhas, legenda,
+    numericas)`. Usa os parâmetros padrão (todos os idiomas, 60 palavras, Jaccard, resumo inteiro,
+    árvore máxima com 20% de arestas extras), que a tabela de parâmetros registra.
+    """
+    if kb is None:
+        return None
+    try:
+        from . import similitude
+        from .viz import similitude as viz_sim
+        if not similitude.aplicavel(kb.conexao):
+            return None
+        dados = similitude.analisa(kb.conexao)
+        svg = viz_sim.svg(dados, similitude.TITULO)
+        if not svg:
+            return None
+        parametros = [[_esc(a), _esc(b)] for a, b in similitude.descreve_parametros(dados)]
+        ordem = sorted(dados["formas"], key=lambda f: (f["comunidade"], -f["frequencia"], f["forma"]))
+        linhas = [[_esc(f["forma"]), f["idioma"].upper(), str(f["frequencia"]), str(f["resumos"]),
+                   str(f["comunidade"]), str(f["grau"])] for f in ordem]
+        partes = [
+            figura(svg, similitude.TITULO + "."),
+            f'<p class="{classe_nota}">{_esc(similitude.NOTA)}</p>',
+            tabela(["Parâmetro", "Valor"], parametros, "Parâmetros da análise de similitude."),
+            tabela(["Palavra", "Idioma", "Frequência", "Resumos", "Bloco", "Grau"], linhas,
+                   "Palavras do grafo de similitude: frequência (segmentos), resumos que a contêm, "
+                   "bloco temático (comunidade de Louvain) e grau (ligações desenhadas).",
+                   numericas=(2, 3, 4, 5)),
+        ]
+        for aviso in dados["avisos"]:
+            partes.append(f'<p class="{classe_nota}">{_esc(aviso)}</p>')
+        return partes
+    except Exception:
+        return None
+
+
+def _bloco_similitude_pasta(destino: Path, kb) -> str:
+    """HTML da seção de similitude para o relatório em pasta ("" se não se aplica)."""
+    def figura(svg, legenda):
+        (destino / "images" / "similitude.svg").write_text(svg, encoding="utf-8")
+        return (f'<p><img src="images/similitude.svg" alt="{_esc(legenda)}" width="100%"></p>')
+
+    def tabela(cabecalho, linhas, legenda, numericas=()):
+        return _tabela(cabecalho, linhas, legenda, numericas=numericas)
+    partes = similitude_html(kb, figura, tabela, classe_nota="fonte")
+    if not partes:
+        return ""
+    return "\n".join([f'<h2 id="similitude">{TITULO_SECAO_SIMILITUDE}</h2>'] + partes)
+
+
 def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
               medida_temporal: str = "EquivalenceIndex",
               com_bibliometria: bool = True, devolve_resultados: bool = False,
@@ -654,6 +711,12 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
         bloco_duplo = ""
     if bloco_duplo:
         bloco_lt = (bloco_lt + "\n" + bloco_duplo) if bloco_lt else bloco_duplo
+    try:
+        bloco_sim = _bloco_similitude_pasta(destino, kb)
+    except Exception:
+        bloco_sim = ""
+    if bloco_sim:
+        bloco_lt = (bloco_lt + "\n" + bloco_sim) if bloco_lt else bloco_sim
     _pagina_indice(destino, resultados, mapa, config, estendido, com_bibliometria,
                    kb=kb, periodos=periodos, medida_temporal=medida_temporal,
                    linha_do_tempo_bloco=bloco_lt)
@@ -1129,6 +1192,9 @@ def gera_pagina_completa(destino: Path, kb, secoes: list[dict], ignoradas: list[
         if (destino / pasta / "images" / "duploMapa.svg").exists():
             bloco.append(f'<p><a href="{pasta}/index.html#duplo-mapa">Duplo mapa de áreas das '
                          "revistas (corpus completo)</a></p>")
+        if (destino / pasta / "images" / "similitude.svg").exists():
+            bloco.append(f'<p><a href="{pasta}/index.html#similitude">Similitude dos resumos '
+                         "(corpus completo)</a></p>")
         figuras = []
         mapeador = secao["config"].mapeadores[0] if secao["config"].mapeadores else "nucleo"
         for indice, r in enumerate(resultados):
