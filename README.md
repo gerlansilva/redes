@@ -473,3 +473,13 @@ python3 -m redes constroi /tmp/demo/teste.bib --formato bibtex \
     --saida /tmp/demo/teste.redes --periodos 2015-2026
 python3 -m redes analisa /tmp/demo/teste.redes --unidade Words --min-freq 1
 ```
+
+## Licença
+
+Copyright (C) 2026 Gerlan Silva da Silva ([ORCID 0000-0002-9996-9983](https://orcid.org/0000-0002-9996-9983)).
+
+Este programa é software livre, distribuído sob a **GNU General Public License,
+versão 3 ou posterior** (GPL-3.0-or-later); veja o arquivo `LICENSE`. Ele se
+inspira no [SciMAT](https://sci2s.ugr.es/scimat/), também distribuído sob a GPL v3.
+Este programa é distribuído na esperança de ser útil, mas **sem nenhuma garantia**.
+

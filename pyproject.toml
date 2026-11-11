@@ -5,8 +5,10 @@ description = "Redes: mapeamento científico (bibliometria) inspirado no SciMAT,
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Gerlan Silva da Silva" }]
+license = { text = "GPL-3.0-or-later" }
 keywords = ["bibliometria", "cientometria", "mapeamento científico", "SciMAT", "Scopus", "análise de redes"]
 classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Information Analysis",
@@ -27,6 +29,9 @@ redes = "redes.cli:main"
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 include = ["redes*"]

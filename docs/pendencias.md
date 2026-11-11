@@ -285,7 +285,7 @@ Depende de decisão do usuário:
    como (só os maiores agrupamentos, sem arestas fracas, ou outra regra)?*
 2. ~~Rótulos por tema fora de palavras-chave e referências.~~ Decidido: autores,
    países e IES ficam com o nome do líder do agrupamento.
-3. ~~Publicação do pacote.~~ Decidido: uso local. O pacote já se instala com
+3. ~~Publicação do pacote.~~ Decidido: PyPI com o nome `redes`, licença GPL-3.0-or-later (o código tem trechos derivados do SciMAT, que é GPL v3); registro futuro no INPI. Antes decidido: uso local. O pacote já se instala com
    `pip install .`; PyPI e índice interno não serão usados por enquanto.
 4. **Paridade na integração contínua.** `scripts/paridade*.py` e a grade exigem o
    fork Java compilado em `/tmp/demo/celii`. *Pergunta: o fork pode ir para o
