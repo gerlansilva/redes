@@ -246,8 +246,8 @@
               <div class="controle"><input id="corte" type="number" min="0" step="0.05" value="0" title="Similaridade mínima para unir temas (0 = unir tudo)." style="width:100%;border:0;outline:0;background:transparent;font:inherit;color:inherit"></div>
             </div>
             <div class="campo min" id="campoComponente" hidden>
-              <label for="componenteMin" title="Rede de instituições: componentes conexos com menos instituições que isto não viram agrupamento e ficam sem agrupamento (fora dos halos).">Componente mínimo</label>
-              <div class="controle"><input id="componenteMin" type="number" min="1" step="1" value="3" title="Menor componente (em instituições) que pode virar agrupamento. Padrão: 3." style="width:100%;border:0;outline:0;background:transparent;font:inherit;color:inherit"></div>
+              <label for="componenteMin" title="Redes de autores, países e instituições: componentes conexos com menos nós que isto não viram agrupamento e ficam sem agrupamento (fora dos halos). Nenhum nó nem aresta é apagado e a frequência mínima não muda.">Tam. mín. do agrupamento</label>
+              <div class="controle"><input id="componenteMin" type="number" min="1" step="1" value="3" title="Menor componente (em nós) que pode virar agrupamento. 1 = sem filtro. Padrão: 3 em instituições, 1 em autores e países." style="width:100%;border:0;outline:0;background:transparent;font:inherit;color:inherit"></div>
             </div>
             <div class="campo rede">
               <label for="rede" title="Número mínimo e máximo de itens em cada agrupamento.">Tamanho do grupo</label>
@@ -335,6 +335,7 @@
         <div class="aba" data-aba="dendrograma" role="tab" tabindex="0" aria-selected="false">Dendrograma</div>
         <div class="aba" data-aba="linhatempo" role="tab" tabindex="0" aria-selected="false">Linha do tempo</div>
         <div class="aba" data-aba="densidade" role="tab" tabindex="0" aria-selected="false">Densidade</div>
+        <div class="aba" data-aba="duplomapa" role="tab" tabindex="0" aria-selected="false">Duplo mapa</div>
         <div class="aba" data-aba="longitudinal" role="tab" tabindex="0" aria-selected="false">Comparar períodos</div>
       </div>
       <div class="qualidade-caixa" id="qualidadeCaixa" hidden>
@@ -727,6 +728,43 @@
         <div class="rodape-tabela" id="rodapeDensidade">Cor = densidade de itens frequentes e fortemente ligados (branco: pouca; amarelo: muita). Usa o corpus completo, não só o período; só os rótulos que cabem aparecem.</div>
       </section>
 
+      <section class="tabela-bloco" id="blocoDuploMapa" data-bloco="blocoDuploMapa">
+        <header>
+          <h2>Duplo mapa de áreas das revistas</h2>
+          <span class="meta" id="metaDuploMapa">revistas que publicam o corpus e revistas citadas, por área</span>
+        </header>
+        <div class="dendro-controles">
+          <label class="campo-mini dendro-grupos">Revistas que publicam: <b id="dmEsqValor">10</b>
+            <input type="range" id="dmEsq" min="3" max="30" step="1" value="10" aria-label="Número de revistas que publicam o corpus">
+          </label>
+          <label class="campo-mini dendro-grupos">Revistas citadas: <b id="dmDirValor">16</b>
+            <input type="range" id="dmDir" min="5" max="40" step="1" value="16" aria-label="Número de revistas citadas">
+          </label>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioDuploMapa">Execute uma análise para ver o duplo mapa.</div>
+          <div class="dm-figura" id="dmFigura" hidden></div>
+        </div>
+        <p class="dm-aviso" id="dmAviso" hidden></p>
+        <div class="tabela-scroll dm-tabela" id="dmTabelaCaixa" hidden>
+          <table>
+            <caption>Revista → área, para conferência (classificação aproximada por palavras do nome)</caption>
+            <thead>
+              <tr>
+                <th>Revista</th>
+                <th style="width:190px">Área (aproximada)</th>
+                <th style="width:170px" title="Termo da lista de áreas que decidiu a classificação">Termo que decidiu</th>
+                <th class="num" style="width:96px" title="Citações feitas pelos documentos do corpus publicados na revista">Citações feitas</th>
+                <th class="num" style="width:108px" title="Citações recebidas das revistas do corpus">Citações recebidas</th>
+                <th style="width:92px">Desenhada</th>
+              </tr>
+            </thead>
+            <tbody id="dmCorpo"></tbody>
+          </table>
+        </div>
+        <div class="rodape-tabela" id="rodapeDuploMapa">Esquerda: revistas que publicam os documentos do corpus; direita: revistas citadas por elas; faixa = citações entre áreas. A área é inferida por palavras do NOME da revista (aproximada): confira a tabela. Usa o corpus completo, não só o período.</div>
+      </section>
+
       <section class="acoes-finais">
         <div>
           <div class="rotulo-secao">Exportar e compartilhar</div>
@@ -759,6 +797,7 @@
               <button type="button" role="menuitem" tabindex="-1" data-exp="dendrograma-svg" data-precisa="resultado">Dendrograma do período (SVG)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="linhatempo-svg" data-precisa="resultado">Linha do tempo (SVG)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="densidade-svg" data-precisa="resultado">Mapa de densidade (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="duplomapa-svg" data-precisa="resultado">Duplo mapa de áreas (SVG)</button>
               <button type="button" role="menuitem" tabindex="-1" data-exp="fluxo-svg">Fluxo Autor – País – IES (SVG)</button>
             </div>
             <p class="menu-aviso" id="avisoExportar" hidden>Escolha uma análise no menu lateral para liberar os dados.</p>

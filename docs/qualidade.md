@@ -22,12 +22,43 @@ agrupamentos" do método).
 | Selo | Quando |
 |---|---|
 | Ruim | Q abaixo de 0,15 ou silhueta média abaixo de 0 |
-| Atenção | Q abaixo de 0,30; razão abaixo de 0,6; silhueta média abaixo de 0,10; mais de 30% dos itens com silhueta negativa; menos de 60% dos itens em agrupamentos; rede fragmentada (mais componentes do que a metade dos itens); ou unidade Autores (coautoria nunca passa de Atenção) |
+| Atenção | Q abaixo de 0,30; razão abaixo de 0,6; silhueta média abaixo de 0,05; mais de 30% dos itens com silhueta negativa; menos de 60% dos itens em agrupamentos; rede fragmentada (mais componentes do que a metade dos itens); ou unidade Autores (coautoria nunca passa de Atenção) |
 | Indefinido | Menos de 15 itens, menos de 2 agrupamentos ou rede sem ligação positiva. Nenhum número é mostrado como 0 |
 | OK | Nenhum dos alertas acima |
 
 Leitura prudente, não aprovação: a maioria das redes reais fica em
 "Atenção" e isso não invalida o mapa.
+
+### Calibração (11/11/2026)
+
+Medida com `scripts/distribuicao_selo.py` em serj, serj_auto, novo142 e eecera59:
+todas as unidades e matrizes, frequências mínimas 1 e 2, mais as análises do
+relatório completo (435 períodos, 323 com selo definido; os demais ficam
+"Indefinido" por terem menos de 15 itens ou menos de 2 agrupamentos).
+
+Régua: o Louvain maximiza o Q, então é a melhor divisão que a rede permite. Um
+alerta que acusa essa divisão na maioria das redes mede a rede, não a divisão.
+Nas bases reais, a partição do Louvain é acusada por Q < 0,30 em 23% dos períodos
+e por Q < 0,15 em 9%, mas por silhueta média < 0,10 em 39%. A silhueta usa
+distância 1 − similaridade, e par sem ligação direta fica a distância 1: numa
+rede esparsa, mesmo um grupo bem separado dá valor baixo. O limiar de coesão
+passou de 0,10 para **0,05** (a partição do Louvain é acusada em 21%, na faixa do
+Q). Nada mais mudou: Q, razão, itens negativos e cobertura acusam entre 22% e 42%
+dos períodos e discriminam.
+
+| Selo (só períodos com selo definido) | Antes (silhueta < 0,10) | Depois (silhueta < 0,05) |
+|---|---|---|
+| OK | 27 (8%) | 45 (14%) |
+| Atenção | 232 (72%) | 214 (66%) |
+| Ruim | 64 (20%) | 64 (20%) |
+| Análises do relatório (44 períodos): OK / Atenção / Ruim | 2 / 40 / 2 | 7 / 35 / 2 |
+
+Motivos que sobram na Atenção (136 períodos acusam coesão < 0,05; 107 itens
+negativos > 30%; 104 razão < 0,6; 76 Q < 0,30; 69 cobertura < 60%; 60 rede
+fragmentada; 47 coautoria, em 23 deles como único motivo) são sinais reais, não
+artefato de limiar: o algoritmo padrão (centros simples) acha divisões mais
+fracas que o Louvain em mapas de referências, periódicos e países. O selo continua
+conservador de propósito.
 
 ## Rótulos por tema
 

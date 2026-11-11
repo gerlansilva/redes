@@ -199,7 +199,7 @@ def comando_web(args) -> int:
 
 def monta_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="scimatpy", description="Redes — análise da produção científica.")
+        prog="redes", description="Redes — análise da produção científica.")
     sub = parser.add_subparsers(dest="comando", required=True)
 
     comum = argparse.ArgumentParser(add_help=False)
@@ -228,9 +228,11 @@ def monta_parser() -> argparse.ArgumentParser:
                        choices=["nucleo", "interseccao", "secundarios", "kcore",
                                 "uniao", "acoplamento"],
                        help="mapeadores de documentos a aplicar")
-    comum.add_argument("--componente-min", type=int, default=3, dest="componente_min",
-                       help="unidade Institutions: componentes com menos instituições "
-                            "que isto ficam sem agrupamento (padrão 3)")
+    comum.add_argument("--tamanho-minimo-agrupamento", "--componente-min", type=int,
+                       default=None, dest="componente_min",
+                       help="unidades Authors, Countries e Institutions: componentes "
+                            "com menos nós que isto ficam sem agrupamento "
+                            "(padrão: 3 em Institutions; 1 = sem filtro nas demais)")
     comum.add_argument("--k-core", type=int, default=2, dest="k_core",
                        help="valor de k do mapeador k-core")
     comum.add_argument("--palavras", nargs="+", default=["autor", "fonte"],

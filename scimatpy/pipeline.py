@@ -43,6 +43,11 @@ MENSAGEM_MAPEADOR_ACOPLAMENTO = (
     "secundários ou k-core).")
 
 
+# Unidades de entidade em que o filtro de tamanho mínimo do agrupamento vale.
+UNIDADES_FILTRO_AGRUPAMENTO = ("Authors", "Countries", "Institutions")
+COMPONENTE_MINIMO_POR_UNIDADE = {"Institutions": 3}
+
+
 @dataclass
 class Configuracao:
     """Parâmetros de uma análise, equivalentes a `AnalysisConfiguration`."""
@@ -62,9 +67,11 @@ class Configuracao:
     indices: tuple[str, ...] = ("h", "g", "hg", "q2", "media", "soma", "minimo", "maximo")
     # Itens a descartar antes da rede (termos genéricos como "ESTATISTICA").
     ignorar: tuple[str, ...] = ()
-    # Só na unidade Institutions: componente conexo da rede com menos
-    # instituições que isto não vira agrupamento (os nós ficam sem agrupamento).
-    componente_minimo: int = 3
+    # Authors, Countries e Institutions: componente conexo da rede com menos nós
+    # que isto não vira agrupamento (os nós ficam sem agrupamento, fora dos
+    # halos; nenhum nó nem aresta é apagado). None = padrão da unidade
+    # (3 em Institutions, 1 = sem filtro nas demais).
+    componente_minimo: int | None = None
 
     def valida(self) -> None:
         if self.unidade not in ("Words", "Authors", "References",
@@ -87,8 +94,16 @@ class Configuracao:
             raise ValueError(f"corte inválido: {self.corte}")
         if self.k_core < 1:
             raise ValueError(f"k-core inválido: {self.k_core}")
-        if self.componente_minimo < 1:
+        if self.componente_minimo is not None and self.componente_minimo < 1:
             raise ValueError(f"tamanho mínimo do componente inválido: {self.componente_minimo}")
+
+    def agrupamento_minimo(self) -> int:
+        """Tamanho mínimo efetivo do componente (1 = sem filtro)."""
+        if self.unidade not in UNIDADES_FILTRO_AGRUPAMENTO:
+            return 1
+        if self.componente_minimo is None:
+            return COMPONENTE_MINIMO_POR_UNIDADE.get(self.unidade, 1)
+        return self.componente_minimo
 
 
 @dataclass
@@ -133,6 +148,8 @@ class ResultadoPeriodo:
     rotulos: dict[int, str] = field(default_factory=dict)
     # Rede de IES: uniões de variantes feitas e componentes deixados sem agrupamento.
     ies: dict | None = None
+    # Authors/Countries/Institutions: efeito do tamanho mínimo do agrupamento.
+    filtro_agrupamento: dict | None = None
 
     def rotulo(self, no: int) -> str:
         """Rótulo de um nó para exibição: título do documento ou nome do item.
@@ -204,12 +221,25 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
                                             config.tamanho_maximo, config.corte,
                                             cancelado=cancelado)
     info_ies = None
-    if config.unidade == "Institutions":
+    info_filtro = None
+    if config.unidade in UNIDADES_FILTRO_AGRUPAMENTO:
+        minimo_comp = config.agrupamento_minimo()
+        grupos_antes = len(conjunto.agrupamentos)
         conjunto, pequenos = _descarta_componentes_pequenos(
-            rede, conjunto, config.componente_minimo)
+            rede, conjunto, minimo_comp)
+        info_filtro = {
+            "minimo": minimo_comp,
+            "grupos_antes": grupos_antes,
+            "grupos_depois": len(conjunto.agrupamentos),
+            "componentes_pequenos": len(pequenos),
+            "isolados": sum(1 for c in rede.componentes() if len(c) == 1),
+            "nos_sem_agrupamento": sum(len(c) for c in rede.componentes()
+                                       if len(c) < minimo_comp),
+        }
+    if config.unidade == "Institutions":
         indice = projeto.indice_ies()
         info_ies = {
-            "componente_minimo": config.componente_minimo,
+            "componente_minimo": minimo_comp,
             "unioes": indice.unioes,
             "variantes_unidas": indice.quantidade_variantes_unidas(),
             "componentes": sorted((len(c) for c in rede.componentes()), reverse=True),
@@ -268,6 +298,7 @@ def executa_periodo(projeto: ProjetoScimat, periodo_id: int, periodo_nome: str,
         agregado=agregado,
         rotulos=rotulos,
         ies=info_ies,
+        filtro_agrupamento=info_filtro,
     )
 
 

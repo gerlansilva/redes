@@ -134,7 +134,7 @@ class RelatorioCompletoTest(unittest.TestCase):
             palavras_autor=[f"tema {i % 4}", f"tema {i % 3 + 4}", "geral"]) for i in range(40)]
         caminho = Path(tempfile.mkdtemp()) / "c.redes"
         build.constroi(docs, caminho, periodos=[("A", 2015, 2017), ("B", 2018, 2020)])
-        r = api.gera_relatorio_completo({"projeto": str(caminho)})
+        r = api.gera_relatorio_completo({"projeto": str(caminho), "formato": "pastas"})
         self.assertTrue(r["secoes"])
         self.assertTrue(any("referências" in i["motivo"] for i in r["ignoradas"]))
         pasta = api.RELATORIOS[r["token"]]

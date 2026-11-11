@@ -15,6 +15,7 @@ As figuras são SVG, vetoriais, sem dependência de rasterizador.
 
 from __future__ import annotations
 
+import copy
 import html
 import re
 import shutil
@@ -22,7 +23,7 @@ from contextvars import ContextVar
 import unicodedata
 from pathlib import Path
 
-from . import linha_do_tempo, longitudinal, metodo, rotulos
+from . import cache_figuras, linha_do_tempo, longitudinal, metodo, rotulos
 from .pipeline import executa_periodo
 from .texto import exibe_termo
 from . import exports
@@ -318,6 +319,20 @@ NOTA_RAJADA_PALAVRAS = (
     "embora a rede de palavras possa incluir também as de fonte.")
 
 
+def halo_cacheado(kb, resultado, rotulos_novos) -> str:
+    """Rede completa do período em halos, desenhada uma vez por conteúdo.
+
+    O relatório em pastas e o arquivo único pedem a mesma figura (mesmo título,
+    rótulos e pontos de virada); o cache compartilhado evita desenhá-la de novo,
+    e os pontos de virada só são calculados quando o desenho é necessário.
+    """
+    titulo = f"Rede completa — {resultado.periodo}"
+    chave = ("halo", cache_figuras.base(resultado), titulo,
+             repr(sorted((rotulos_novos or {}).items())), cache_figuras.selo_projeto(kb))
+    return cache_figuras.obtem(chave, lambda: halo_svg(
+        resultado, titulo, rotulos=rotulos_novos, pivos=metodo.pivos_para_halo(kb, resultado)))
+
+
 def linha_do_tempo_aplicavel(config) -> bool:
     """A figura só tem sentido para palavras, autores ou referências em co-ocorrência."""
     return (config.matriz == "CoOccurrence"
@@ -349,9 +364,15 @@ def rotulos_linha_do_tempo(kb, config, dados: dict) -> dict:
 
 def linha_do_tempo_do_corpus(kb, config, max_nos: int = linha_do_tempo.MAX_NOS):
     """(dados, rótulos novos) da linha do tempo do corpus completo."""
-    dados = linha_do_tempo.constroi(kb, config, max_nos=max_nos)
-    rot = rotulos_linha_do_tempo(kb, config, dados) if dados.get("faixas") else {}
-    return dados, rot
+    def calcula():
+        dados = linha_do_tempo.constroi(kb, config, max_nos=max_nos)
+        rot = rotulos_linha_do_tempo(kb, config, dados) if dados.get("faixas") else {}
+        return dados, rot
+
+    # Valor guardado por estado do projeto e configuração; quem pede recebe uma cópia.
+    return copy.deepcopy(cache_figuras.obtem(
+        ("linha-do-tempo", cache_figuras.selo_projeto(kb), cache_figuras.selo_configuracao(config),
+         max_nos, cache_figuras.ambiente()), calcula))
 
 
 def titulo_linha_do_tempo(config) -> str:
@@ -437,13 +458,22 @@ def densidade_html(kb, config, figura, classe_nota: str = "nota"):
     if kb is None or not densidade_aplicavel(config):
         return None
     try:
-        resultado = densidade_do_corpus(kb, config)
-        dados = viz_densidade.calcula(resultado)
-        if not dados["nos"]:
-            return [f'<p class="{classe_nota}">{_esc(dados.get("aviso") or "Sem dados para o mapa de densidade.")}</p>']
+        def desenha():
+            resultado = densidade_do_corpus(kb, config)
+            dados = viz_densidade.calcula(resultado)
+            if not dados["nos"]:
+                return ("aviso", dados.get("aviso") or "Sem dados para o mapa de densidade.")
+            titulo = titulo_densidade(config)
+            return ("svg", viz_densidade.svg(resultado, titulo, unidade=config.unidade, dados=dados))
+
+        # O mapa só depende do projeto e da configuração: vale para os dois formatos de relatório.
+        tipo, valor = cache_figuras.obtem(
+            ("densidade", cache_figuras.selo_projeto(kb), cache_figuras.selo_configuracao(config),
+             cache_figuras.ambiente()), desenha)
+        if tipo == "aviso":
+            return [f'<p class="{classe_nota}">{_esc(valor)}</p>']
         titulo = titulo_densidade(config)
-        svg = viz_densidade.svg(resultado, titulo, unidade=config.unidade, dados=dados)
-        return [figura(svg, titulo + "."), f'<p class="{classe_nota}">{_esc(NOTA_DENSIDADE)}</p>']
+        return [figura(valor, titulo + "."), f'<p class="{classe_nota}">{_esc(NOTA_DENSIDADE)}</p>']
     except Exception:
         return None
 
@@ -458,6 +488,72 @@ def _bloco_densidade_pasta(destino: Path, kb, config) -> str:
     if not partes:
         return ""
     return "\n".join(['<h2 id="densidade">Mapa de densidade (corpus completo)</h2>'] + partes)
+
+
+# ------------------------------------------------- duplo mapa (áreas das revistas)
+
+TITULO_SECAO_DUPLO = "Duplo mapa de áreas das revistas (corpus completo)"
+
+
+def duplo_mapa_html(kb, figura, tabela, classe_nota: str = "nota"):
+    """Partes HTML da seção do duplo mapa, ou None quando não se aplica ou o cálculo falha.
+
+    `figura(svg, legenda)` monta a figura numerada e `tabela(cabecalho, linhas, legenda,
+    numericas)` cada tabela; quem chama omite a seção quando o retorno é None.
+    """
+    if kb is None:
+        return None
+    try:
+        from . import duplo_mapa
+        from .viz import duplo_mapa as viz_duplo
+        dados = duplo_mapa.calcula_do_banco(kb.conexao)
+        if not dados["aplicavel"]:
+            return None
+        svg = viz_duplo.svg(dados, duplo_mapa.TITULO)
+        if not svg:
+            return None
+        c = dados["cobertura"]
+        pct = duplo_mapa.porcentagem
+        aviso = (f"Classificação aproximada, por palavras do nome da revista. Sem área: "
+                 f"{pct(c['pct_citadas_nao_classificadas'])} das citações recebidas, "
+                 f"{pct(c['pct_citantes_nao_classificadas'])} das citações feitas e "
+                 f"{pct(c['pct_revistas_nao_classificadas'])} das revistas "
+                 f"({c['revistas_nao_classificadas']} de {c['revistas']}). "
+                 f"Referências sem periódico identificado, fora do mapa: {c['sem_fonte']}.")
+        fluxos = [[_esc(f["origem"]), _esc(f["destino"]), str(f["valor"]), pct(f["pct"])]
+                  for f in dados["fluxos"]]
+        linhas = [[_esc(l["revista"]), _esc(l["area"]),
+                   _esc(l["termo"]) if l["termo"] else "—",
+                   str(l["publica"]), str(l["citada"]), "sim" if l["no_desenho"] else "não"]
+                  for l in dados["tabela"]]
+        return [
+            figura(svg, duplo_mapa.TITULO + "."),
+            f'<p class="{classe_nota}">{_esc(duplo_mapa.NOTA)}</p>',
+            f'<p class="{classe_nota}">{_esc(aviso)}</p>',
+            tabela(["Área da esquerda", "Área da direita", "Citações", "% das desenhadas"], fluxos,
+                   "Fluxos entre áreas no duplo mapa.", numericas=(2, 3)),
+            tabela(["Revista", "Área (aproximada)", "Termo que decidiu", "Citações feitas",
+                    "Citações recebidas", "Desenhada"], linhas,
+                   "Revista → área, para conferência (classificação aproximada por palavras do "
+                   "nome; as marcadas \"não\" são as sem área mais frequentes fora do desenho).",
+                   numericas=(3, 4)),
+        ]
+    except Exception:
+        return None
+
+
+def _bloco_duplo_pasta(destino: Path, kb) -> str:
+    """HTML da seção do duplo mapa para o relatório em pasta ("" se não se aplica)."""
+    def figura(svg, legenda):
+        (destino / "images" / "duploMapa.svg").write_text(svg, encoding="utf-8")
+        return (f'<p><img src="images/duploMapa.svg" alt="{_esc(legenda)}" width="100%"></p>')
+
+    def tabela(cabecalho, linhas, legenda, numericas=()):
+        return _tabela(cabecalho, linhas, legenda, numericas=numericas)
+    partes = duplo_mapa_html(kb, figura, tabela, classe_nota="fonte")
+    if not partes:
+        return ""
+    return "\n".join([f'<h2 id="duplo-mapa">{TITULO_SECAO_DUPLO}</h2>'] + partes)
 
 
 def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
@@ -496,9 +592,7 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
         # seção "Whole network" do SciMAT, mais o arquivo Pajek correspondente.
         try:
             (destino / "images" / f"wholeNetwork-period{indice}.svg").write_text(
-                halo_svg(resultado, f"Rede completa — {resultado.periodo}",
-                         rotulos=rotulos_novos,
-                         pivos=metodo.pivos_para_halo(kb, resultado)),
+                halo_cacheado(kb, resultado, rotulos_novos),
                 encoding="utf-8")
         except Exception:
             pass
@@ -554,6 +648,12 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
         bloco_dens = ""
     if bloco_dens:
         bloco_lt = (bloco_lt + "\n" + bloco_dens) if bloco_lt else bloco_dens
+    try:
+        bloco_duplo = _bloco_duplo_pasta(destino, kb)
+    except Exception:
+        bloco_duplo = ""
+    if bloco_duplo:
+        bloco_lt = (bloco_lt + "\n" + bloco_duplo) if bloco_lt else bloco_duplo
     _pagina_indice(destino, resultados, mapa, config, estendido, com_bibliometria,
                    kb=kb, periodos=periodos, medida_temporal=medida_temporal,
                    linha_do_tempo_bloco=bloco_lt)
@@ -883,6 +983,8 @@ def _pagina_periodo(destino, resultado, grupos, indice, kb=None) -> None:
         corpo.append("<h2>Variantes unidas</h2>")
         corpo.append(metodo.ies_html(
             resultado, lambda cab, lin, leg, numericas=(): _tabela(cab, lin, leg, numericas=numericas)))
+    elif resultado.configuracao.unidade in ("Authors", "Countries"):
+        corpo.append(metodo.filtro_agrupamento_html(resultado))
 
     corpo.extend(diagramas)
     (destino / f"period{indice}.html").write_text(
@@ -1024,6 +1126,9 @@ def gera_pagina_completa(destino: Path, kb, secoes: list[dict], ignoradas: list[
         if (destino / pasta / "images" / "densidade.svg").exists():
             bloco.append(f'<p><a href="{pasta}/index.html#densidade">Mapa de densidade do '
                          "corpus completo</a></p>")
+        if (destino / pasta / "images" / "duploMapa.svg").exists():
+            bloco.append(f'<p><a href="{pasta}/index.html#duplo-mapa">Duplo mapa de áreas das '
+                         "revistas (corpus completo)</a></p>")
         figuras = []
         mapeador = secao["config"].mapeadores[0] if secao["config"].mapeadores else "nucleo"
         for indice, r in enumerate(resultados):

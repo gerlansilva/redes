@@ -203,6 +203,7 @@ function ligarEventos() {
   ligarDendrograma();
   ligarLinhaDoTempo();
   ligarDensidade();
+  ligarDuploMapa();
   ligarPivos();
   $("fecharBase").addEventListener("click", fecharBase);
   $("modalBase").addEventListener("click", (evento) => {
@@ -301,6 +302,9 @@ function ligarEventos() {
       if ($("analise").value === "personalizada") aplicarAbas(null, true);
     });
   }
+  $("componenteMin").addEventListener("input", () => {
+    $("componenteMin").dataset.editado = "1";
+  });
   $("analise").addEventListener("change", () => {
     escolherAnalise($("analise").value, false);
   });
@@ -426,7 +430,8 @@ async function carregarInicio() {
   }
 }
 
-/* Apresentação: logo e frase; segue sozinha em ~2,5 s ou ao clicar/Enter/Espaço. */
+/* Apresentação: fica na tela até a pessoa clicar em "Começar", que abre a tela de
+   envio do corpus (com projetos recentes e a opção de abrir um projeto existente). */
 function prepararApresentacao() {
   const tela = $("apresentacao");
   let pular = false;
@@ -440,24 +445,12 @@ function prepararApresentacao() {
     tela.classList.add("sem-animacao");
   }
   let seguiu = false;
-  let relogio = null;
-  const tecla = (evento) => {
-    if (evento.key === "Enter" || evento.key === " ") {
-      evento.preventDefault();
-      avancar();
-    }
-  };
-  function avancar() {
+  $("btnComecar").addEventListener("click", () => {
     if (seguiu) return;
     seguiu = true;
-    clearTimeout(relogio);
-    document.removeEventListener("keydown", tecla);
     tela.hidden = true;
     abrirModal();
-  }
-  tela.addEventListener("click", avancar);
-  document.addEventListener("keydown", tecla);
-  relogio = setTimeout(avancar, 2500);
+  });
   $("btnComecar").focus({ preventScroll: true });
 }
 
@@ -567,6 +560,7 @@ function aplicarProjeto(projeto) {
   dendro.token = null;
   limparLinhaDoTempo(true);
   limparDensidade(true);
+  limparDuploMapa(true);
   document.querySelectorAll(".aba[data-aba]").forEach((aba) => {
     const ativa = aba.dataset.aba === "rede";
     aba.classList.toggle("ativa", ativa);
@@ -682,7 +676,7 @@ function parametros() {
     tamanho_minimo: minimo,
     tamanho_maximo: maximo,
     corte: Number($("corte").value) || 0,
-    componente_minimo: Math.max(1, Math.floor(Number($("componenteMin").value)) || 3),
+    componente_minimo: Math.max(1, Math.floor(Number($("componenteMin").value)) || padraoComponente()),
     mapeadores,
     palavras,
     periodo: Number($("periodo").value),
@@ -703,6 +697,7 @@ function selecionarAba(chave) {
   if (chave === "dendrograma") carregarDendrograma();
   if (chave === "linhatempo") carregarLinhaDoTempo();
   if (chave === "densidade") carregarDensidade();
+  if (chave === "duplomapa") carregarDuploMapa();
 }
 
 function abasDaAnalise(chave) {
@@ -721,6 +716,7 @@ function abasDaAnalise(chave) {
     }
     if (!abas.includes("linhatempo")) abas.splice(abas.indexOf("dendrograma") + 1, 0, "linhatempo");
     if (!abas.includes("densidade")) abas.splice(abas.indexOf("linhatempo") + 1, 0, "densidade");
+    if (!abas.includes("duplomapa")) abas.splice(abas.indexOf("densidade") + 1, 0, "duplomapa");
   }
   return abas;
 }
@@ -756,6 +752,7 @@ const BLOCO_POR_ABA = {
   dendrograma: "blocoDendrograma",
   linhatempo: "blocoLinhaDoTempo",
   densidade: "blocoDensidade",
+  duplomapa: "blocoDuploMapa",
   longitudinal: "blocoLongitudinal",
 };
 
@@ -921,9 +918,24 @@ function aplicarAnalise(chave) {
   if (mudou) marcarDesatualizada();
 }
 
+const UNIDADES_FILTRO_AGRUPAMENTO = ["Authors", "Countries", "Institutions"];
+
+// Padrão do tamanho mínimo do agrupamento: 3 em instituições, 1 (sem filtro) nas demais.
+function padraoComponente() {
+  return $("unidade").value === "Institutions" ? 3 : 1;
+}
+
 function mostrarCampoComponente() {
   const campo = $("campoComponente");
-  if (campo) campo.hidden = $("unidade").value !== "Institutions";
+  if (!campo) return;
+  const unidade = $("unidade").value;
+  campo.hidden = !UNIDADES_FILTRO_AGRUPAMENTO.includes(unidade);
+  const entrada = $("componenteMin");
+  // Ao trocar de unidade, volta ao padrão dela, a menos que a pessoa tenha mexido no campo.
+  if (entrada.dataset.unidade !== unidade) {
+    entrada.dataset.unidade = unidade;
+    entrada.value = String(padraoComponente());
+  }
 }
 
 /* O mapeador "Acoplamento" só existe no acoplamento básico (os nós são documentos). */
@@ -1001,10 +1013,41 @@ function redefinirFrequencia() {
   mostrarNotaAuto("");
 }
 
-function mostrarNotaAuto(texto) {
+function mostrarNotaAuto(texto, acao) {
   const nota = $("notaAuto");
   nota.textContent = texto;
   nota.hidden = !texto;
+  if (texto && acao) {
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "nota-auto-acao";
+    botao.textContent = acao.rotulo;
+    botao.addEventListener("click", acao.aoClicar);
+    nota.appendChild(document.createElement("br"));
+    nota.appendChild(botao);
+    // A sugestão fica dentro do painel "mais opções": abre para ela aparecer.
+    const mais = $("maisOpcoes");
+    if (mais) mais.open = true;
+  }
+}
+
+// Sugestão do modo simples para redes de entidades: pares isolados pulverizam a rede.
+function acaoOcultarGruposPequenos(resultado) {
+  const unidade = resultado.parametros.unidade;
+  if (!["Authors", "Countries"].includes(unidade)) return null;
+  if ((resultado.parametros.componente_minimo || 1) > 1) return null;
+  const nome = unidade === "Authors" ? "autores" : "países";
+  return {
+    rotulo: `Ocultar grupos com menos de 3 ${nome}`,
+    aoClicar: () => {
+      const entrada = $("componenteMin");
+      entrada.value = "3";
+      entrada.dataset.editado = "1";
+      entrada.dataset.unidade = unidade;
+      marcarDesatualizada();
+      previsualizar();
+    },
+  };
 }
 
 function plural(n, singular, pluralTexto) {
@@ -1067,7 +1110,13 @@ async function ajustarFrequencia(resultado) {
   if (final > LIMITE_TEMAS && recusado === null && estado.freq > inicial) {
     partes.push(`Ainda restam ${plural(final, sing, plur)}; use + e − para ajustar.`);
   }
-  mostrarNotaAuto(partes.join(" "));
+  const filtro = atual.filtro_agrupamento;
+  if (filtro && filtro.minimo > 1 && atual.parametros.unidade !== "Institutions") {
+    partes.push(`Grupos com menos de ${filtro.minimo} ` +
+      `${atual.parametros.unidade === "Authors" ? "autores" : "países"} ocultados: ` +
+      `de ${filtro.grupos_antes} para ${filtro.grupos_depois} grupos.`);
+  }
+  mostrarNotaAuto(partes.join(" "), recusado !== null ? acaoOcultarGruposPequenos(atual) : null);
   return atual;
 }
 
@@ -1140,6 +1189,8 @@ function renderizarResultado(resultado) {
   if (abaAtual() === "linhatempo") carregarLinhaDoTempo();
   limparDensidade(false);
   if (abaAtual() === "densidade") carregarDensidade();
+  limparDuploMapa(false);
+  if (abaAtual() === "duplomapa") carregarDuploMapa();
   $("seloPrevia").textContent = "Prévia sob demanda";
   $("seloPrevia").classList.remove("alerta");
   fecharDrawer();
@@ -3447,6 +3498,9 @@ function atualizarMenuExportar() {
     else if (item.dataset.exp === "densidade-svg" && !densidadeAplicavel()) {
       motivo = MOTIVO_DENSIDADE;
     }
+    else if (item.dataset.exp === "duplomapa-svg" && !duploMapaAplicavel()) {
+      motivo = dm.motivo;
+    }
     else if (item.dataset.exp === "fluxo-svg" && !fluxoDisponivel()) {
       motivo = "A base não traz afiliação nem país; não há fluxo Autor – País – IES.";
     }
@@ -3487,6 +3541,7 @@ function executarExportacao(tipo) {
   else if (tipo === "dendrograma-svg") baixarDendrograma();
   else if (tipo === "linhatempo-svg") baixarLinhaDoTempo();
   else if (tipo === "densidade-svg") baixarDensidade();
+  else if (tipo === "duplomapa-svg") baixarDuploMapa();
   else exportar(tipo);
 }
 
@@ -3849,6 +3904,140 @@ async function baixarDensidade() {
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = "densidade.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  } catch (erro) {
+    mostrarToast(erro.message, true);
+  }
+}
+
+/* ---------------------------------------------------------------- duplo mapa */
+
+const dm = { token: null, seq: 0, tempo: null, motivo: "" };
+const MENSAGEM_DUPLO_VAZIO = "Execute uma análise para ver o duplo mapa.";
+
+// O duplo mapa vale para o corpus completo; só não se aplica quando a base não traz
+// periódicos (dos documentos ou das referências), o que o servidor informa ao abrir a aba.
+function duploMapaAplicavel() {
+  return !dm.motivo;
+}
+
+function urlDuploMapa(extra = {}) {
+  const q = new URLSearchParams({
+    token: estado.token, max_esq: $("dmEsq").value, max_dir: $("dmDir").value, ...extra });
+  return `/api/duplo-mapa?${q}`;
+}
+
+function mensagemDuploMapa(texto) {
+  $("vazioDuploMapa").hidden = false;
+  $("vazioDuploMapa").textContent = texto;
+  $("dmFigura").hidden = true;
+  $("dmFigura").replaceChildren();
+  $("dmAviso").hidden = true;
+  $("dmTabelaCaixa").hidden = true;
+  $("dmCorpo").replaceChildren();
+}
+
+// Esquece a figura (e ignora respostas em andamento) quando a análise ou o projeto muda.
+function limparDuploMapa(novoProjeto) {
+  dm.token = null;
+  dm.seq += 1;
+  dm.motivo = "";
+  clearTimeout(dm.tempo);
+  if (novoProjeto) {
+    $("dmEsq").value = "10";
+    $("dmEsqValor").textContent = "10";
+    $("dmDir").value = "16";
+    $("dmDirValor").textContent = "16";
+  }
+  mensagemDuploMapa(MENSAGEM_DUPLO_VAZIO);
+  $("metaDuploMapa").textContent = "revistas que publicam o corpus e revistas citadas, por área";
+}
+
+function desenharTabelaDuploMapa(linhas) {
+  const corpo = $("dmCorpo");
+  corpo.replaceChildren();
+  for (const l of linhas) {
+    const tr = document.createElement("tr");
+    const textos = [l.revista, l.area, l.termo || "—", String(l.publica), String(l.citada),
+      l.no_desenho ? "sim" : "não"];
+    textos.forEach((texto, i) => {
+      const td = document.createElement("td");
+      if (i === 3 || i === 4) td.className = "num";
+      td.textContent = texto;
+      tr.append(td);
+    });
+    corpo.append(tr);
+  }
+}
+
+async function carregarDuploMapa(forcar) {
+  if (!estado.token) {
+    mensagemDuploMapa(MENSAGEM_DUPLO_VAZIO);
+    return;
+  }
+  if (!forcar && dm.token === estado.token && !$("dmFigura").hidden) return;
+  const seq = ++dm.seq;
+  const token = estado.token;
+  if (!forcar) mensagemDuploMapa("calculando o duplo mapa…");
+  try {
+    const d = await api(urlDuploMapa());
+    if (seq !== dm.seq || token !== estado.token) return;
+    dm.token = token;
+    dm.motivo = "";
+    $("dmFigura").innerHTML = d.svg;
+    const svg = $("dmFigura").querySelector("svg");
+    if (svg) { svg.removeAttribute("height"); svg.style.height = "auto"; }
+    $("dmFigura").hidden = false;
+    $("vazioDuploMapa").hidden = true;
+    const c = d.cobertura;
+    const pct = (v) => `${(v * 100).toFixed(v > 0 && v < 0.1 ? 1 : 0).replace(".", ",")}%`;
+    $("metaDuploMapa").textContent =
+      `Publicam o corpus: ${d.n_esquerda} de ${plural(d.total_esquerda, "revista", "revistas")} · `
+      + `citadas: ${d.n_direita} de ${plural(d.total_direita, "revista", "revistas")}`;
+    $("dmAviso").textContent =
+      `Classificação aproximada, por palavras do nome da revista. Sem área: ${pct(c.pct_citadas_nao_classificadas)} `
+      + `das citações recebidas e ${pct(c.pct_revistas_nao_classificadas)} das revistas `
+      + `(${c.revistas_nao_classificadas} de ${c.revistas}). Referências sem periódico, fora do mapa: `
+      + `${c.sem_fonte}.`;
+    $("dmAviso").hidden = false;
+    desenharTabelaDuploMapa(d.tabela);
+    $("dmTabelaCaixa").hidden = false;
+    atualizarMenuExportar();
+  } catch (erro) {
+    if (seq !== dm.seq) return;
+    dm.token = null;
+    dm.motivo = erro.message;
+    mensagemDuploMapa(erro.message);
+    $("metaDuploMapa").textContent = "não se aplica a esta base";
+    atualizarMenuExportar();
+  }
+}
+
+function ligarDuploMapa() {
+  for (const [campo, rotulo] of [["dmEsq", "dmEsqValor"], ["dmDir", "dmDirValor"]]) {
+    $(campo).addEventListener("input", () => {
+      $(rotulo).textContent = $(campo).value;
+      clearTimeout(dm.tempo);
+      dm.tempo = setTimeout(() => carregarDuploMapa(true), 250);
+    });
+  }
+}
+
+async function baixarDuploMapa() {
+  if (!estado.token) return;
+  try {
+    const resposta = await fetch(urlDuploMapa({ baixar: "1" }));
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => ({}));
+      throw new Error(corpo.erro || "Não há dados para o duplo mapa.");
+    }
+    const blob = await resposta.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "duplo-mapa.svg";
     document.body.appendChild(link);
     link.click();
     link.remove();

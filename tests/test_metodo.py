@@ -196,10 +196,15 @@ class MetodoTest(unittest.TestCase):
         self.assertIn("Itens após redução (freq. ≥ 2)", completo)
 
     def test_relatorio_completo_pela_api(self):
+        # Arquivo único: só o .html (sem a pasta de páginas, que custava centenas de arquivos).
         r = api.gera_relatorio_completo({"projeto": str(self.projeto), "formato": "unico"})
+        unico_pasta = api.RELATORIOS[r["token"]]
+        self.assertEqual(["relatorio-completo.html"], sorted(p.name for p in unico_pasta.iterdir()))
+        unico = (unico_pasta / "relatorio-completo.html").read_text(encoding="utf-8")
+        r = api.gera_relatorio_completo({"projeto": str(self.projeto), "formato": "pastas"})
         pasta = api.RELATORIOS[r["token"]]
         completo = (pasta / "index.html").read_text(encoding="utf-8")
-        unico = (pasta / "relatorio-completo.html").read_text(encoding="utf-8")
+        self.assertFalse((pasta / "relatorio-completo.html").exists())
         for pagina in (completo, unico):
             self.assertIn("Parâmetros e método", pagina)
             self.assertIn("Maior agrupamento", pagina)

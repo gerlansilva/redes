@@ -12,12 +12,16 @@ import datetime
 import re
 from pathlib import Path
 
-from . import dendro_helper, longitudinal, metodo, report
+from . import cache_figuras, dendro_helper, longitudinal, metodo, report
+from . import areas as _areas_revistas
+from . import duplo_mapa as _duplo_mapa
 from .report import (ORDEM_MEDIDAS, ROTULOS_MAPEADOR, ROTULOS_MEDIDA, _esc,
                      _quadrante, _tabela)
 from .viz.cluster import rede_agrupamento_svg
 from .viz.halo import halo_svg
 from .viz.strategic import diagrama_svg
+
+PARTES_DO_CORPO = ("linha-do-tempo", "densidade")
 
 # Acima disso, as redes de agrupamento ficam só nos maiores grupos de cada período.
 LIMITE_BYTES = 15 * 1024 * 1024
@@ -194,13 +198,24 @@ def _contagem_documentos(kb) -> int:
 class _Cache:
     """Guarda os SVG já desenhados, para refazer o documento com menos redes."""
 
-    def __init__(self) -> None:
+    def __init__(self, pular: frozenset = frozenset()) -> None:
         self.dados: dict[tuple, str | None] = {}
+        # Partes (nomes no fim da chave) que este uso não precisa calcular: um
+        # trabalhador da geração paralela pode cuidar só das figuras por período.
+        self.pular = pular
 
-    def obtem(self, chave, construtor) -> str | None:
+    def obtem(self, chave, construtor, compartilhado: bool = True) -> str | None:
+        """Valor do cache do documento; `compartilhado` o liga ao cache de figuras.
+
+        A chave começa pelo conteúdo da análise (`chave_da_secao`), então o mesmo
+        desenho pedido em outro relatório, ou por um processo trabalhador, vale aqui.
+        """
+        if self.pular and any(parte in self.pular for parte in chave):
+            return None
         if chave not in self.dados:
             try:
-                self.dados[chave] = construtor()
+                self.dados[chave] = (cache_figuras.obtem(("unico",) + tuple(chave), construtor)
+                                     if compartilhado else construtor())
             except Exception:
                 self.dados[chave] = None
         return self.dados[chave]
@@ -234,6 +249,23 @@ def _densidade_partes(kb, config):
     return ("\n".join(partes), figuras) if partes else None
 
 
+def _duplo_partes(kb):
+    """(HTML com marcadores, figuras, tabelas) do duplo mapa de áreas das revistas, ou None."""
+    figuras: list[tuple[str, str]] = []
+    tabelas: list[tuple] = []
+
+    def figura(svg, legenda):
+        figuras.append((svg, legenda))
+        return f"\x00FIG{len(figuras) - 1}\x00"
+
+    def tabela(cabecalho, linhas, legenda, numericas=()):
+        tabelas.append((cabecalho, linhas, legenda, numericas))
+        return f"\x00TAB{len(tabelas) - 1}\x00"
+
+    partes = report.duplo_mapa_html(kb, figura, tabela, classe_nota="nota")
+    return ("\n".join(partes), figuras, tabelas) if partes else None
+
+
 def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
                    numero: int, medida_temporal: str, limite) -> tuple[str, int]:
     """HTML de uma análise. Devolve também quantas redes de agrupamento foram omitidas."""
@@ -241,7 +273,7 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
     rotulo = secao["rotulo"]
     resultados = secao["resultados"]
     config = secao["config"]
-    chave = secao.get("pasta") or str(numero)
+    chave = cache_figuras.chave_da_secao(kb, config, resultados, medida_temporal)
     partes = [doc.cabecalho(2, str(numero), rotulo, f"s{numero}"),
               f'<p>{_esc(secao.get("descricao", ""))}</p>']
 
@@ -257,7 +289,8 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
 
     partes.append(metodo.metodo_html(
         config, periodos, resultados, None, secao.get("medida_temporal", medida_temporal),
-        kb, doc.tabela, rotulo=rotulo.lower(), titulo=titulo))
+        kb, doc.tabela, rotulo=rotulo.lower(), titulo=titulo,
+        com_duplo=None if numero == 2 else False))
 
     # X.2 Por período
     partes.append(doc.cabecalho(3, f"{numero}.2", "Por período", f"s{numero}-periodos"))
@@ -282,6 +315,8 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
 
     if config.unidade == "Institutions" and resultados and resultados[0].ies:
         partes.append(metodo.ies_html(resultados[0], doc.tabela, rotulo.lower()))
+    elif config.unidade in ("Authors", "Countries") and resultados:
+        partes.append(metodo.filtro_agrupamento_html(resultados[0], rotulo.lower()))
 
     # X.3 Períodos
     partes.append(doc.cabecalho(3, f"{numero}.3", "Resultados de cada período",
@@ -317,9 +352,7 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
             partes.append('<p class="nota">O diagrama estratégico não pôde ser desenhado '
                           "para este período.</p>")
         svg = cache.obtem((chave, indice, "halo"),
-                          lambda: halo_svg(r, f"Rede completa — {r.periodo}",
-                                           rotulos=rotulos_novos,
-                                           pivos=metodo.pivos_para_halo(kb, r)))
+                          lambda: report.halo_cacheado(kb, r, rotulos_novos))
         if svg:
             legenda_halo = f"Rede do período — {rotulo.lower()}, {r.periodo}."
             if "ponto de virada" in svg:
@@ -374,12 +407,12 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
                                     f"s{numero}-evolucao"))
         subsecao += 1
         mapa = cache.obtem((chave, "mapa"), lambda: longitudinal.constroi(
-            kb, config, periodos, medida_temporal, resultados=resultados))
+            kb, config, periodos, medida_temporal, resultados=resultados), False)
         if mapa is not None:
             ev = cache.obtem((chave, "evolucao"), lambda: longitudinal.evolucao_svg(
-                mapa, "Mapa de evolução dos temas", largura=980))
+                mapa, "Mapa de evolução dos temas", largura=980), False)
             so = cache.obtem((chave, "sobreposicao"), lambda: longitudinal.sobreposicao_svg(
-                mapa, "Mapa de sobreposição", largura=680))
+                mapa, "Mapa de sobreposição", largura=680), False)
             if ev:
                 partes.append(doc.figura(ev, f"Mapa de evolução dos temas — {rotulo.lower()}."))
             if so:
@@ -407,6 +440,23 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
         for i, (svg, legenda) in enumerate(figuras_d):
             texto_d = texto_d.replace(f"\x00FIG{i}\x00", doc.figura(svg, legenda))
         partes.append(texto_d)
+        subsecao += 1
+    # X.n Duplo mapa (corpus completo; igual em todas as análises, então só na primeira)
+    bloco_duplo = None
+    if numero == 2:
+        bloco_duplo = cache.obtem(
+            (chave, "duplo-mapa", _areas_revistas.assinatura(), _duplo_mapa.MAX_ESQ,
+             _duplo_mapa.MAX_DIR), lambda: _duplo_partes(kb))
+    if bloco_duplo:
+        partes.append(doc.cabecalho(3, f"{numero}.{subsecao}", report.TITULO_SECAO_DUPLO,
+                                    f"s{numero}-duplo-mapa"))
+        texto_m, figuras_m, tabelas_m = bloco_duplo
+        for i, (svg, legenda) in enumerate(figuras_m):
+            texto_m = texto_m.replace(f"\x00FIG{i}\x00", doc.figura(svg, legenda))
+        for i, (cabecalho, linhas, legenda, numericas) in enumerate(tabelas_m):
+            texto_m = texto_m.replace(f"\x00TAB{i}\x00",
+                                      doc.tabela(cabecalho, linhas, legenda, numericas))
+        partes.append(texto_m)
         subsecao += 1
     # X.n Dendrograma
     partes.append(doc.cabecalho(3, f"{numero}.{subsecao}", "Dendrograma (agrupamento hierárquico)",
@@ -501,3 +551,25 @@ def gera_arquivo_unico(caminho_saida: Path, kb, periodos, secoes: list[dict],
             break
     caminho_saida.write_text(pagina, encoding="utf-8")
     return caminho_saida
+
+
+def aquece_secao(kb, periodos, secao: dict, medida_temporal: str = "EquivalenceIndex",
+                 parte: str = "tudo") -> None:
+    """Desenha e calcula, no cache compartilhado, o que o bloco de uma análise pede.
+
+    Serve aos processos trabalhadores da geração paralela: o documento é montado
+    de verdade (numeração descartável), de modo que o processo principal, ao montar
+    o arquivo final, só encontra figuras e cálculos prontos. O texto é descartado.
+
+    `parte`: "periodos" (tudo, menos as figuras do corpus completo), "corpo" (só a
+    linha do tempo e o mapa de densidade do corpus completo) ou "tudo".
+    """
+    config = secao["config"]
+    if parte in ("tudo", "periodos"):
+        pular = frozenset(PARTES_DO_CORPO) if parte == "periodos" else frozenset()
+        _bloco_analise(_Documento(), _Cache(pular), kb, periodos, secao, 2, medida_temporal, None)
+    if parte == "corpo":
+        chave = cache_figuras.chave_da_secao(kb, config, secao["resultados"], medida_temporal)
+        cache = _Cache()
+        cache.obtem((chave, "linha-do-tempo"), lambda: _linha_do_tempo_partes(kb, config))
+        cache.obtem((chave, "densidade"), lambda: _densidade_partes(kb, config))

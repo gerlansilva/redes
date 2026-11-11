@@ -135,47 +135,71 @@ def _distancias(rede: Rede, origem: int) -> dict[int, float]:
 
 
 def intermediacao(rede: Rede) -> dict[int, float]:
-    """Betweenness de Brandes com custo 1/peso, como no Bibliomapa."""
-    centralidade = {no: 0.0 for no in rede.nos}
+    """Betweenness de Brandes com custo 1/peso, como no Bibliomapa.
 
-    for origem in rede.nos:
+    Mesma conta, mesma ordem de somas e mesmo desempate do laço literal (o
+    resultado é idêntico bit a bit; `tests/test_desempenho_relatorio.py` compara
+    com a formulação literal): só troca dicionários por listas indexadas e
+    calcula o custo de cada aresta uma vez.
+    """
+    nos = rede.nos
+    n = len(nos)
+    indice = {no: i for i, no in enumerate(nos)}
+    adjacentes = [[(indice[v], v, _custo(peso)) for v, peso in rede.adjacencia[no].items()]
+                  for no in nos]
+    infinito = math.inf
+    centralidade = [0.0] * n
+    empurra = heapq.heappush
+    retira = heapq.heappop
+
+    for s in range(n):
+        origem = nos[s]
         predecessores: dict[int, list[int]] = {}
-        distancia = {no: math.inf for no in rede.nos}
-        caminhos = {no: 0.0 for no in rede.nos}
+        distancia = [infinito] * n
+        caminhos = [0.0] * n
         pilha: list[int] = []
-        fila: list[tuple[float, int]] = []
 
-        distancia[origem] = 0.0
-        caminhos[origem] = 1.0
-        heapq.heappush(fila, (0.0, origem))
+        distancia[s] = 0.0
+        caminhos[s] = 1.0
+        fila = [(0.0, origem)]
 
         while fila:
-            atual, no = heapq.heappop(fila)
-            if atual > distancia[no]:
+            atual, no = retira(fila)
+            i = indice[no]
+            if atual > distancia[i]:
                 continue
-            pilha.append(no)
+            pilha.append(i)
+            base = distancia[i]
 
-            for vizinho, peso in rede.adjacencia[no].items():
-                nova = distancia[no] + _custo(peso)
-                if nova < distancia[vizinho] - 1e-10:
-                    distancia[vizinho] = nova
-                    heapq.heappush(fila, (nova, vizinho))
-                    caminhos[vizinho] = caminhos[no]
-                    predecessores[vizinho] = [no]
-                elif abs(nova - distancia[vizinho]) <= 1e-10:
-                    caminhos[vizinho] += caminhos[no]
-                    predecessores.setdefault(vizinho, []).append(no)
+            for j, vizinho, custo in adjacentes[i]:
+                nova = base + custo
+                alvo = distancia[j]
+                if nova < alvo - 1e-10:
+                    distancia[j] = nova
+                    empurra(fila, (nova, vizinho))
+                    caminhos[j] = caminhos[i]
+                    predecessores[j] = [i]
+                elif abs(nova - alvo) <= 1e-10:
+                    caminhos[j] += caminhos[i]
+                    lista = predecessores.get(j)
+                    if lista is None:
+                        predecessores[j] = [i]
+                    else:
+                        lista.append(i)
 
-        dependencia = {no: 0.0 for no in rede.nos}
+        dependencia = [0.0] * n
         while pilha:
             w = pilha.pop()
-            for v in predecessores.get(w, []):
-                if caminhos[w] > 0:
-                    dependencia[v] += caminhos[v] / caminhos[w] * (1.0 + dependencia[w])
-            if w != origem:
+            anteriores = predecessores.get(w)
+            if anteriores:
+                caminhos_w = caminhos[w]
+                if caminhos_w > 0:
+                    for v in anteriores:
+                        dependencia[v] += caminhos[v] / caminhos_w * (1.0 + dependencia[w])
+            if w != s:
                 centralidade[w] += dependencia[w]
 
-    return {no: valor / 2.0 for no, valor in centralidade.items()}
+    return {no: centralidade[i] / 2.0 for i, no in enumerate(nos)}
 
 
 def proximidade(rede: Rede) -> dict[int, float]:

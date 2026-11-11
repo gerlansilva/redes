@@ -272,11 +272,15 @@ def avalia(resultado, limite_nos: int = LIMITE_NOS) -> dict:
             sobe("ruim")
             avisos.append(
                 f"Em média, os itens estão mais perto de outros grupos do que "
-                f"do próprio (coesão {_num(sm, 2, (0.0, 0.10))}).")
-        elif sm < 0.10:
+                f"do próprio (coesão {_num(sm, 2, (0.0, 0.05))}).")
+        # 0,05 e não 0,10: com a silhueta definida por ligação direta (1 − similaridade), redes
+        # esparsas dão valores baixos mesmo na melhor divisão; 0,10 acusava 39% das partições
+        # do próprio Louvain nas bases reais, e 0,05 acusa 21% (como o Q < 0,30, que acusa
+        # 23%). Distribuição e método em docs/qualidade.md.
+        elif sm < 0.05:
             sobe("atencao")
             avisos.append(
-                f"Os grupos são pouco coesos (coesão média {_num(sm, 2, (0.0, 0.10))}): os "
+                f"Os grupos são pouco coesos (coesão média {_num(sm, 2, (0.0, 0.05))}): os "
                 "itens ficam quase tão perto de outros grupos quanto do seu.")
     pn = out["pct_silhueta_negativa"]
     if pn is not None and pn > 30:

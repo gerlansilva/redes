@@ -17,8 +17,11 @@ from __future__ import annotations
 
 import html
 
-from . import bibliometria, linha_do_tempo, pivos, qualidade, rajadas, rotulos, termos
+from . import bibliometria, cache_figuras, linha_do_tempo, pivos, qualidade, rajadas, rotulos, termos
+from . import areas as _areas_revistas
+from . import duplo_mapa as _duplo_mapa
 from .viz import densidade as viz_densidade
+from .viz import duplo_mapa as viz_duplo_mapa
 from .clustering import ALGORITMOS
 from .similarity import MEDIDAS
 from .texto import rotulo_legivel
@@ -167,7 +170,7 @@ def _plural(n: int, singular: str, plural: str) -> str:
 # confere que continuam iguais aos do código.
 LIMIARES_QUALIDADE = {
     "q_ruim": 0.15, "q_atencao": 0.30, "razao": 0.6,
-    "silhueta_ruim": 0.0, "silhueta_atencao": 0.10,
+    "silhueta_ruim": 0.0, "silhueta_atencao": 0.05,
     "pct_negativos": 30, "pct_agrupados": 60,
 }
 
@@ -189,12 +192,20 @@ def selo_qualidade(nivel: str | None) -> str:
             f'{NIVEIS_ROTULO[nivel]}</span>')
 
 
-def _guarda(resultado, chave: str, calcula):
-    """Guarda no próprio resultado o que já foi calculado (os relatórios pedem várias vezes)."""
+def _guarda(resultado, chave: str, calcula, kb=None):
+    """Guarda no próprio resultado o que já foi calculado (os relatórios pedem várias vezes).
+
+    Além do objeto, vale o cache compartilhado (`cache_figuras`), cuja chave é o
+    conteúdo do resultado e, quando o cálculo lê o projeto, o estado do arquivo:
+    o relatório em pastas, o arquivo único e uma repetição da geração reaproveitam
+    o mesmo cálculo. Falhas não são compartilhadas.
+    """
     cache = resultado.__dict__.setdefault("_cache_qualidade", {})
     if chave not in cache:
         try:
-            cache[chave] = calcula()
+            cache[chave] = cache_figuras.obtem(
+                ("guarda", cache_figuras.base(resultado), chave,
+                 cache_figuras.selo_projeto(kb) if kb is not None else ""), calcula)
         except Exception:        # qualidade e rótulos nunca derrubam um relatório
             cache[chave] = None
     return cache[chave]
@@ -209,7 +220,7 @@ def rotulos_do_resultado(kb, resultado) -> dict:
     """`rotulos.rotula_grupos` do período (calculado uma vez); {} se falhar ou sem `kb`."""
     if kb is None:
         return resultado.__dict__.get("_cache_qualidade", {}).get("rotulos") or {}
-    return _guarda(resultado, "rotulos", lambda: rotulos.rotula_grupos(kb, resultado)) or {}
+    return _guarda(resultado, "rotulos", lambda: rotulos.rotula_grupos(kb, resultado), kb) or {}
 
 
 TOPO_PIVOS = 10      # pontos de virada listados por período
@@ -218,7 +229,7 @@ TOPO_PIVOS = 10      # pontos de virada listados por período
 def pivos_do_resultado(kb, resultado) -> dict | None:
     """`pivos.pontos_de_virada` do período (calculado uma vez); None se falhar."""
     return _guarda(resultado, "pivos",
-                   lambda: pivos.pontos_de_virada(resultado, kb, topo=TOPO_PIVOS))
+                   lambda: pivos.pontos_de_virada(resultado, kb, topo=TOPO_PIVOS), kb)
 
 
 def pivos_para_halo(kb, resultado) -> list | None:
@@ -310,7 +321,7 @@ def linhas_do_periodo(kb, resultado) -> dict[int, dict]:
             r = rot.get(linha["indice"]) or {}
             linha["indicativo"] = bool(r.get("indicativo")) if linha["rotulo_novo"] else False
         return {linha["indice"]: linha for linha in linhas}
-    return _guarda(resultado, "linhas", calcula) or {}
+    return _guarda(resultado, "linhas", calcula, kb) or {}
 
 
 def nome_do_grupo(kb, resultado, grupo) -> tuple[str, str | None, bool]:
@@ -477,12 +488,16 @@ def parametros_linhas(config, periodos=None, resultados=(), frequencia=None,
         origens = [_ORIGEM_PALAVRAS.get(o, o) for o in config.palavras]
         linhas.append(["Origem das palavras",
                        ", ".join(origens) if origens else "todas (nenhuma origem marcada)"])
-    if config.unidade == "Institutions":
-        minimo_comp = config.componente_minimo
-        linhas.append(["Tamanho mínimo do componente (IES)",
+    if config.unidade in ("Authors", "Countries", "Institutions"):
+        minimo_comp = config.agrupamento_minimo()
+        subst = _SUBST_FILTRO[config.unidade]
+        linhas.append(["Tamanho mínimo do componente (IES)" if config.unidade == "Institutions"
+                       else "Tamanho mínimo do agrupamento",
                        f"{minimo_comp} (componentes conexos da rede com menos de {minimo_comp} "
-                       "instituições não viram agrupamento e ficam sem agrupamento, fora dos halos)"
-                       if minimo_comp > 1 else "1 (todo componente pode virar agrupamento)"])
+                       f"{subst[1]} não viram agrupamento e ficam sem agrupamento, fora dos "
+                       "halos; nenhum nó nem aresta é apagado)"
+                       if minimo_comp > 1 else "1 (sem filtro: todo componente pode virar agrupamento)"])
+    if config.unidade == "Institutions":
         linhas.append(["União de variantes de nome",
                        "automática e conservadora; cada união está na tabela \"variantes unidas\""])
     linhas.append(["Termos ignorados",
@@ -541,7 +556,7 @@ def parametros_html(config, periodos=None, resultados=(), frequencia=None,
 
 
 def algoritmo_html(config, medida_temporal: str | None = None,
-                   n_periodos: int | None = None) -> str:
+                   n_periodos: int | None = None, com_duplo: bool = True) -> str:
     """Como o código chega aos agrupamentos, em linguagem simples, para esta configuração."""
     frequencia = config.minimo_frequencia
     unidade = _ITEM_UNIDADE.get(config.unidade, "itens")
@@ -602,7 +617,8 @@ def algoritmo_html(config, medida_temporal: str | None = None,
 
     # 4. Agrupamento
     p.append("<p><strong>4. Agrupamento.</strong> " + _texto_algoritmo(config)
-             + (_texto_ies_componentes(config) if config.unidade == "Institutions" else "")
+             + (_texto_ies_componentes(config)
+                if config.unidade in ("Authors", "Countries", "Institutions") else "")
              + "</p>")
 
     # 5. Diagrama estratégico
@@ -662,6 +678,9 @@ def algoritmo_html(config, medida_temporal: str | None = None,
         proximo += 1
     if config.matriz == "CoOccurrence":
         p.append(_texto_densidade(proximo))
+        proximo += 1
+    if com_duplo:
+        p.append(_texto_duplo_mapa(proximo))
         proximo += 1
     p.append(_texto_pivos(config, proximo))
     proximo += 1
@@ -728,6 +747,36 @@ def _texto_densidade(numero: int) -> str:
         f"mais de {d.LIMITE_ROTULO} caracteres são cortados e o texto inteiro fica na dica "
         "do item. O mapa não é calculado para acoplamento nem cocitação, cujos nós são "
         "documentos.</p>")
+
+
+def _texto_duplo_mapa(numero: int) -> str:
+    """Método do duplo mapa, com as constantes lidas de `duplo_mapa` e `areas`."""
+    d, v = _duplo_mapa, viz_duplo_mapa
+    nomes = ", ".join(a.nome for a in _areas_revistas.regras_ativas()[0])
+    return (
+        f"<p><strong>{numero}. Duplo mapa de áreas das revistas.</strong> Figura complementar "
+        "sobre o corpus completo, que não depende do tipo de rede da análise (nem do período). "
+        "Cada referência de cada documento conta como uma citação da revista do documento para "
+        "a revista da referência (com os grupos de revistas editados na base); referências sem "
+        "periódico identificado e grupos ocultos ficam de fora, e o total delas é informado. "
+        f"À esquerda entram as {d.MAX_ESQ} revistas que mais citam (padrão; a tela aceita de "
+        f"{d.LIMITE_ESQ[0]} a {d.LIMITE_ESQ[1]}) e, à direita, as {d.MAX_DIR} mais citadas por "
+        f"elas (de {d.LIMITE_DIR[0]} a {d.LIMITE_DIR[1]}). A área de cada revista é inferida por "
+        "palavras do <em>nome</em> da revista: cada área tem uma lista de termos (palavra inteira, "
+        "início de palavra ou expressão, sem considerar acento nem caixa) e vale a primeira área "
+        f"da lista cujo termo aparece no nome, na ordem {nomes}; a revista sem nenhum termo fica em "
+        f"\"{_areas_revistas.NAO_CLASSIFICADO}\". É uma classificação <strong>aproximada</strong>: "
+        "não usa categorias de base alguma, nomes ambíguos podem cair na área errada e as listas "
+        "(módulo <code>areas</code>, ou arquivo apontado por <code>REDES_AREAS</code>, com fixação "
+        "de área por revista) podem ser ajustadas. A figura traz a tabela revista → área, com o "
+        "termo que decidiu cada caso, e a porcentagem de citações e de revistas sem área. As "
+        "faixas somam as citações entre cada par de áreas, só entre as revistas desenhadas, com "
+        "a mesma escala de largura em todas elas (no máximo "
+        f"{v.ESCALA_MAX:g} pixels por citação, ajustada para que o total ocupe cerca de "
+        f"{v.ALTURA_FLUXO} pixels); a ordem das áreas da direita é a que cruza menos faixas. "
+        "Diferente do CiteSpace, as áreas não vêm de categorias de uma base e as faixas são "
+        "contagens simples, sem z-score. O mapa não é calculado quando a base não traz o "
+        "periódico dos documentos ou o periódico das referências.</p>")
 
 
 def _texto_pivos(config, numero: int) -> str:
@@ -850,18 +899,40 @@ def _texto_ies_nomes() -> str:
         "e o motivo.</p>")
 
 
+_SUBST_FILTRO = {"Authors": ("autor", "autores"), "Countries": ("país", "países"),
+                 "Institutions": ("instituição", "instituições")}
+
+
 def _texto_ies_componentes(config) -> str:
-    """Regra do tamanho mínimo do componente na rede de IES."""
-    minimo = config.componente_minimo
+    """Regra do tamanho mínimo do agrupamento (componente conexo) em redes de entidades."""
+    minimo = config.agrupamento_minimo()
     if minimo <= 1:
         return ""
+    plural = _SUBST_FILTRO[config.unidade][1]
+    redes = {"Authors": "de coautoria", "Countries": "de países",
+             "Institutions": "de instituições"}[config.unidade]
     return (
-        f" Na rede de instituições, antes de aceitar um agrupamento calculam-se os "
-        f"componentes conexos da rede (conjuntos de instituições ligadas entre si, direta ou "
-        f"indiretamente, por coautoria institucional). Componentes com menos de {minimo} "
-        "instituições não viram agrupamento e não entram nos halos: seus nós ficam como "
-        f"\"sem agrupamento\". O parâmetro é o tamanho mínimo do componente (padrão 3, "
+        f" Na rede {redes}, antes de aceitar um agrupamento calculam-se os "
+        f"componentes conexos da rede (conjuntos de {plural} ligados entre si, direta ou "
+        f"indiretamente). Componentes com menos de {minimo} "
+        f"{plural} não viram agrupamento e não entram nos halos: seus nós ficam como "
+        "\"sem agrupamento\" (para Q e silhueta, cada um conta como grupo próprio). "
+        "Nenhum nó nem aresta é apagado e a frequência mínima não muda. O parâmetro é o "
+        f"tamanho mínimo do agrupamento (padrão {3 if config.unidade == 'Institutions' else 1}, "
         f"aqui {minimo}).")
+
+
+def filtro_agrupamento_html(resultado, rotulo: str = "") -> str:
+    """Nota do efeito do tamanho mínimo do agrupamento (Authors e Countries; IES tem a sua)."""
+    info = getattr(resultado, "filtro_agrupamento", None)
+    unidade = resultado.configuracao.unidade
+    if not info or info["minimo"] <= 1 or unidade == "Institutions":
+        return ""
+    plural = _SUBST_FILTRO[unidade][1]
+    return (f'<p class="nota">Componentes com menos de {info["minimo"]} {plural} não viram '
+            f'agrupamento e ficam sem agrupamento: {info["grupos_antes"]} grupos antes do '
+            f'filtro, {info["grupos_depois"]} depois; {_inteiro(info["nos_sem_agrupamento"])} '
+            f'{plural} ficaram sem agrupamento ({_inteiro(info["isolados"])} isolados).</p>')
 
 
 def ies_html(resultado, tabela=None, rotulo: str = "") -> str:
@@ -1228,7 +1299,7 @@ def _avisos_html(dados: list[dict]) -> str:
 
 def metodo_html(config, periodos=None, resultados=(), frequencia=None,
                 medida_temporal: str | None = "EquivalenceIndex", kb=None, tabela=None,
-                rotulo: str = "", titulo=None) -> str:
+                rotulo: str = "", titulo=None, com_duplo: bool | None = None) -> str:
     """Bloco completo: parâmetros, indicadores e método.
 
     `titulo(texto)` devolve o cabeçalho de cada parte; sem ele, usa `<h4>` sem
@@ -1242,8 +1313,11 @@ def metodo_html(config, periodos=None, resultados=(), frequencia=None,
         partes += [titulo("Indicadores"),
                    indicadores_html(resultados, periodos, kb, config, frequencia, tabela,
                                     rotulo)]
+    if com_duplo is None:
+        com_duplo = True if kb is None else _duplo_mapa.aplicavel(kb.conexao)
     partes += [titulo("Como funciona"), algoritmo_html(config, medida_temporal,
-                                                          len(periodos) if periodos else None)]
+                                                          len(periodos) if periodos else None,
+                                                          com_duplo=com_duplo)]
     return "\n".join(partes)
 
 

@@ -141,7 +141,7 @@ class _Corpus:
 
 # ------------------------------------------------------------------ cache
 
-_CACHE_MAXIMO = 4
+_CACHE_MAXIMO = 12     # 4 períodos + corpus completo, para as 8 análises de um relatório
 _cache_corpus: "OrderedDict[tuple, _Corpus]" = OrderedDict()
 _trava_cache = threading.Lock()
 

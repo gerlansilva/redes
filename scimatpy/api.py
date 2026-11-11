@@ -299,6 +299,13 @@ def _config(dados: dict) -> Configuracao:
     if not isinstance(ignorar, (list, tuple)):
         raise ErroApi("\"ignorar\" precisa ser uma lista de termos")
 
+    # Tamanho mínimo do agrupamento: "tamanho_minimo_agrupamento" é o nome novo e
+    # "componente_minimo" o antigo (alias). Padrão: 3 em Institutions, 1 nas demais.
+    nome_comp = ("tamanho_minimo_agrupamento"
+                 if dados.get("tamanho_minimo_agrupamento") not in (None, "")
+                 else "componente_minimo")
+    componente = inteiro(nome_comp, COMPONENTE_MINIMO_PADRAO if unidade == "Institutions" else 1, 1)
+
     return Configuracao(
         ignorar=tuple(str(t).strip() for t in ignorar if str(t).strip()),
         unidade=unidade,
@@ -314,7 +321,7 @@ def _config(dados: dict) -> Configuracao:
         k_core=inteiro("k_core", 2, 1),
         palavras=tuple(palavras),
         indices=tuple(indices),
-        componente_minimo=inteiro("componente_minimo", COMPONENTE_MINIMO_PADRAO, 1),
+        componente_minimo=componente,
     )
 
 
@@ -503,6 +510,46 @@ def densidade_do_pedido(pedido: dict) -> dict:
         "n_total": dados["total"],
         "max_nos": topo,
         "suavizacao": suavizacao,
+    }
+
+
+def duplo_mapa_do_pedido(pedido: dict) -> dict:
+    """Duplo mapa de áreas das revistas (GET e POST). Usa ``token`` de uma análise já calculada
+    ou, sem ele, ``projeto``/``caminho``; vale para o corpus completo, qualquer que seja a
+    configuração da análise."""
+    from . import duplo_mapa
+    from .viz import duplo_mapa as viz_duplo
+    n_esq = _inteiro_limitado(pedido.get("max_esq"), duplo_mapa.MAX_ESQ,
+                              *duplo_mapa.LIMITE_ESQ, "max_esq")
+    n_dir = _inteiro_limitado(pedido.get("max_dir"), duplo_mapa.MAX_DIR,
+                              *duplo_mapa.LIMITE_DIR, "max_dir")
+    token = _token(pedido.get("token"))
+    if token:
+        caminho = Path(_analise(token)["projeto"])
+        if not caminho.exists():
+            raise ErroExpirado(f"O projeto desta análise não existe mais: {caminho}")
+    else:
+        caminho = _valida_projeto(str(pedido.get("projeto") or pedido.get("caminho") or ""))
+    with ProjetoScimat(caminho) as kb:
+        dados = duplo_mapa.calcula_do_banco(kb.conexao, n_esq, n_dir)
+    if not dados["aplicavel"]:
+        raise ErroApi(dados["aviso"])
+    titulo = duplo_mapa.TITULO if pedido.get("baixar") in ("1", "true") else ""
+    cobertura = dados["cobertura"]
+    return {
+        "svg": viz_duplo.svg(dados, titulo),
+        "nota": duplo_mapa.NOTA,
+        "avisos": dados["avisos"],
+        "areas": dados["areas"],
+        "fluxos": dados["fluxos"],
+        "tabela": dados["tabela"],
+        "cobertura": cobertura,
+        "n_esquerda": len(dados["esquerda"]),
+        "n_direita": len(dados["direita"]),
+        "total_esquerda": dados["total_esquerda"],
+        "total_direita": dados["total_direita"],
+        "max_esq": n_esq,
+        "max_dir": n_dir,
     }
 
 
@@ -861,8 +908,10 @@ def analisa(dados: dict) -> dict:
             "palavras": list(config.palavras),
             "indices": list(config.indices),
             "ignorar": list(config.ignorar),
-            "componente_minimo": config.componente_minimo,
+            "componente_minimo": config.agrupamento_minimo(),
+            "tamanho_minimo_agrupamento": config.agrupamento_minimo(),
         },
+        "filtro_agrupamento": getattr(resultado, "filtro_agrupamento", None),
         "ies": _ies_publico(resultado),
         "avisos": avisos,
         "termos_genericos": genericos,
@@ -1257,7 +1306,7 @@ def _edita_base(dados: dict) -> dict:
 
 def gera_relatorio(dados: dict) -> dict:
     """Gera o relatório HTML e devolve a URL de abertura."""
-    from . import report
+    from . import cache_figuras, report
 
     caminho = _valida_projeto(dados.get("projeto", ""))
     config = _config(dados)
@@ -1267,7 +1316,7 @@ def gera_relatorio(dados: dict) -> dict:
     estendido = bool(dados.get("estendido", False))
     medida = dados.get("medida_temporal", "EquivalenceIndex")
 
-    with ProjetoScimat(caminho) as kb:
+    with cache_figuras.escopo(), ProjetoScimat(caminho) as kb:
         periodos = kb.periodos()
         if not periodos:
             raise ErroApi("o projeto não tem períodos")
@@ -1368,21 +1417,27 @@ def _escolhe_frequencia(kb, periodos, base: dict, parametros: dict, fixa=None):
 
 def gera_relatorio_completo(dados: dict) -> dict:
     """Uma análise por seção (as que a base permite), num relatório só."""
-    from . import report
+    from . import cache_figuras, paralelo, report
 
     caminho = _valida_projeto(dados.get("projeto", ""))
     base = {k: v for k, v in dados.items()
             if k in ("similaridade", "algoritmo", "ignorar", "tamanho_minimo", "tamanho_maximo")}
     medida = dados.get("medida_temporal", "EquivalenceIndex")
 
-    with ProjetoScimat(caminho) as kb:
+    with cache_figuras.escopo(), ProjetoScimat(caminho) as kb:
         periodos = kb.periodos()
         if not periodos:
             raise ErroApi("o projeto não tem períodos")
+        formato = dados.get("formato") or "unico"
+        if formato not in ("unico", "pastas"):
+            raise ErroApi("formato do relatório completo: unico ou pastas")
         token = secrets.token_urlsafe(10)
         destino = CACHE / f"rel-{token}"
         destino.mkdir(parents=True, exist_ok=True)
 
+        # Cada análise pronta segue para um processo trabalhador (figuras e cálculos
+        # pesados) enquanto esta thread analisa a próxima; `espera()` junta tudo.
+        aquecedor = paralelo.Aquecedor(kb, formato, medida, destino)
         secoes, ignoradas = [], []
         for chave, rotulo, descricao, parametros, sql, minimo, motivo in ANALISES_COMPLETO:
             disponivel = kb.conexao.execute(sql).fetchone()[0]
@@ -1397,13 +1452,8 @@ def gera_relatorio_completo(dados: dict) -> dict:
                 continue
             config, frequencia, resultados_previos = escolhida
             pasta = f"{chave}"
-            token_voltar = report._VOLTAR.set("../index.html")
-            try:
-                resumo = report.gera_html(destino / pasta, kb, periodos, config, False, medida,
-                                          com_bibliometria=False, devolve_resultados=True,
-                                          resultados=resultados_previos)
-            finally:
-                report._VOLTAR.reset(token_voltar)
+            # Arquivo único: não há pasta de páginas; só o resultado é necessário.
+            resumo = {"resultados": resultados_previos}
             nota = ""
             por_periodo = [len(r.grupos) for r in resumo["resultados"]]
             if por_periodo and max(por_periodo) <= 2:
@@ -1414,13 +1464,23 @@ def gera_relatorio_completo(dados: dict) -> dict:
             secoes.append({"rotulo": rotulo,
                            "descricao": descricao + f" Frequência mínima {frequencia}." + nota,
                            "pasta": pasta, "config": config, "resultados": resumo["resultados"]})
+            aquecedor.submete(secoes[-1])
+        aquecedor.espera()
         if not secoes:
             raise ErroApi("Nenhuma análise de mapeamento pôde ser gerada com esta base.")
-        report._pagina_bibliometria(destino, kb)
-        report.gera_pagina_completa(destino, kb, secoes, ignoradas, medida)
-        formato = dados.get("formato") or "unico"
-        if formato not in ("unico", "pastas"):
-            raise ErroApi("formato do relatório completo: unico ou pastas")
+        if formato == "pastas":
+            for secao in secoes:
+                if secao.get("pronta_em_pasta"):
+                    continue          # um trabalhador já gravou as páginas desta análise
+                token_voltar = report._VOLTAR.set("../index.html")
+                try:
+                    report.gera_html(destino / secao["pasta"], kb, periodos, secao["config"],
+                                     False, medida, com_bibliometria=False,
+                                     devolve_resultados=True, resultados=secao["resultados"])
+                finally:
+                    report._VOLTAR.reset(token_voltar)
+            report._pagina_bibliometria(destino, kb)
+            report.gera_pagina_completa(destino, kb, secoes, ignoradas, medida)
         if formato == "unico":
             from . import relatorio_unico
             relatorio_unico.gera_arquivo_unico(destino / "relatorio-completo.html", kb,
@@ -1919,6 +1979,14 @@ class Manipulador(BaseHTTPRequestHandler):
                                   "image/svg+xml", True)
                 else:
                     self._json(200, dados)
+            elif rota == "/api/duplo-mapa":
+                pedido = {k: v[0] for k, v in parametros.items() if v}
+                dados = duplo_mapa_do_pedido(pedido)
+                if pedido.get("baixar") in ("1", "true"):
+                    self._arquivo(dados["svg"].encode("utf-8"), "duplo-mapa.svg",
+                                  "image/svg+xml", True)
+                else:
+                    self._json(200, dados)
             elif rota == "/api/pivos":
                 self._json(200, pivos_da_analise(_param(parametros, "token")))
             elif rota == "/api/rajadas":
@@ -2053,6 +2121,8 @@ class Manipulador(BaseHTTPRequestHandler):
                 self._json(200, linha_do_tempo_do_pedido(self._json_pedido()))
             elif rota == "/api/densidade":
                 self._json(200, densidade_do_pedido(self._json_pedido()))
+            elif rota == "/api/duplo-mapa":
+                self._json(200, duplo_mapa_do_pedido(self._json_pedido()))
             elif rota == "/api/analisa":
                 self._json(200, analisa(self._json_pedido()))
             elif rota == "/api/grade":

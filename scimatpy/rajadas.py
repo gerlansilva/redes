@@ -11,9 +11,11 @@ que usam o termo (ou citam a referência), não de citações recebidas.
 """
 from __future__ import annotations
 
+import copy
 import math
 from collections import defaultdict
 
+from . import cache_figuras
 from .texto import termo_legivel
 
 S_PADRAO = 2.0
@@ -107,7 +109,21 @@ _SQL = {
 def calcula(conexao, tipo: str = "palavras", limite: int = 20,
             minimo_documentos: int = MINIMO_DOCUMENTOS, s: float = S_PADRAO,
             gama: float = GAMA_PADRAO) -> dict:
-    """Rajadas mais fortes de palavras-chave dos autores ou de referências."""
+    """Rajadas mais fortes de palavras-chave dos autores ou de referências.
+
+    O cálculo é determinístico e vale por estado do arquivo do projeto: os
+    relatórios o pedem várias vezes (pontos de virada, linha do tempo); a cópia
+    devolvida pode ser alterada sem afetar o cache.
+    """
+    selo = cache_figuras.selo_conexao(conexao)
+    if selo is None:
+        return _calcula(conexao, tipo, limite, minimo_documentos, s, gama)
+    chave = ("rajadas", selo, tipo, limite, minimo_documentos, s, gama)
+    return copy.deepcopy(cache_figuras.obtem(
+        chave, lambda: _calcula(conexao, tipo, limite, minimo_documentos, s, gama)))
+
+
+def _calcula(conexao, tipo, limite, minimo_documentos, s, gama) -> dict:
     if tipo not in _SQL:
         raise ValueError("tipo de rajada desconhecido: use palavras ou referencias")
     anos_doc = _anos_dos_documentos(conexao)

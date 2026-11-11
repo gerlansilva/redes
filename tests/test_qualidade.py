@@ -231,11 +231,12 @@ class LimiaresTest(unittest.TestCase):
 
     def test_silhueta(self):
         self.assertEqual(self._avalia(0.5, sil=[-0.05] * 20)["nivel"], "ruim")
-        self.assertEqual(self._avalia(0.5, sil=[0.05] * 20)["nivel"], "atencao")
+        self.assertEqual(self._avalia(0.5, sil=[0.04] * 20)["nivel"], "atencao")
+        self.assertEqual(self._avalia(0.5, sil=[0.05] * 20)["nivel"], "ok")     # limiar: < 0,05
         self.assertEqual(self._avalia(0.5, sil=[0.2] * 20)["nivel"], "ok")
 
     def test_muitas_silhuetas_negativas(self):
-        sil = [0.6] * 13 + [-0.1] * 7           # 35% negativos, média > 0,1
+        sil = [0.6] * 13 + [-0.1] * 7           # 35% negativos, média > 0,05
         a = self._avalia(0.5, sil=sil)
         self.assertEqual(a["nivel"], "atencao")
         self.assertAlmostEqual(a["pct_silhueta_negativa"], 35.0)

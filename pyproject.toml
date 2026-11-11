@@ -1,11 +1,17 @@
 [project]
 name = "scimatpy"
 version = "0.1.0"
-description = "Fluxo de análise do SciMAT em Python, com figuras no estilo relimeARS"
+description = "Redes: mapeamento científico (bibliometria) inspirado no SciMAT, com interface web local em português"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["networkx>=3.0", "numpy>=1.24"]
 
+[project.optional-dependencies]
+# Só para os testes de interface (pulam sozinhos quando o Playwright não está instalado).
+teste = ["playwright>=1.40"]
+
 [project.scripts]
+redes = "scimatpy.cli:main"
 scimatpy = "scimatpy.cli:main"
 
 [build-system]

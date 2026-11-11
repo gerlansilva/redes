@@ -11,13 +11,13 @@ O núcleo de análise, a interface web e os relatórios estão completos para as
 sete unidades (com Países e Instituições), quatro matrizes, seis algoritmos e
 cinco similaridades. A
 paridade com o fork Java cobre 540 comparações, sem divergência. A suíte tem
-mais de 400 casos de teste.
+mais de 560 casos de teste.
 
 As análises novas (qualidade, rótulos, linha do tempo, pontos de virada,
 densidade, dendrograma, IES e Sankey) estão entregues, com arestas conhecidas
-listadas em **O que falta**. Fora isso, falta distribuição: instalador desktop
-e integração contínua. Os dois dependem de decisões externas ao código
-(repositório, plataforma alvo e assinatura), não de implementação de análise.
+listadas em **O que falta**. Fora isso, falta distribuição: o instalador desktop
+(plataforma alvo e assinatura) e um repositório onde a integração contínua, já
+escrita, possa rodar. São decisões externas ao código, não implementação de análise.
 
 ## O que foi fechado
 
@@ -194,45 +194,96 @@ Registrado, não feito (ganho pequeno frente ao risco):
   matriz próprias. O ganho barato (reaproveitar o resultado da frequência
   escolhida em `gera_html` e no mapa longitudinal, que antes refaziam a
   análise duas vezes) já foi aplicado.
-- **Figuras repetidas no relatório completo**: o halo e o diagrama de cada
-  período são gerados na página do período e de novo no arquivo único. Evitar
-  isso exige um cache de SVG por (período, configuração) compartilhado entre
-  `report.py` e `relatorio_unico.py`; fica para quando o tempo do relatório
-  completo for o gargalo. Medido no SERJ (4 períodos): 20,3 s antes e 19,9 s
-  depois, com as execuções da análise caindo de 128 para 64; o tempo é
-  dominado pelo desenho das figuras, não pela análise.
+- **Figuras repetidas no relatório completo** — feito em 11/11/2026, veja
+  "Desempenho do relatório completo" abaixo.
+
+## Desempenho do relatório completo (11/11/2026)
+
+Medido em `serj_auto.redes` (8 análises, 4 períodos), máquina de 2 núcleos e
+compartilhada. Perfil (cProfile): o tempo era o desenho das figuras (layouts de
+mola do halo, 60%), os pontos de virada (intermediação), o mapa de densidade, os
+rótulos por tema e a análise em si; o arquivo único ainda regenerava a pasta de
+páginas (1.255 arquivos) só para descartá-la.
+
+| Relatório completo (arquivo único) | Antes | Depois |
+|---|---|---|
+| serj_auto | 23,4 s | 7,3 s |
+| serj | 31,6 s | 9,8 s |
+| novo142 | 20,1 s | 6,4 s |
+| arquivos gravados (serj_auto) | 1.370 | 1 |
+| pasta de páginas (serj_auto) | 15,3 s | 11,9 s |
+
+O que mudou, sem alterar a saída (HTML idêntico ao do processo único sem cache em
+serj, serj_auto, novo142 e eecera59, e a pasta de páginas idêntica, arquivo por
+arquivo, em serj_auto; `tests/test_desempenho_relatorio.py`):
+
+- arquivo único sem a pasta de páginas;
+- cache por conteúdo (`cache_figuras.py`): chave = impressão do resultado do
+  período (configuração, rede, agrupamentos, nomes) + título, rótulos e estado do
+  projeto; vale só dentro de uma geração de relatório (`escopo`), é esvaziado se
+  uma constante de cálculo mudar, e cobre halo, linha do tempo, densidade, pontos
+  de virada, rótulos, qualidade e rajadas;
+- processos trabalhadores (`paralelo.py`, `trabalhador.py`): cada análise vai para
+  um processo, que devolve o que desenhou; falhou, o principal refaz;
+- intermediação de Brandes com listas em vez de dicionários (1,6 vez mais rápida,
+  mesmo resultado bit a bit), `sem_acentos` com cache, cache de corpora de rótulos
+  de 4 para 12 períodos, `norm` do relaxamento dos nós soltos sem o invólucro.
+
+Fica: o layout de mola do NetworkX (cerca de um quarto do tempo restante) é
+cálculo de NumPy sobre matrizes pequenas; uma versão própria foi medida e só
+ganhou 10%, então não entrou. Com um só núcleo o ganho vem do cache e da pasta
+suprimida (13 a 14 s no serj_auto).
+
+## Estresse completo no SERJ (11/11/2026)
+
+`scripts`: corpus completo de `serj.redes` (280 documentos), cada análise de ponta
+a ponta, sem o filtro de frequência do relatório:
+
+| Unidade (freq. 1) | Nós | Agrupamentos | Selo | Qualidade | Rótulos | Pontos de virada | Linha do tempo | Densidade | Halo | Pico de memória |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Palavras | 676 | 132 | OK | 0,03 s | 0,11 s | 1,0 s | 0,06 s | 0,5 s | 4,3 s | 72 MB |
+| Referências | 9.715 | 672 | Atenção | 0,9 s (silhueta dispensada) | 0,12 s | pulado (limite de 800 nós, avisa) | 2,9 s | 0,7 s | 13,2 s | 265 MB |
+| Instituições | 334 | 42 | Atenção | 0,01 s | 0,00 s | 0,01 s | 0,01 s | 0,6 s | 2,7 s | 69 MB |
+
+Nenhuma etapa trava nem estoura memória; a mais cara é o desenho do halo da rede
+de referências sem filtro (13 s), que o relatório completo evita ao escolher
+frequência mínima 3.
 
 ## O que falta
 
-Arestas das análises novas:
+Fechado em 11/11/2026 (constava aqui): selo quase sempre "Atenção" (limiar de
+coesão 0,10 para 0,05, com a distribuição antes e depois em `docs/qualidade.md`),
+estresse completo no SERJ (acima), figuras repetidas e tempo do relatório completo
+(acima), integração contínua (`.github/workflows/tests.yml`: unittest em Linux e
+macOS, Playwright opcional, instalação limpa; falta só um repositório onde rodar)
+e empacotamento Python (`pyproject.toml` com o comando `redes`, conferido num
+ambiente virtual limpo, instruções no README).
 
-1. **Selo quase sempre "Atenção".** Com os limiares atuais, a maioria das redes
-   reais cai em Atenção; o selo informa pouco. Falta decidir se os limiares
-   mudam ou se o selo ganha outra escala. Hoje o texto já avisa que isso não
-   invalida o mapa.
-2. **Estresse completo no corpus SERJ.** Qualidade, rótulos, linha do tempo,
-   densidade, pontos de virada e IES não foram rodados de ponta a ponta no
-   SERJ completo (References com 9.744 nós); falta medir tempo e memória.
-3. **Duplo mapa simplificado.** Só se o usuário quiser: uma versão simplificada
-   do mapa ao lado do mapa completo. Sem demanda, fica fora.
-4. **Rótulos por tema fora de palavras-chave e referências.** Autores, países
-   e IES seguem com o nome do líder, de propósito; só entra se houver um método
-   que faça sentido para essas unidades.
+Depende de decisão do usuário:
 
-Distribuição:
-
-5. **Empacotamento desktop.** Só existe a interface web local (`scimatpy web`).
-   Falta o empacotamento Tauri, o instalador e a assinatura para uso por não
-   técnicos. Bloqueio: o diretório não é um repositório git, não há
-   identidade de assinatura definida e é preciso escolher a plataforma alvo
-   (macOS, Windows ou ambos).
-6. **Integração contínua.** Não há pipeline. A suíte roda à mão
-   (`python3 -m unittest discover -s tests -t .`) e a paridade depende de
-   `/tmp/demo/celii` com o fork Java compilado. Bloqueio: sem repositório,
-   não há onde executar o fluxo.
-7. **Publicação do pacote (opcional).** `pyproject.toml` já descreve o pacote
-   e o ponto de entrada `scimatpy`; falta decidir se ele será publicado em
-   índice interno ou no PyPI, com as credenciais correspondentes.
+1. **Escala do selo.** A calibração acima moveu o OK de 8% para 14% dos períodos
+   com selo definido; o resto da Atenção são sinais reais. O selo ainda junta um
+   alerta isolado e quatro alertas ao mesmo tempo sob "Atenção". Simulação sobre
+   as mesmas bases: se 3 famílias de alerta convergentes (força, divisão melhor
+   do Louvain, coesão, cobertura) valessem "Ruim", a distribuição ficaria OK 12%,
+   Atenção 58%, Ruim 29%. *Pergunta: o selo "Ruim" deve passar a significar
+   "3 ou mais famílias de alerta ao mesmo tempo"?*
+2. **Duplo mapa simplificado.** Só se o usuário quiser uma versão simplificada do
+   mapa ao lado do completo. *Pergunta: quer essa versão? Se sim, simplificada
+   como (só os maiores agrupamentos, sem arestas fracas, ou outra regra)?*
+3. **Rótulos por tema fora de palavras-chave e referências.** Autores, países e
+   IES seguem com o nome do líder. *Pergunta: aceita o nome do líder também
+   nessas unidades, ou há um critério de rótulo (por exemplo, o termo mais
+   frequente nos títulos dos documentos do grupo) que prefira?*
+4. **Empacotamento desktop (Tauri) e assinatura.** *Pergunta: macOS, Windows ou
+   ambos? Há identidade de assinatura (Apple Developer ID, certificado Windows)
+   e onde ficará o repositório?* Sem isso só vale a instalação pelo Python.
+5. **Publicação do pacote.** O pacote já se instala (`pip install .`). *Pergunta:
+   PyPI, índice interno ou só distribuição do desktop?*
+6. **Paridade na integração contínua.** `scripts/paridade*.py` e a grade exigem o
+   fork Java compilado em `/tmp/demo/celii`. *Pergunta: o fork pode ir para o
+   repositório (ou ser publicado como artefato) para a paridade rodar na
+   integração contínua?*
 
 ## Verificação
 

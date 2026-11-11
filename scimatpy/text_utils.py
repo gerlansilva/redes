@@ -7,6 +7,7 @@ importador CSV (`maiúsculas`, espaço → hífen).
 
 from __future__ import annotations
 
+import functools
 import re
 import unicodedata
 
@@ -14,6 +15,7 @@ LIGACOES = frozenset(
     "of the and for in on a an to with from by at as de da do das dos e y".split())
 
 
+@functools.lru_cache(maxsize=262144)
 def sem_acentos(texto: str) -> str:
     decomposto = unicodedata.normalize("NFD", texto or "")
     return "".join(c for c in decomposto if unicodedata.category(c) != "Mn")

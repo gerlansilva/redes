@@ -257,7 +257,7 @@ def _relaxa_soltos(nodepos: dict, soltos: list[int], centros: np.ndarray,
                     break
                 b += int(perto[0])
                 dvp = pontos[a] - pontos[b]
-                distancia = np.linalg.norm(dvp) + 1e-6
+                distancia = math.sqrt(dvp.dot(dvp)) + 1e-6      # = np.linalg.norm, sem a chamada
                 if distancia < 16:
                     passo = (16 - distancia) / 2 * dvp / distancia
                     pontos[a] += passo
@@ -277,7 +277,7 @@ def _relaxa_soltos(nodepos: dict, soltos: list[int], centros: np.ndarray,
                         break
                     i += int(perto[0])
                     dvi = pontos[j] - centros[i]
-                    distancia = np.linalg.norm(dvi) + 1e-6
+                    distancia = math.sqrt(dvi.dot(dvi)) + 1e-6
                     if distancia < limites[i]:
                         pontos[j] += (limites[i] - distancia) * dvi / distancia
                     i += 1

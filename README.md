@@ -74,6 +74,25 @@ python3 scripts/grade.py periodos    # grade dos três períodos
 
 ## Uso
 
+### Instalação e comando `redes`
+
+Requer Python 3.10 ou mais novo (dependências: `networkx` e `numpy`). Num
+ambiente virtual limpo:
+
+```bash
+python3 -m venv ~/venv_redes
+~/venv_redes/bin/pip install /caminho/para/redes        # ou: pip install -e . (desenvolvimento)
+~/venv_redes/bin/redes web                               # interface em http://127.0.0.1:8765
+~/venv_redes/bin/redes --help                            # analisa, constroi, grade, web
+```
+
+`redes` é o ponto de entrada do pacote (`scimatpy` continua valendo como
+sinônimo, e `python3 -m scimatpy web` também). A instalação inclui a interface
+(`ui/`) e os recursos (`assets/`); foi conferida num ambiente virtual limpo, com
+`pip install -e .` e com instalação comum, abrindo a interface e baixando
+`/static/app.js`. Para os testes de interface: `pip install -e ".[teste]"` e
+`python -m playwright install chromium` (sem isso esses testes pulam).
+
 ### Interface web
 
 ```bash
@@ -391,8 +410,26 @@ batam:
 A auditoria original e o que foi corrigido estão em
 [pendencias.md](docs/pendencias.md). O que resta é de produto, não de
 paridade: distribuição desktop (Tauri), edição de sinônimos e stopwords na
-interface, e algumas arestas das análises novas (selo quase sempre "Atenção",
-estresse completo no corpus SERJ).
+interface, e algumas arestas das análises novas. Em 11/11/2026 foram fechados
+o selo quase sempre "Atenção" (limiar de coesão calibrado, `docs/qualidade.md`),
+o estresse completo no SERJ, a integração contínua (`.github/workflows/tests.yml`,
+ainda sem repositório para rodar) e o empacotamento Python (`redes`). O que
+depende de decisão do usuário está, com a pergunta, em `docs/pendencias.md`.
+
+### Desempenho do relatório completo
+
+O relatório completo tem dois formatos. O **arquivo único** gera só o
+`relatorio-completo.html` (antes regenerava a pasta inteira, mais de mil
+arquivos, e descartava). Em bases com 120 documentos ou mais as figuras e os
+cálculos pesados de cada análise vão para processos trabalhadores
+(`scimatpy/paralelo.py`, até 4, um por núcleo), enquanto o principal analisa a
+próxima; os desenhos e cálculos ficam num cache de conteúdo
+(`scimatpy/cache_figuras.py`) compartilhado entre o relatório em pastas, o
+arquivo único e uma repetição da geração. A saída é idêntica à do processo
+único sem cache (os testes comparam o HTML); qualquer falha de um trabalhador
+só faz o principal calcular aquela análise sozinho. Interruptores:
+`REDES_PARALELO=0` (um processo só), `REDES_PARALELO=forca` (paralelo mesmo em
+base pequena), `REDES_TRABALHADORES=N` e `REDES_SEM_CACHE=1`.
 
 ## Próximos passos
 
@@ -408,7 +445,12 @@ estresse completo no corpus SERJ).
 python3 -m unittest discover -s tests -t .
 ```
 
-Os testes (mais de 400 casos) cobrem o esquema `.redes` e os contadores dos gatilhos, a grade
+A integração contínua (`.github/workflows/tests.yml`) roda a mesma suíte em Linux
+e macOS (Python 3.10, 3.12 e 3.13), um job opcional com Playwright e um job que
+instala o pacote fora do modo editável e sobe a interface. Os testes que precisam
+de projetos reais, do fork Java (paridade) ou do Playwright pulam sozinhos.
+
+Os testes (mais de 560 casos) cobrem o esquema `.redes` e os contadores dos gatilhos, a grade
 de 162 linhas, as opções de análise (corte, origens de palavras, k-core),
 similaridade, medidas e índices, agrupamentos, mapeadores de documentos, os
 carregadores, a conversão de referências e a API da interface: importação por
