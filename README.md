@@ -1,14 +1,57 @@
 # Redes
 
-**Redes** é a ferramenta de mapeamento e análise da produção científica. O
-pacote Python que a executa chama-se `redes` internamente: ele reimplementa
-o fluxo do SciMAT, com as mesmas decisões algorítmicas do programa original e
+**Redes** é a ferramenta de mapeamento e análise da produção científica. Ela
+reimplementa o fluxo do SciMAT, com as mesmas decisões algorítmicas do programa original e
 figuras no estilo do atlas
 [relimeARS](https://github.com/gerlansilva/relimeARS) — halos por agrupamento,
 selos numerados e paleta própria.
 
 O objetivo é ter o fluxo inteiro em Python: ler o corpus, montar a matriz,
 normalizar, agrupar, medir, desenhar e relatar, sem depender da interface Java.
+
+## Como usar (instalação pelo PyPI)
+
+A ferramenta roda no seu computador, em português, e nenhum dado sai da sua
+máquina. Você precisa do **Python 3.10 ou mais novo**.
+
+**1. Conferir o Python.** Abra o terminal (no Windows, o PowerShell) e rode
+`python3 --version` (no Windows: `py --version`). Se não aparecer 3.10 ou mais, instale
+o Python em <https://www.python.org/downloads/>, feche e abra o terminal de novo.
+
+**2. Instalar (uma única vez).**
+
+macOS ou Linux:
+
+```bash
+python3 -m venv ~/venv_redes
+~/venv_redes/bin/pip install redes
+```
+
+Windows (PowerShell):
+
+```powershell
+py -m venv $HOME\venv_redes
+$HOME\venv_redes\Scripts\pip install redes
+```
+
+**3. Abrir a ferramenta (sempre que for usar).**
+
+```bash
+~/venv_redes/bin/redes web                      # macOS ou Linux
+```
+
+```powershell
+$HOME\venv_redes\Scripts\redes web             # Windows
+```
+
+O navegador abre sozinho. Clique em **Começar**, envie o arquivo exportado da sua base
+(CSV, BibTeX, RIS ou OpenAlex; por exemplo, o CSV do Scopus) e escolha as análises.
+Os projetos ficam na pasta `redes-projetos`, dentro da sua pasta pessoal.
+
+**Atualizar:** `~/venv_redes/bin/pip install --upgrade redes`.
+
+**Se algo der errado:** no macOS, o comando `pip` sozinho pode não existir; use sempre o
+caminho completo acima. Para a lista de comandos, rode `redes --help`.
 
 ## Estado atual
 
@@ -87,8 +130,7 @@ python3 -m venv ~/venv_redes
 ~/venv_redes/bin/redes --help                            # analisa, constroi, grade, web
 ```
 
-`redes` é o ponto de entrada do pacote (`redes` continua valendo como
-sinônimo, e `python3 -m redes web` também). A instalação inclui a interface
+`redes` é o ponto de entrada do pacote (`python3 -m redes web` também funciona). A instalação inclui a interface
 (`ui/`) e os recursos (`assets/`); foi conferida num ambiente virtual limpo, com
 `pip install -e .` e com instalação comum, abrindo a interface e baixando
 `/static/app.js`. Para os testes de interface: `pip install -e ".[teste]"` e

@@ -1,6 +1,6 @@
 [project]
 name = "redes"
-version = "0.1.0"
+version = "0.1.1"
 description = "Redes: mapeamento científico (bibliometria) inspirado no SciMAT, com interface web local em português"
 readme = "README.md"
 requires-python = ">=3.10"
