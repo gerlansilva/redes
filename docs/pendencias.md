@@ -283,12 +283,10 @@ Depende de decisão do usuário:
 1. **Duplo mapa simplificado.** Só se o usuário quiser uma versão simplificada do
    mapa ao lado do completo. *Pergunta: quer essa versão? Se sim, simplificada
    como (só os maiores agrupamentos, sem arestas fracas, ou outra regra)?*
-2. **Rótulos por tema fora de palavras-chave e referências.** Autores, países e
-   IES seguem com o nome do líder. *Pergunta: aceita o nome do líder também
-   nessas unidades, ou há um critério de rótulo (por exemplo, o termo mais
-   frequente nos títulos dos documentos do grupo) que prefira?*
-3. **Publicação do pacote.** O pacote já se instala (`pip install .`). *Pergunta:
-   PyPI ou índice interno?*
+2. ~~Rótulos por tema fora de palavras-chave e referências.~~ Decidido: autores,
+   países e IES ficam com o nome do líder do agrupamento.
+3. ~~Publicação do pacote.~~ Decidido: uso local. O pacote já se instala com
+   `pip install .`; PyPI e índice interno não serão usados por enquanto.
 4. **Paridade na integração contínua.** `scripts/paridade*.py` e a grade exigem o
    fork Java compilado em `/tmp/demo/celii`. *Pergunta: o fork pode ir para o
    repositório (ou ser publicado como artefato) para a paridade rodar na
