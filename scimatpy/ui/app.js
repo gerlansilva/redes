@@ -379,6 +379,8 @@ function ligarEventos() {
   $("lightbox").addEventListener("click", fecharLightbox);
   $("fecharLightbox").addEventListener("click", fecharLightbox);
 
+  ligarQualidade();
+
   document.addEventListener("keydown", (evento) => {
     if (evento.key === "Escape") {
       fecharMenuExportar(false);
@@ -1087,7 +1089,7 @@ function renderizarResultado(resultado) {
   const unidade = UNIDADES[resultado.parametros.unidade];
 
   $("metaHalo").textContent =
-    `${unidade} · ${resumo.grupos} agrupamentos · ${resumo.nos} nós`;
+    `${unidade} · ${plural(resumo.grupos, "agrupamento", "agrupamentos")} · ${resumo.nos} nós`;
   $("metaEstrategico").textContent =
     `Callon · ${resultado.periodo.nome}`;
   $("metaGrupos").textContent =
@@ -1209,6 +1211,7 @@ function renderizarResultado(resultado) {
 
   renderizarTabela(resultado);
   renderizarIndices(resultado);
+  renderizarQualidade(resultado);
   atualizarMenuExportar();
   estado.docsToken = null;
   if (abaAtual() === "documentos") carregarDocumentos();
@@ -1217,7 +1220,7 @@ function renderizarResultado(resultado) {
   $("vazioLongitudinal").textContent =
     "Abra a aba Comparar períodos para montar os mapas.";
   $("downloadEvolucao").hidden = true;
-  $("linkGrupos").textContent = `${resumo.grupos} grupos`;
+  $("linkGrupos").textContent = plural(resumo.grupos, "grupo", "grupos");
 }
 
 
@@ -1225,18 +1228,34 @@ function renderizarResultado(resultado) {
 
 // "STATISTICAL-REASONING" vira "Statistical reasoning"; nomes de pessoas e
 // países ficam com cada palavra capitalizada.
+//
+// Só se reescreve a caixa de um termo escrito todo em maiúsculas (padrão do SciMAT);
+// o que vem dos dados com caixa mista ("Lee H.S.", "South Africa") fica como está.
 function nomeLegivel(texto, unidade) {
-  const base = String(texto || "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
-  if (!base) return "—";
-  if (["Authors", "AuthorsReference", "Countries"].includes(unidade)) {
-    return base.replace(/(^|\s)(\p{L})/gu, (_, espaco, letra) => espaco + letra.toUpperCase());
+  const bruto = String(texto || "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!bruto) return "—";
+  const pessoaOuPais = ["Authors", "AuthorsReference", "Countries"].includes(unidade);
+  const tudoMaiusculo = bruto === bruto.toLocaleUpperCase() && bruto !== bruto.toLocaleLowerCase();
+  if (!tudoMaiusculo) {
+    const minusculo = bruto === bruto.toLocaleLowerCase();
+    return minusculo && !pessoaOuPais ? bruto.charAt(0).toUpperCase() + bruto.slice(1) : bruto;
+  }
+  const base = bruto.toLowerCase();
+  if (pessoaOuPais) {
+    // Iniciais ("H.S.") continuam em maiúsculas, como nos nomes já formatados.
+    return base.replace(/(^|\s)(\S+)/gu, (_, espaco, palavra) =>
+      espaco + (/^(\p{L}\.)+$/u.test(palavra)
+        ? palavra.toUpperCase() : palavra.charAt(0).toUpperCase() + palavra.slice(1)));
   }
   return base.charAt(0).toUpperCase() + base.slice(1);
 }
 
 function itemLegivel(texto, unidade) {
   const base = nomeLegivel(texto, unidade);
-  return ["Authors", "AuthorsReference", "Countries"].includes(unidade)
+  const bruto = String(texto || "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  const tudoMaiusculo = bruto === bruto.toLocaleUpperCase() && bruto !== bruto.toLocaleLowerCase();
+  // Só o que veio todo em maiúsculas ganha minúscula inicial no meio da frase.
+  return ["Authors", "AuthorsReference", "Countries"].includes(unidade) || !tudoMaiusculo
     ? base : base.charAt(0).toLowerCase() + base.slice(1);
 }
 
@@ -1258,6 +1277,11 @@ function mostrarCarregandoResumo() {
 }
 
 function renderizarResumoVazio(texto) {
+  const caixaQualidade = $("qualidadeCaixa");
+  if (caixaQualidade) {
+    fecharQualidade(false);
+    caixaQualidade.hidden = true;
+  }
   const p = document.createElement("p");
   p.className = "resumo-vazio";
   p.textContent = texto;
@@ -1276,11 +1300,12 @@ function linhaTema(grupo, unidade, maximo, comQuadrante) {
   const linha = elemento("button", `tema-linha ${grupo.quadrante}`);
   linha.type = "button";
   linha.addEventListener("click", () => abrirGrupo(grupo.selo));
-  const nome = nomeLegivel(grupo.rotulo, unidade);
+  const nomeAtual = nomeLegivel(grupo.rotulo, unidade);
+  const nome = grupo.rotulo_novo_curto ? maiuscula(grupo.rotulo_novo_curto) : nomeAtual;
   const docs = grupo.documentos || 0;
   const selo = elemento("span", `selo ${grupo.quadrante}`, String(grupo.selo));
   const titulo = elemento("span", "tema-nome", nome);
-  titulo.title = nome;
+  titulo.title = nome === nomeAtual ? nome : `${nome} (item central: ${nomeAtual})`;
   const contagem = elemento("span", "tema-docs", plural(docs, "doc", "docs"));
   const barra = elemento("span", "tema-barra");
   const preenchimento = document.createElement("i");
@@ -1410,7 +1435,7 @@ function renderizarTabela(resultado) {
   if (!grupos.length) {
     const linha = document.createElement("tr");
     const celula = document.createElement("td");
-    celula.colSpan = 7;
+    celula.colSpan = 9;
     celula.style.color = "#8A94A6";
     celula.textContent = "Nenhum agrupamento nesta configuração.";
     linha.append(celula);
@@ -1444,12 +1469,34 @@ function renderizarTabela(resultado) {
 
     const celulaNome = document.createElement("td");
     celulaNome.className = "grupo";
-    celulaNome.textContent = grupo.rotulo;
+    if (grupo.rotulo_novo) {
+      celulaNome.append(document.createTextNode(maiuscula(grupo.rotulo_novo)));
+      if (grupo.rotulo_indicativo) {
+        const ind = elemento("span", "rot-ind", "(indicativo)");
+        ind.title = "Poucos documentos no núcleo: o rótulo é só uma indicação.";
+        celulaNome.append(ind);
+      }
+      celulaNome.append(elemento("span", "rot-atual", grupo.rotulo));
+    } else {
+      celulaNome.textContent = grupo.rotulo;
+    }
     celulaNome.title = grupo.nos.join(", ");
 
     const celulaItens = document.createElement("td");
     celulaItens.className = "num";
     celulaItens.textContent = String(grupo.itens);
+
+    const celulaSilhueta = document.createElement("td");
+    celulaSilhueta.className = "num";
+    celulaSilhueta.textContent = numeroOuTraco(grupo.silhueta, 2);
+    if (grupo.silhueta == null) {
+      celulaSilhueta.title = "Agrupamento com menos de 3 itens (ou silhueta não calculada)";
+    }
+
+    const celulaAno = document.createElement("td");
+    celulaAno.className = "num";
+    celulaAno.textContent = grupo.ano_medio == null
+      ? "—" : grupo.ano_medio.toFixed(1).replace(".", ",");
 
     const celulaCentralidade = document.createElement("td");
     celulaCentralidade.className = "num";
@@ -1472,14 +1519,169 @@ function renderizarTabela(resultado) {
     celulaSeta.className = "seta-grupo";
     celulaSeta.textContent = "›";
 
-    linha.append(celulaSelo, celulaNome, celulaItens, celulaCentralidade,
-      celulaDensidade, celulaQuadrante, celulaSeta);
+    linha.append(celulaSelo, celulaNome, celulaItens, celulaSilhueta, celulaAno,
+      celulaCentralidade, celulaDensidade, celulaQuadrante, celulaSeta);
     corpo.append(linha);
   }
 
   $("rodapeTabela").textContent =
-    `${grupos.length} agrupamentos · ${resultado.resumo.documentos} documentos ` +
+    `${plural(grupos.length, "agrupamento", "agrupamentos")} · ${resultado.resumo.documentos} documentos ` +
     `no período · quadrante pela faixa normalizada de Callon`;
+}
+
+// Põe a primeira letra em maiúscula, sem mexer em nomes já formatados (autores com
+// iniciais, como "Lee H.S.", ou termos que já começam em maiúscula).
+function maiuscula(texto) {
+  const t = String(texto || "");
+  if (/\p{Lu}\./u.test(t)) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function numeroOuTraco(valor, casas) {
+  if (valor == null || Number.isNaN(valor)) return "—";
+  let texto = Number(valor).toFixed(casas);
+  if (Number(texto) === 0) texto = texto.replace("-", "");   // nunca "-0,00"
+  return texto.replace(".", ",").replace("-", "\u2212");
+}
+
+/* ------------------------------------------------------ qualidade do mapa */
+
+const NIVEL_QUALIDADE = {
+  ok: { texto: "OK", icone: "✓",
+        leitura: "Os agrupamentos se sustentam na rede." },
+  atencao: { texto: "Atenção", icone: "!",
+             leitura: "Leitura prudente: alguns limites entre agrupamentos podem ser pouco nítidos. " +
+                      "É comum em redes reais e não invalida o mapa." },
+  ruim: { texto: "Ruim", icone: "✕",
+          leitura: "A divisão em agrupamentos é fraca na rede; use o mapa como exploração, não como conclusão." },
+  indefinido: { texto: "Indefinido", icone: "?",
+                leitura: "Não há dados suficientes para avaliar; isso não quer dizer que a qualidade seja zero." },
+};
+
+function renderizarQualidade(resultado) {
+  const caixa = $("qualidadeCaixa");
+  const q = resultado.qualidade;
+  fecharQualidade(false);
+  if (!q) {
+    caixa.hidden = true;
+    return;
+  }
+  const nivel = NIVEL_QUALIDADE[q.nivel] ? q.nivel : "indefinido";
+  const info = NIVEL_QUALIDADE[nivel];
+  caixa.hidden = false;
+  const botao = $("seloQualidade");
+  botao.className = `selo-qualidade nivel-${nivel}`;
+  $("sqIcone").dataset.s = info.icone;
+  $("sqNivel").textContent = info.texto;
+  const indef = nivel === "indefinido";
+  const pctAgrupados = q.n_nos ? `${Math.round(q.pct_agrupados)}% agrup.` : "";
+  $("sqResumo").textContent = indef ? "" :
+    `Q ${numeroOuTraco(q.q, 2)} · sil. ${numeroOuTraco(q.silhueta_media, 2)} · ${pctAgrupados}`;
+  botao.title = "Qualidade dos agrupamentos: clique para ver o detalhe";
+
+  const pop = $("popQualidade");
+  const titulo = elemento("h3");
+  titulo.id = "popQualidadeTitulo";
+  titulo.append(document.createTextNode("Qualidade do mapa"),
+                elemento("span", `selo-q nivel-${nivel}`, `${info.icone} ${info.texto}`));
+  const lista = elemento("dl");
+  const linhaStat = (nome, valor) => {
+    lista.append(elemento("dt", null, nome), elemento("dd", null, valor));
+  };
+  linhaStat("Força da divisão (Q)", indef ? "—" : numeroOuTraco(q.q, 2));
+  linhaStat("Q do Louvain (referência)", indef ? "—" : numeroOuTraco(q.q_louvain, 2));
+  linhaStat("Silhueta média", indef ? "—" : numeroOuTraco(q.silhueta_media, 2));
+  linhaStat("Itens em agrupamentos",
+            q.n_nos && !(indef && !q.pct_agrupados)
+              ? `${numeroOuTraco(q.pct_agrupados, 0)}% de ${nf.format(q.n_nos)}` : "—");
+  const filhos = [titulo, elemento("p", "pq-leitura", info.leitura), lista];
+  if (q.avisos && q.avisos.length) {
+    filhos.push(elemento("h4", null, "Avisos"));
+    const ul = elemento("ul");
+    for (const aviso of q.avisos) ul.append(elemento("li", null, aviso));
+    filhos.push(ul);
+  }
+  filhos.push(elemento("p", "pq-rodape",
+    "Q vai de 0 (divisão ao acaso) a perto de 1; a silhueta, de −1 a 1. " +
+    "O relatório explica os critérios em “Como funciona”."));
+  pop.replaceChildren(...filhos);
+}
+
+function abrirQualidade() {
+  const pop = $("popQualidade");
+  if (!pop.hidden) return;
+  pop.hidden = false;
+  $("qualidadeCaixa").closest(".barra-resultados")?.classList.add("com-popover");
+  $("seloQualidade").setAttribute("aria-expanded", "true");
+  posicionarQualidade(true);
+  pop.focus({ preventScroll: true });
+}
+
+// Faz o popover caber na janela: rola a página o mínimo, e se ainda faltar espaço
+// limita a altura (rolagem interna) ou abre para cima, acima da barra de exportação.
+function posicionarQualidade(rolar) {
+  const pop = $("popQualidade");
+  if (!pop || pop.hidden) return;
+  const selo = $("seloQualidade");
+  pop.classList.remove("acima");
+  pop.style.maxHeight = "";
+  const margem = 12;
+  const limiteInferior = () => {
+    let limite = window.innerHeight;
+    const acoes = document.querySelector(".acoes-finais");
+    if (acoes && getComputedStyle(acoes).position === "sticky") {
+      const topo = acoes.getBoundingClientRect().top;
+      if (topo > selo.getBoundingClientRect().bottom) limite = Math.min(limite, topo);
+    }
+    return limite - margem;
+  };
+  const cabeAbaixo = () => pop.getBoundingClientRect().bottom <= limiteInferior();
+  if (!cabeAbaixo() && rolar) {
+    // Rola só o necessário; a barra de abas é "sticky", então o selo para sob o cabeçalho.
+    window.scrollBy(0, Math.ceil(pop.getBoundingClientRect().bottom - limiteInferior()));
+  }
+  if (cabeAbaixo()) return;
+  const caixa = selo.getBoundingClientRect();
+  const abaixo = limiteInferior() - caixa.bottom - 8;
+  const cabecalho = document.querySelector(".topo, header.cabecalho, .barra-topo");
+  const topoUtil = cabecalho ? cabecalho.getBoundingClientRect().bottom : 0;
+  const acima = caixa.top - Math.max(topoUtil, 0) - 8 - margem;
+  if (abaixo >= 220 || abaixo >= acima) {
+    pop.style.maxHeight = `${Math.max(140, Math.floor(abaixo))}px`;
+  } else {
+    pop.classList.add("acima");
+    pop.style.maxHeight = `${Math.max(140, Math.floor(acima))}px`;
+  }
+}
+
+function fecharQualidade(devolveFoco = true) {
+  const pop = $("popQualidade");
+  if (!pop || pop.hidden) return;
+  pop.hidden = true;
+  $("qualidadeCaixa").closest(".barra-resultados")?.classList.remove("com-popover");
+  $("seloQualidade").setAttribute("aria-expanded", "false");
+  if (devolveFoco) $("seloQualidade").focus({ preventScroll: true });
+}
+
+function ligarQualidade() {
+  const botao = $("seloQualidade");
+  botao.addEventListener("click", () => {
+    if ($("popQualidade").hidden) abrirQualidade(); else fecharQualidade();
+  });
+  document.addEventListener("click", (evento) => {
+    if (!$("qualidadeCaixa").contains(evento.target)) fecharQualidade(false);
+  });
+  window.addEventListener("resize", () => posicionarQualidade(false));
+  $("qualidadeCaixa").addEventListener("keydown", (evento) => {
+    if (evento.key === "Escape" && !$("popQualidade").hidden) {
+      evento.stopPropagation();
+      fecharQualidade();
+    }
+  });
+  $("qualidadeCaixa").addEventListener("focusout", (evento) => {
+    const para = evento.relatedTarget;
+    if (para && !$("qualidadeCaixa").contains(para)) fecharQualidade(false);
+  });
 }
 
 function medida(valor, fracao) {
@@ -1533,10 +1735,20 @@ function renderizarDrawer(dados) {
   selo.className = `selo ${grupo.quadrante}`;
   selo.textContent = String(grupo.selo);
 
-  $("drawerTitulo").textContent = grupo.rotulo;
-  $("drawerQuadrante").replaceChildren(
-    etiquetaQuadrante(grupo.quadrante,
-                      estado.resultado?.parametros.unidade));
+  $("drawerTitulo").textContent =
+    grupo.rotulo_novo ? maiuscula(grupo.rotulo_novo) : grupo.rotulo;
+  const subDrawer = [etiquetaQuadrante(grupo.quadrante,
+                                       estado.resultado?.parametros.unidade)];
+  const extras = [];
+  if (grupo.rotulo_novo) {
+    extras.push(`${grupo.rotulo_indicativo ? "rótulo indicativo · " : ""}item central: ${grupo.rotulo}`);
+  }
+  extras.push(`silhueta ${numeroOuTraco(grupo.silhueta, 2)}`);
+  if (grupo.ano_medio != null) {
+    extras.push(`ano médio ${grupo.ano_medio.toFixed(1).replace(".", ",")}`);
+  }
+  subDrawer.push(elemento("span", "rot-atual-drawer", extras.join(" · ")));
+  $("drawerQuadrante").replaceChildren(...subDrawer);
 
   $("drawerMetricas").replaceChildren(
     metrica("Itens", grupo.itens),
@@ -2981,7 +3193,7 @@ async function compararPeriodos() {
     $("downloadEvolucao").href = mapa.download;
     $("downloadEvolucao").hidden = false;
     $("metaLongitudinal").textContent =
-      `${mapa.periodos.length} ${mapa.periodos.length === 1 ? "período" : "períodos"} · ${mapa.nos} agrupamentos · ${mapa.elos} elos`;
+      `${mapa.periodos.length} ${mapa.periodos.length === 1 ? "período" : "períodos"} · ${plural(mapa.nos, "agrupamento", "agrupamentos")} · ${plural(mapa.elos, "elo", "elos")}`;
     $("rodapeLongitudinal").textContent =
       `Medida de sobreposição: ` +
       `${MEDIDAS_TEMPORAIS[mapa.medida] || mapa.medida}. ` +

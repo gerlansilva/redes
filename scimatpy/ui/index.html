@@ -327,6 +327,16 @@
         <div class="aba" data-aba="dendrograma" role="tab" tabindex="0" aria-selected="false">Dendrograma</div>
         <div class="aba" data-aba="longitudinal" role="tab" tabindex="0" aria-selected="false">Comparar períodos</div>
       </div>
+      <div class="qualidade-caixa" id="qualidadeCaixa" hidden>
+        <button type="button" class="selo-qualidade" id="seloQualidade" aria-haspopup="dialog"
+                aria-expanded="false" aria-controls="popQualidade">
+          <span class="sq-icone" id="sqIcone" aria-hidden="true"></span>
+          <span class="sq-texto">Qualidade: <b id="sqNivel">—</b></span>
+          <span class="sq-resumo" id="sqResumo"></span>
+        </button>
+        <div class="pop-qualidade" id="popQualidade" role="dialog" aria-labelledby="popQualidadeTitulo"
+             tabindex="-1" hidden></div>
+      </div>
       </div>
 
       <div class="resultados" id="resultados">
@@ -493,15 +503,17 @@
               <tr>
                 <th style="width:52px">Selo</th>
                 <th>Agrupamento</th>
-                <th class="num" style="width:70px">Itens</th>
-                <th class="num" style="width:170px">Centralidade</th>
-                <th class="num" style="width:170px">Densidade</th>
+                <th class="num" style="width:64px">Itens</th>
+                <th class="num" style="width:76px" title="Coesão média dos itens do agrupamento, de −1 a 1; — quando há menos de 3 itens">Silhueta</th>
+                <th class="num" style="width:76px" title="Ano médio dos documentos do núcleo">Ano médio</th>
+                <th class="num" style="width:150px">Centralidade</th>
+                <th class="num" style="width:150px">Densidade</th>
                 <th style="width:150px">Quadrante</th>
                 <th style="width:36px"></th>
               </tr>
             </thead>
             <tbody id="gruposCorpo">
-              <tr><td colspan="7" style="color:#8A94A6">Nenhuma análise executada.</td></tr>
+              <tr><td colspan="9" style="color:#8A94A6">Nenhuma análise executada.</td></tr>
             </tbody>
           </table>
         </div>

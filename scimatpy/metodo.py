@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import html
 
-from . import bibliometria, rajadas, termos
+from . import bibliometria, qualidade, rajadas, rotulos, termos
 from .clustering import ALGORITMOS
 from .similarity import MEDIDAS
 
@@ -123,6 +123,20 @@ CSS = """
 @media print { .rolagem { overflow:visible; } }
 .metodo .nota-metodo { color:#475569; font-size:12.5px; }
 @media print { .metodo { break-inside:auto; } .metodo p, .metodo li { orphans:3; widows:3; } }
+.selo-q { display:inline-block; padding:1px 9px; border-radius:999px; border:1px solid;
+          font-size:12px; font-weight:600; white-space:nowrap; line-height:1.5; }
+.selo-q-ok { color:#067647; background:#E6F8EE; border-color:#9ED8BA; }
+.selo-q-atencao { color:#7A4E00; background:#FFF3C4; border-color:#E8CB6A; }
+.selo-q-ruim { color:#B42318; background:#FEF3F2; border-color:#F4A9A1; }
+.selo-q-indefinido { color:#475569; background:#F1F3F8; border-color:#C5CCDB; }
+.avisos-qualidade { margin:4px 0 14px; font-size:12.5px; color:#334155; }
+.avisos-qualidade ul { margin:2px 0 6px; padding-left:20px; }
+.avisos-qualidade li { margin:1px 0; }
+.cel-agrupamento { min-width:170px; }
+.rot-novo { color:#0B1F66; }
+.rot-ind { color:#7A4E00; font-size:11px; font-weight:600; white-space:nowrap; }
+.rot-atual { color:#64748B; font-size:11px; }
+@media print { .selo-q { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 """
 
 
@@ -142,6 +156,133 @@ def _decimal(valor: float) -> str:
 
 def _plural(n: int, singular: str, plural: str) -> str:
     return singular if n == 1 else plural
+
+
+# Limiares do selo de qualidade. Os valores moram em `qualidade.avalia` (literais
+# no código); aqui só se repetem para o texto, e tests/test_qualidade_integracao.py
+# confere que continuam iguais aos do código.
+LIMIARES_QUALIDADE = {
+    "q_ruim": 0.15, "q_atencao": 0.30, "razao": 0.6,
+    "silhueta_ruim": 0.0, "silhueta_atencao": 0.10,
+    "pct_negativos": 30, "pct_agrupados": 60,
+}
+
+NIVEIS_ROTULO = {"ok": "OK", "atencao": "Atenção", "ruim": "Ruim",
+                 "indefinido": "Indefinido"}
+_NIVEIS_ICONE = {"ok": "✓", "atencao": "!", "ruim": "✕", "indefinido": "?"}
+
+
+def _n2(valor, casas: int = 2) -> str:
+    """Número com vírgula; '—' quando não há valor (nunca mostra 0 no lugar)."""
+    return "—" if valor is None else f"{valor:.{casas}f}".replace(".", ",")
+
+
+def selo_qualidade(nivel: str | None) -> str:
+    """Selo textual do nível de qualidade (texto E cor; o texto basta sozinho)."""
+    nivel = nivel if nivel in NIVEIS_ROTULO else "indefinido"
+    return (f'<span class="selo-q selo-q-{nivel}">'
+            f'<span aria-hidden="true">{_NIVEIS_ICONE[nivel]}</span> '
+            f'{NIVEIS_ROTULO[nivel]}</span>')
+
+
+def _guarda(resultado, chave: str, calcula):
+    """Guarda no próprio resultado o que já foi calculado (os relatórios pedem várias vezes)."""
+    cache = resultado.__dict__.setdefault("_cache_qualidade", {})
+    if chave not in cache:
+        try:
+            cache[chave] = calcula()
+        except Exception:        # qualidade e rótulos nunca derrubam um relatório
+            cache[chave] = None
+    return cache[chave]
+
+
+def qualidade_do_resultado(resultado) -> dict | None:
+    """`qualidade.avalia` do período (calculada uma vez), ou None se falhar."""
+    return _guarda(resultado, "qualidade", lambda: qualidade.avalia(resultado))
+
+
+def rotulos_do_resultado(kb, resultado) -> dict:
+    """`rotulos.rotula_grupos` do período (calculado uma vez); {} se falhar ou sem `kb`."""
+    if kb is None:
+        return resultado.__dict__.get("_cache_qualidade", {}).get("rotulos") or {}
+    return _guarda(resultado, "rotulos", lambda: rotulos.rotula_grupos(kb, resultado)) or {}
+
+
+def linhas_do_periodo(kb, resultado) -> dict[int, dict]:
+    """`qualidade.tabela_grupos` do período, por índice em `resultado.grupos`."""
+    def calcula():
+        rot = rotulos_do_resultado(kb, resultado)
+        linhas = qualidade.tabela_grupos(resultado, rot, kb=kb)
+        for linha in linhas:
+            r = rot.get(linha["indice"]) or {}
+            linha["indicativo"] = bool(r.get("indicativo")) if linha["rotulo_novo"] else False
+        return {linha["indice"]: linha for linha in linhas}
+    return _guarda(resultado, "linhas", calcula) or {}
+
+
+def nome_do_grupo(kb, resultado, grupo) -> tuple[str, str | None, bool]:
+    """(principal, subtítulo, indicativo) de um agrupamento.
+
+    O rótulo novo (quando existe) é o principal e o atual, o subtítulo; sem rótulo
+    novo, o principal é o atual e o subtítulo é None.
+    """
+    atual = grupo.rotulo or "Sem grupo"
+    try:
+        indice = next(i for i, g in enumerate(resultado.grupos) if g is grupo)
+        r = rotulos_do_resultado(kb, resultado).get(indice) or {}
+    except Exception:
+        r = {}
+    novo = " ".join(str(r.get("rotulo") or "").split())
+    if not novo:
+        return atual, None, False
+    return novo, atual, bool(r.get("indicativo"))
+
+
+def tabela_agrupamentos(kb, resultado, grupos, medidas, formato, ligar=None):
+    """Cabeçalho, linhas (HTML) e colunas numéricas da tabela de agrupamentos de um período.
+
+    `grupos`: os grupos na ordem em que o relatório os numera. `medidas`: lista de
+    (chave no grupo, rótulo da coluna). `formato(valor)`: número como texto.
+    `ligar(posição, html)`: envolve o nome num link (padrão: sem link).
+
+    A coluna Agrupamento mostra o rótulo novo em destaque (com "(indicativo)" quando
+    há poucos documentos) e o atual como subtítulo; sem rótulo novo, só o atual.
+    """
+    por_indice = linhas_do_periodo(kb, resultado)
+    posicao_no_resultado = {id(g): i for i, g in enumerate(resultado.grupos)}
+    linhas = []
+    for posicao, g in enumerate(grupos, start=1):
+        extra = por_indice.get(posicao_no_resultado.get(id(g)), {})
+        novo = extra.get("rotulo_novo")
+        if novo:
+            principal = f'<strong class="rot-novo">{_esc(novo)}</strong>'
+            if extra.get("indicativo"):
+                principal += ' <span class="rot-ind">(indicativo)</span>'
+            nome = ((ligar(posicao, principal) if ligar else principal)
+                    + f'<br><span class="rot-atual">{_esc(g.rotulo)}</span>')
+        else:
+            atual = _esc(g.rotulo)
+            nome = ligar(posicao, atual) if ligar else atual
+        nome = f'<div class="cel-agrupamento">{nome}</div>'
+        sil = extra.get("silhueta")
+        ano = extra.get("ano_medio")
+        linhas.append([
+            str(posicao), nome, str(len(g.nos)),
+            _n2(sil), "—" if ano is None else _n2(ano, 1),
+            str(extra.get("documentos_nucleo", len(g.documentos_nucleo))),
+            _quadrante_rotulo(g),
+            formato(g.centralidade), formato(g.densidade),
+        ] + [formato(g.medidas.get(chave, 0)) for chave, _ in medidas])
+    cabecalho = (["Nº", "Agrupamento", "Itens", "Silhueta", "Ano médio",
+                  "Documentos (núcleo)", "Quadrante", "Centralidade", "Densidade"]
+                 + [rotulo for _, rotulo in medidas])
+    numericas = (0, 2, 3, 4, 5, 7, 8) + tuple(range(9, 9 + len(medidas)))
+    return cabecalho, linhas, numericas
+
+
+def _quadrante_rotulo(grupo) -> str:
+    return {"motor": "Motor", "nicho": "Nicho", "basico": "Básico",
+            "emergente": "Emergente"}[_quadrante(grupo)]
 
 
 def _tabela_padrao(cabecalho, linhas, legenda=None, numericas=()):
@@ -409,7 +550,83 @@ def algoritmo_html(config, medida_temporal: str | None = None,
         "salto entre fusões consecutivas; a correlação cofenética mede o quanto a árvore "
         "preserva as distâncias originais, e ARI e NMI comparam o corte com os "
         "agrupamentos da rede (1 = idêntico).</p>")
+    p.append(_texto_qualidade(config))
     p.append("</div>")
+    return "\n".join(p)
+
+
+def _texto_qualidade(config) -> str:
+    """Qualidade do mapa e rótulos, em linguagem simples, com os limiares do código."""
+    lim = LIMIARES_QUALIDADE
+    minimo_nos = qualidade.MINIMO_NOS
+    minimo_sil = qualidade.MINIMO_NOS_SILHUETA
+    limite_nos = qualidade.LIMITE_NOS
+    min_docs = rotulos.MINIMO_DOCUMENTOS
+    indicativo_ate = rotulos.LIMITE_INDICATIVO - 1
+    cobertura = int(round(rotulos.COBERTURA_MAXIMA * 100))
+    minimo_grupo = rotulos.MINIMO_NO_GRUPO
+    p = []
+    p.append(
+        "<p><strong>9. Qualidade do mapa.</strong> Duas medidas dizem se a divisão em "
+        "agrupamentos se sustenta na rede.</p>")
+    p.append(
+        "<ul>"
+        "<li><em>Modularidade Q</em> (força da divisão): compara as ligações que ficam "
+        "dentro dos agrupamentos com as que se esperariam se a rede fosse sorteada, "
+        "ponderando pela similaridade; vai de cerca de 0 (como dividir ao acaso) a perto "
+        "de 1 (grupos bem separados). O item sem agrupamento conta como um grupo de um "
+        "item só. Compara-se com o <em>Q do Louvain</em> porque o Louvain procura "
+        "justamente o maior Q possível: se o Q desta divisão é bem menor, existe outra "
+        f"divisão mais nítida (razão Q/Q<sub>Louvain</sub> abaixo de {_n2(lim['razao'])}).</li>"
+        "<li><em>Silhueta</em>: para cada item, quanto mais perto ele está do próprio "
+        "agrupamento do que do agrupamento vizinho mais próximo (distância = 1 − "
+        "similaridade normalizada, como no dendrograma), de −1 a 1; valor negativo "
+        f"indica item possivelmente mal alocado. Agrupamentos com menos de {minimo_sil} "
+        "itens ficam fora (a silhueta de um grupo tão pequeno não informa nada) e "
+        f"aparecem com “—”. Em redes com mais de {limite_nos} itens agrupados a silhueta "
+        "é dispensada, para a análise não ficar lenta.</li></ul>")
+    p.append(
+        "<p><strong>Selo de qualidade.</strong> <em>Ruim</em>: Q abaixo de "
+        f"{_n2(lim['q_ruim'])} ou silhueta média abaixo de {_n2(lim['silhueta_ruim'])}. "
+        f"<em>Atenção</em>: Q abaixo de {_n2(lim['q_atencao'])}; razão Q/Q<sub>Louvain</sub> "
+        f"abaixo de {_n2(lim['razao'])}; silhueta média abaixo de "
+        f"{_n2(lim['silhueta_atencao'])}; mais de {lim['pct_negativos']}% dos itens com "
+        f"silhueta negativa; menos de {lim['pct_agrupados']}% dos itens em agrupamentos; "
+        "ou rede fragmentada (há mais componentes do que a metade dos itens, isto é, "
+        "o componente médio tem menos de 2 itens, quase só itens isolados e pares; "
+        "nesse caso um Q alto não indica qualidade). <em>Indefinido</em>: menos de "
+        f"{minimo_nos} itens, menos de 2 agrupamentos ou rede sem ligações com valor "
+        "positivo; nesses casos nenhum número é mostrado como 0, porque não houve "
+        "avaliação. <em>OK</em>: nenhum dos alertas acima.</p>")
+    p.append(
+        "<p><strong>Aviso.</strong> A maioria das redes reais fica em “atenção”, e isso "
+        "<em>não invalida o mapa</em>: o selo serve de leitura prudente (quais limites "
+        "entre temas merecem desconfiança), não de aprovação ou reprovação.</p>")
+    if config.unidade == "Authors":
+        p.append(
+            "<p><strong>Atenção com autores.</strong> Em redes de coautoria, um Q alto é "
+            "em geral um artefato: cada documento liga todos os seus autores entre si e a "
+            "rede se parte em muitos grupos pequenos e isolados, que a modularidade "
+            "premia sem que haja estrutura temática. Leia o Q junto com o aviso de rede "
+            "fragmentada e com o número de itens por agrupamento. Por isso, com autores, o "
+            "selo nunca é <em>OK</em>: no máximo <em>Atenção</em>.</p>")
+    p.append(
+        "<p><strong>10. Rótulos dos agrupamentos.</strong> O <em>rótulo novo</em> traz "
+        "os termos que mais distinguem o agrupamento dos demais documentos do mesmo "
+        "período, pela razão de verossimilhança de Dunning (G²): comparam-se os "
+        "documentos do núcleo do agrupamento com todos os outros documentos do período, "
+        "e sobem os termos bem mais frequentes no agrupamento. Os termos vêm das palavras "
+        "do título, das palavras-chave dos autores (expressão inteira) e, do resumo, "
+        "apenas de pares de palavras (bigramas), porque palavra solta de resumo é "
+        f"genérica demais; um termo precisa aparecer em pelo menos {minimo_grupo} "
+        "documentos do agrupamento, e singular, plural e acento são unidos. É preciso ao "
+        f"menos {min_docs} documentos no núcleo; com {min_docs} a {indicativo_ate} o "
+        "rótulo sai marcado como <em>(indicativo)</em>, e com "
+        f"{rotulos.LIMITE_INDICATIVO} ou mais é firme. Agrupamento que cobre mais de "
+        f"{cobertura}% dos documentos do período não recebe rótulo (não distingue "
+        "nada). O rótulo atual, tirado do item central, continua como subtítulo, e "
+        "onde não há rótulo novo vale só ele. Nas tabelas, <em>Ano médio</em> é a média "
+        "do ano de publicação dos documentos do núcleo.</p>")
     return "\n".join(p)
 
 
@@ -556,6 +773,7 @@ def _indicadores_periodo(resultado, nome: str, frequencia: int) -> dict:
         "itens_agrupados": agrupados,
         "itens_sem_agrupamento": len(resultado.conjunto.nos_sem_grupo()),
         "quadrantes": quadrantes,
+        "qualidade": qualidade_do_resultado(resultado),
     }
 
 
@@ -606,6 +824,7 @@ def indicadores(resultados, periodos=None, kb=None, config=None, frequencia=None
         "itens_agrupados": len(agrupados),
         "itens_sem_agrupamento": None,
         "quadrantes": quadrantes,
+        "qualidade": None,           # não se soma entre períodos
     }
     if kb is not None and periodos:
         ids = [p.id for p in periodos]
@@ -666,6 +885,32 @@ def indicadores_linhas(dados: list[dict], config, frequencia=None) -> tuple[list
         ["Nós da rede sem agrupamento"] + [numero(x["itens_sem_agrupamento"]) for x in dados],
         ["Quadrantes"] + [quadrantes(x) for x in dados],
     ]
+    if any(x.get("qualidade") for x in dados):
+        def q(x, chave, casas=2, pct=False):
+            ql = x.get("qualidade")
+            if not ql or ql.get("nivel") == "indefinido" or ql.get(chave) is None:
+                return "—"
+            return _n2(ql[chave], 0 if pct else casas) + ("%" if pct else "")
+
+        def pct_agrupados(x):
+            ql = x.get("qualidade")
+            if not ql or not ql.get("n_nos"):
+                return "—"
+            if ql.get("nivel") == "indefinido" and not ql["pct_agrupados"]:
+                return "—"          # indefinido nunca mostra 0
+            return _n2(ql["pct_agrupados"], 0) + "%"
+
+        def nivel(x):
+            ql = x.get("qualidade")
+            return selo_qualidade(ql["nivel"]) if ql else "—"
+
+        linhas += [
+            ["Modularidade Q"] + [q(x, "q") for x in dados],
+            ["Q do Louvain (referência)"] + [q(x, "q_louvain") for x in dados],
+            ["Silhueta média"] + [q(x, "silhueta_media") for x in dados],
+            ["% dos itens em agrupamentos"] + [pct_agrupados(x) for x in dados],
+            ["Qualidade do mapa"] + [nivel(x) for x in dados],
+        ]
     return cabecalho, [[_esc(l[0])] + l[1:] for l in linhas]
 
 
@@ -690,7 +935,28 @@ def indicadores_html(resultados, periodos=None, kb=None, config=None, frequencia
                 "períodos; a rede não se soma entre períodos. " + nota)
     return ('<div class="rolagem">'
             + tabela(cabecalho, linhas, legenda, numericas=tuple(range(1, len(cabecalho))))
-            + f'</div><p class="fonte">{_esc(nota)}</p>')
+            + f'</div><p class="fonte">{_esc(nota)}</p>' + _avisos_html(dados))
+
+
+def _avisos_html(dados: list[dict]) -> str:
+    """Avisos de qualidade de cada período, em lista abaixo da tabela de indicadores."""
+    blocos = []
+    por_periodo = [x for x in dados if x.get("qualidade")]
+    multiplos = len(por_periodo) > 1
+    for x in por_periodo:
+        avisos = x["qualidade"].get("avisos") or []
+        if not avisos:
+            continue
+        itens = "".join(f"<li>{_esc(a)}</li>" for a in avisos)
+        titulo = (f"Avisos de qualidade — {_esc(x['escopo'])}" if multiplos
+                  else "Avisos de qualidade")
+        blocos.append(f"<p><strong>{titulo}</strong></p><ul>{itens}</ul>")
+    if not blocos:
+        return ""
+    return ('<div class="avisos-qualidade">' + "".join(blocos)
+            + '<p class="fonte">Como ler o selo: veja “Qualidade do mapa e rótulos” em '
+              "“Como funciona”. A maioria das redes reais fica em atenção, e isso não "
+              "invalida o mapa.</p></div>")
 
 
 def metodo_html(config, periodos=None, resultados=(), frequencia=None,

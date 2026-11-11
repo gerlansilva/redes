@@ -20,8 +20,31 @@ def _ligacoes_txt(n: int) -> str:
     return f"{n} ligação interna" if n == 1 else f"{n} ligações internas"
 
 
+def _novo_do_grupo(resultado, grupo, rotulos, termos: int = 3) -> str | None:
+    """Rótulo novo do `grupo` (índice em ``resultado.grupos``), ou None."""
+    if not rotulos:
+        return None
+    from .halo import texto_rotulo_novo
+    for indice, g in enumerate(resultado.grupos):
+        if g is grupo:
+            return texto_rotulo_novo(rotulos.get(indice), termos)
+    return None
+
+
 def rede_agrupamento_svg(resultado, grupo, titulo: str,
-                         largura: int = 720) -> str:
+                         largura: int = 720, rotulos: dict | None = None) -> str:
+    """Rede de um agrupamento.
+
+    `rotulos` (opcional): índice em ``resultado.grupos`` → rótulo novo (saída de
+    ``rotulos.rotula_grupos``). Quando o agrupamento tem rótulo novo, o título passa
+    a ser "período — rótulo novo" e o rótulo atual vira o subtítulo. Sem ele, o
+    desenho é o de sempre.
+    """
+    novo = _novo_do_grupo(resultado, grupo, rotulos)
+    subtitulo = None
+    if novo:
+        subtitulo = (grupo.rotulo or "Sem grupo")
+        titulo = f"{resultado.periodo} — {novo}"
     nos = list(grupo.nos)
     limite_titulo = max(20, int((largura - 24) / 7.4))
     titulo_curto = titulo if len(titulo) <= limite_titulo else titulo[:limite_titulo - 1].rstrip() + "…"
@@ -35,14 +58,16 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
             f'{html.escape(titulo_curto)} — agrupamento vazio</text></svg>')
 
     altura = max(400, min(980, 36 * len(nos)))
-    cx, cy = largura / 2, altura / 2 - 6
+    desloca = 18 if subtitulo else 0     # espaço do subtítulo
+    altura += desloca
+    cx, cy = largura / 2, altura / 2 - 6 + desloca / 2
     raio = min(largura * 0.30, altura * 0.36)
     # No acoplamento os nós são documentos: o rótulo vem de `resultado.rotulos`.
-    rotulos = {no: resultado.dataset.itens.get(no) or getattr(resultado, "rotulos", {}).get(no)
-               or str(no) for no in nos}
+    nomes_nos = {no: resultado.dataset.itens.get(no) or getattr(resultado, "rotulos", {}).get(no)
+                 or str(no) for no in nos}
     # Os rótulos (até 28 caracteres) ficam fora do círculo: reserva espaço
     # para o mais longo caber na lateral sem ser cortado.
-    maior_rotulo = max(min(len(r), 28) for r in rotulos.values())
+    maior_rotulo = max(min(len(r), 28) for r in nomes_nos.values())
     raio = max(40.0, min(raio, cx - (maior_rotulo * 6.0 + 14 + 10)))
 
     partes = [
@@ -55,6 +80,12 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
         'font-family="Inter, Arial, sans-serif" font-size="14" fill="#14204A">'
         f'{html.escape(titulo_curto)}</text>',
     ]
+    if subtitulo:
+        curto = subtitulo if len(subtitulo) <= limite_titulo else subtitulo[:limite_titulo - 1].rstrip() + "…"
+        partes.append(
+            f'<text x="{largura/2}" y="42" text-anchor="middle" '
+            'font-family="Inter, Arial, sans-serif" font-size="11.5" '
+            f'fill="{TINTA_FRACA}">{html.escape(curto)}</text>')
 
     posicoes = {}
     for indice, no in enumerate(nos):
@@ -86,7 +117,7 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
         direita = x >= cx
         ancora = "start" if direita else "end"
         deslocamento = margem_texto if direita else -margem_texto
-        rotulo = rotulos[no]
+        rotulo = nomes_nos[no]
         if len(rotulo) > 28:
             rotulo = rotulo[:26] + "…"
         partes.append(
@@ -105,13 +136,17 @@ def rede_agrupamento_svg(resultado, grupo, titulo: str,
 
 
 def rede_de_agrupamentos_svg(resultado, titulo: str,
-                             largura: int = 1000, altura: int = 700) -> str:
+                             largura: int = 1000, altura: int = 700,
+                             rotulos: dict | None = None) -> str:
     """Rede de agrupamentos: cada nó é um tema; a aresta é a associação entre eles.
 
     A posição usa um layout de mola sobre os agrupamentos; a espessura e a
     opacidade da aresta seguem o índice de equivalência entre os conjuntos de
     itens dos dois temas (c(A,B)² / c(A)·c(B), a mesma medida de Callon). A cor
     do nó é o quadrante do diagrama estratégico e o raio, o número de itens.
+
+    `rotulos` (opcional): índice em ``resultado.grupos`` → rótulo novo; o texto
+    sobre cada nó usa o novo (2 termos) quando existe e o atual nos demais.
     """
     import networkx as nx
 
@@ -124,6 +159,8 @@ def rede_de_agrupamentos_svg(resultado, titulo: str,
     unidade = resultado.configuracao.unidade
     cores = _quadrantes(unidade)
     curtos = _curtos(unidade)
+    from .halo import nomes_por_rotulo
+    novos = nomes_por_rotulo(resultado, rotulos)
     rede = resultado.rede
 
     ordem = sorted(range(len(grupos)),
@@ -236,7 +273,8 @@ def rede_de_agrupamentos_svg(resultado, titulo: str,
             'font-family="Helvetica, Arial, sans-serif" '
             f'font-size="{min(11.0, r / 2 + 7):.1f}" font-weight="700" '
             f'fill="{cor}">{ordem[i] + 1}</text>')
-        rotulo = grupo.rotulo or "Sem grupo"
+        novo = novos.get(ordem[i])
+        rotulo = (novo[:1].upper() + novo[1:]) if novo else (grupo.rotulo or "Sem grupo")
         if len(rotulo) > 26:
             rotulo = rotulo[:24] + "…"
         partes.append(

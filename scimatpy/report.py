@@ -313,6 +313,7 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
     mapa = longitudinal.constroi(kb, config, periodos, medida_temporal)
 
     for indice, resultado in enumerate(resultados):
+        rotulos_novos = metodo.rotulos_do_resultado(kb, resultado)
         # Um diagrama por mapeador e medida de desempenho, como nas páginas de
         # período do fork: o tamanho das esferas muda com a medida escolhida.
         for mapeador in (resultado.configuracao.mapeadores if resultado.grupos else ()):
@@ -322,7 +323,8 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
                           f"{ROTULOS_MEDIDA[medida]}")
                 diagrama = diagrama_svg(
                     resultado, titulo, metrica=f"{mapeador}:{medida}",
-                    rotulo_metrica=ROTULOS_MEDIDA[medida])
+                    rotulo_metrica=ROTULOS_MEDIDA[medida],
+                    rotulos=rotulos_novos)
                 (destino / "images" /
                  f"strategicDiagram-period{indice}-{mapeador}-{medida}.svg"
                  ).write_text(diagrama, encoding="utf-8")
@@ -331,14 +333,16 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
         # seção "Whole network" do SciMAT, mais o arquivo Pajek correspondente.
         try:
             (destino / "images" / f"wholeNetwork-period{indice}.svg").write_text(
-                halo_svg(resultado, f"Rede completa — {resultado.periodo}"),
+                halo_svg(resultado, f"Rede completa — {resultado.periodo}",
+                         rotulos=rotulos_novos),
                 encoding="utf-8")
         except Exception:
             pass
         try:
             (destino / "images" / f"clusterGraph-period{indice}.svg").write_text(
                 rede_de_agrupamentos_svg(
-                    resultado, f"Rede de agrupamentos — {resultado.periodo}"),
+                    resultado, f"Rede de agrupamentos — {resultado.periodo}",
+                    rotulos=rotulos_novos),
                 encoding="utf-8")
         except Exception:
             pass
@@ -354,14 +358,14 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
         for posicao, grupo in enumerate(grupos, start=1):
             svg = rede_agrupamento_svg(
                 resultado, grupo,
-                f"{resultado.periodo} — {grupo.rotulo}")
+                f"{resultado.periodo} — {grupo.rotulo}", rotulos=rotulos_novos)
             (destino / "images" /
              f"clusterNetwork-period{indice}-cluster{posicao - 1}.svg").write_text(
                 svg, encoding="utf-8")
             _pagina_cluster(destino, kb, resultado, grupo, grupos, indice,
                             posicao, estendido)
 
-        _pagina_periodo(destino, resultado, grupos, indice)
+        _pagina_periodo(destino, resultado, grupos, indice, kb)
 
     evolucao = longitudinal.evolucao_svg(
         mapa, "Mapa de evolução dos temas", largura=980)
@@ -595,7 +599,7 @@ def _pagina_bibliometria(destino: Path, kb) -> None:
         encoding="utf-8")
 
 
-def _pagina_periodo(destino, resultado, grupos, indice) -> None:
+def _pagina_periodo(destino, resultado, grupos, indice, kb=None) -> None:
     corpo = [
         f'<p><a href="index.html">Índice</a></p>',
         f"<h1>Relatório — Redes — {_esc(resultado.periodo)}</h1>",
@@ -646,20 +650,6 @@ def _pagina_periodo(destino, resultado, grupos, indice) -> None:
             f'<p><img src="images/clusterGraph-period{indice}.svg" '
             f'alt="Rede de agrupamentos — {_esc(resultado.periodo)}" width="100%"></p>')
 
-    linhas = []
-    for posicao, grupo in enumerate(grupos, start=1):
-        medidas = grupo.medidas
-        prefixo = f"{resultado.configuracao.mapeadores[0]}:"
-        valores = [_numero(medidas.get(prefixo + nome, 0)) for nome in ORDEM_MEDIDAS]
-        linhas.append([
-            str(posicao),
-            f'<a href="period{indice}-cluster{posicao - 1}.html">'
-            f'{_esc(grupo.rotulo)}</a>',
-            str(len(grupo.nos)),
-            _numero(grupo.densidade),
-            _numero(grupo.centralidade),
-            _quadrante(grupo),
-        ] + valores)
     # Quadro único: métricas de cada agrupamento ao lado da sua rede.
     cartoes = []
     for posicao, grupo in enumerate(grupos, start=1):
@@ -672,23 +662,36 @@ def _pagina_periodo(destino, resultado, grupos, indice) -> None:
             f"Quadrante: {_quadrante(grupo)}",
         ] + [f"{ROTULOS_MEDIDA[nome]}: {_numero(medidas.get(prefixo + nome, 0))}"
              for nome in ("documentos", "h", "g", "hg")])
+        principal, sub, _ind = metodo.nome_do_grupo(kb, resultado, grupo)
+        nome = (f'<a href="period{indice}-cluster{posicao - 1}.html">'
+                f'{_esc(principal)}</a>')
+        if sub:
+            nome += f'<br><span class="rot-atual">{_esc(sub)}</span>'
         cartoes.append([
-            f'<a href="period{indice}-cluster{posicao - 1}.html">'
-            f'{_esc(grupo.rotulo)}</a>',
+            nome,
             metricas,
             f'<img src="images/clusterNetwork-period{indice}-cluster{posicao - 1}.svg" '
-            f'alt="Rede de {_esc(grupo.rotulo)}" width="320">',
+            f'alt="Rede de {_esc(principal)}" width="320">',
         ])
     corpo.append("<h2>Métricas e rede de cada agrupamento</h2>")
     corpo.append(_tabela(["Agrupamento", "Métricas", "Rede do agrupamento"],
                          cartoes, "Quadro de métricas com a rede de cada agrupamento",
                          larguras=["24%", "26%", "50%"]))
 
+    prefixo = f"{resultado.configuracao.mapeadores[0]}:"
+    cabecalho, linhas, numericas = metodo.tabela_agrupamentos(
+        kb, resultado, grupos,
+        [(prefixo + nome, ROTULOS_MEDIDA[nome]) for nome in ORDEM_MEDIDAS],
+        _numero,
+        ligar=lambda posicao, texto: (
+            f'<a href="period{indice}-cluster{posicao - 1}.html">{texto}</a>'))
     corpo.append("<h2>Agrupamentos</h2>")
-    corpo.append(_tabela(
-        ["Selo", "Agrupamento", "Itens", "Densidade", "Centralidade", "Quadrante"]
-        + [ROTULOS_MEDIDA[nome] for nome in ORDEM_MEDIDAS],
-        linhas, "Agrupamentos do período", numericas=tuple(range(2, 15))))
+    corpo.append(_tabela(cabecalho, linhas, "Agrupamentos do período",
+                         numericas=numericas))
+    corpo.append(
+        '<p class="fonte">Silhueta: coesão média dos itens do agrupamento (de −1 a 1; “—” '
+        "quando o agrupamento tem poucos itens). Ano médio: dos documentos do núcleo. "
+        "Rótulo em destaque: termos distintivos do período; abaixo, o nome do item central.</p>")
 
     corpo.extend(diagramas)
     (destino / f"period{indice}.html").write_text(
@@ -700,24 +703,31 @@ def _pagina_cluster(destino, kb, resultado, grupo, grupos, indice,
                     posicao, estendido) -> None:
     internas, externas = _ligacoes(resultado, grupo)
     nomes = {no: resultado.dataset.itens.get(no, str(no)) for no in resultado.rede.nos}
+    principal, sub, indicativo = metodo.nome_do_grupo(kb, resultado, grupo)
+    nome_html = _esc(principal) + (' <span class="rot-ind">(indicativo)</span>'
+                                   if indicativo else "")
 
     corpo = [
         f'<p><a href="index.html">Índice</a> · '
         f'<a href="period{indice}.html">{_esc(resultado.periodo)}</a></p>',
-        f"<h1>{_esc(resultado.periodo)} — {_esc(grupo.rotulo)}</h1>",
+        f"<h1>{_esc(resultado.periodo)} — {_esc(principal)}</h1>",
+    ]
+    if sub:
+        corpo.append(f'<p class="rot-atual">Rótulo atual (item central): {_esc(sub)}</p>')
+    corpo += [
         "<h2>Informações do agrupamento</h2>",
         _tabela(["Medida", "Valor"], [
-            ["Nome", _esc(grupo.rotulo)],
+            ["Nome", nome_html],
             ["Itens", str(len(grupo.nos))],
             ["Densidade", _numero(grupo.densidade)],
             ["Faixa de densidade", _numero(grupo.densidade_faixa)],
             ["Centralidade", _numero(grupo.centralidade)],
             ["Faixa de centralidade", _numero(grupo.centralidade_faixa)],
             ["Quadrante", _quadrante(grupo)],
-        ]),
+        ] + ([["Nome atual (item central)", _esc(sub)]] if sub else [])),
         "<h2>Rede do agrupamento</h2>",
         f'<p><img src="images/clusterNetwork-period{indice}-cluster{posicao - 1}.svg" '
-        f'alt="Rede do agrupamento {_esc(grupo.rotulo)}" width="720"></p>',
+        f'alt="Rede do agrupamento {_esc(principal)}" width="720"></p>',
     ]
 
     linhas = [[_esc(nomes[a]), _esc(nomes[b]), _numero(valor)] for a, b, valor in internas]
@@ -735,7 +745,7 @@ def _pagina_cluster(destino, kb, resultado, grupo, grupos, indice,
         _blocos_documentos(corpo, kb, resultado, grupo)
 
     (destino / f"period{indice}-cluster{posicao - 1}.html").write_text(
-        _pagina(f"{resultado.periodo} — {grupo.rotulo} · Redes",
+        _pagina(f"{resultado.periodo} — {principal} · Redes",
                 "\n".join(corpo)),
         encoding="utf-8")
 

@@ -226,11 +226,18 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
     linhas = []
     for r in resultados:
         maior = max(r.grupos, key=lambda g: (len(g.nos), g.rotulo or ""), default=None)
+        if maior is not None:
+            principal, sub, _ind = metodo.nome_do_grupo(kb, r, maior)
+            celula_maior = f"{_esc(principal)} ({len(maior.nos)} itens)"
+            if sub:
+                celula_maior += f'<br><span class="rot-atual">{_esc(sub)}</span>'
+        else:
+            celula_maior = "—"
         linhas.append([
             _esc(r.periodo),
             _inteiro(r.dataset_original.quantidade_itens()),
             str(len(r.grupos)),
-            f"{_esc(maior.rotulo)} ({len(maior.nos)} itens)" if maior else "—",
+            celula_maior,
         ])
     partes.append(doc.tabela(["Período", "Itens", "Grupos", "Maior grupo"], linhas,
                              f"Resumo por período — {rotulo}.", numericas=(1, 2)))
@@ -256,9 +263,10 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
             f"{len(grupos)} {'agrupamento' if len(grupos) == 1 else 'agrupamentos'}.</p>")
 
         medida = ORDEM_MEDIDAS[0]
+        rotulos_novos = metodo.rotulos_do_resultado(kb, r)
         svg = cache.obtem((chave, indice, "diagrama"), lambda: diagrama_svg(
             r, f"Diagrama estratégico — {r.periodo}", metrica=f"{mapeador}:{medida}",
-            rotulo_metrica=ROTULOS_MEDIDA[medida]))
+            rotulo_metrica=ROTULOS_MEDIDA[medida], rotulos=rotulos_novos))
         if svg:
             partes.append(doc.figura(
                 svg, f"Diagrama estratégico — {rotulo.lower()}, {r.periodo}. O tamanho "
@@ -268,22 +276,22 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
             partes.append('<p class="nota">O diagrama estratégico não pôde ser desenhado '
                           "para este período.</p>")
         svg = cache.obtem((chave, indice, "halo"),
-                          lambda: halo_svg(r, f"Rede completa — {r.periodo}"))
+                          lambda: halo_svg(r, f"Rede completa — {r.periodo}",
+                                           rotulos=rotulos_novos))
         if svg:
             partes.append(doc.figura(svg, f"Rede do período — {rotulo.lower()}, {r.periodo}."))
 
         prefixo = f"{mapeador}:"
-        linhas = []
-        for posicao, g in enumerate(grupos, start=1):
-            linhas.append([
-                str(posicao), _esc(g.rotulo), str(len(g.nos)), _quadrante(g),
-                _n(g.centralidade), _n(g.densidade),
-            ] + [_n(g.medidas.get(prefixo + nome, 0)) for nome in ORDEM_MEDIDAS])
+        cabecalho, linhas, numericas = metodo.tabela_agrupamentos(
+            kb, r, grupos, [(prefixo + nome, ROTULOS_MEDIDA[nome]) for nome in ORDEM_MEDIDAS],
+            _n)
         partes.append(doc.tabela(
-            ["Nº", "Agrupamento", "Itens", "Quadrante", "Centralidade", "Densidade"]
-            + [ROTULOS_MEDIDA[nome] for nome in ORDEM_MEDIDAS],
-            linhas, f"Agrupamentos de {rotulo.lower()}, {r.periodo}.",
-            numericas=(0, 2, 4, 5) + tuple(range(6, 15)), classe="larga"))
+            cabecalho, linhas, f"Agrupamentos de {rotulo.lower()}, {r.periodo}.",
+            numericas=numericas, classe="larga"))
+        partes.append(
+            '<p class="nota">Silhueta: coesão média dos itens do agrupamento (de −1 a 1; “—” '
+            "quando há poucos itens). Ano médio: dos documentos do núcleo. Rótulo em "
+            "destaque: termos distintivos do período; abaixo, o nome do item central.</p>")
 
         mostrados = grupos if limite is None else grupos[:limite]
         if len(mostrados) < len(grupos):
@@ -294,11 +302,13 @@ def _bloco_analise(doc: _Documento, cache: _Cache, kb, periodos, secao: dict,
                 "as métricas de todos estão na tabela acima.</p>")
         figuras = []
         for posicao, g in enumerate(mostrados, start=1):
+            principal, sub, _ind = metodo.nome_do_grupo(kb, r, g)
             svg = cache.obtem((chave, indice, "rede", posicao), lambda: rede_agrupamento_svg(
-                r, g, f"{r.periodo} — {g.rotulo}", largura=720))
+                r, g, f"{r.periodo} — {g.rotulo}", largura=720, rotulos=rotulos_novos))
             if svg:
+                nome = f"“{principal}”" + (f" (atual: “{sub}”)" if sub else "")
                 figuras.append(doc.figura(
-                    svg, f"Rede do agrupamento {posicao}, “{g.rotulo}”, {r.periodo}."))
+                    svg, f"Rede do agrupamento {posicao}, {nome}, {r.periodo}."))
         if figuras:
             partes.append('<div class="redes-grupos">' + "".join(figuras) + "</div>")
 

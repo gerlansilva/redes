@@ -698,22 +698,13 @@ select.botao { appearance: none; padding-right: 30px; cursor: pointer;
   min-width: 0;
   display: flex;
   align-items: center;
+  /* Sem espaço para todas as abas, a barra quebra de linha (nenhuma fica cortada). */
+  flex-wrap: wrap;
   gap: 3px;
   padding: 4px;
   background: #F0F2F9;
   border-radius: 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.abas.corte-inicio { mask-image: linear-gradient(to right, transparent, #000 26px); }
-.abas.corte-fim {
-  mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
-}
-.abas.corte-inicio.corte-fim {
-  mask-image: linear-gradient(to right, transparent, #000 26px,
-                              #000 calc(100% - 30px), transparent);
-}
-.abas::-webkit-scrollbar { display: none; }
 .aba {
   padding: 8px 12px;
   border-radius: 9px;
@@ -2036,3 +2027,50 @@ body:not(.modo-avancado) .selo-estado:not(.erro) { display: none; }
   .cartao > header .cartao-titulo .meta { white-space: normal; overflow-wrap: anywhere; }
   .cartao > header .espaco { display: none; }
 }
+
+/* ------------------------------------------------------- qualidade do mapa */
+.qualidade-caixa { position: relative; flex: none; }
+/* O selo divide a barra com as abas: elas ficam um pouco mais justas para caberem as dez. */
+.barra-resultados:has(.qualidade-caixa:not([hidden])) { gap: 8px; }
+.barra-resultados:has(.qualidade-caixa:not([hidden])) .aba { padding: 8px 7px; font-size: 12px; }
+.barra-resultados.com-popover { z-index: 80; }   /* acima de .acoes-finais (z 20) e do cabeçalho */
+.selo-qualidade {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 999px; border: 1px solid;
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.selo-qualidade:focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
+.selo-qualidade .sq-icone {
+  display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+  background: currentColor; font-size: 10px; font-weight: 800; line-height: 1;
+}
+.selo-qualidade .sq-icone::before { color: #fff; content: attr(data-s); }
+.selo-qualidade .sq-resumo { font-weight: 500; font-size: 11px; opacity: .85; font-variant-numeric: tabular-nums; }
+.selo-qualidade .sq-resumo:empty { display: none; }
+@media (max-width: 1500px) { .selo-qualidade .sq-resumo { display: none; } }
+.nivel-ok { color: #067647; background: #E6F8EE; border-color: #9ED8BA; }
+.nivel-atencao { color: #7A4E00; background: #FFF3C4; border-color: #E8CB6A; }
+.nivel-ruim { color: #B42318; background: #FEF3F2; border-color: #F4A9A1; }
+.nivel-indefinido { color: #475569; background: #F1F3F8; border-color: #C5CCDB; }
+.pop-qualidade {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 40;
+  width: 400px; max-width: 92vw; max-height: calc(100vh - 190px); overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 18px 14px;
+  background: var(--branco); border: 1px solid var(--linha-forte); border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(11, 31, 102, .16); outline: none; text-align: left;
+}
+.pop-qualidade.acima { top: auto; bottom: calc(100% + 8px); }
+.pop-qualidade h3 { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--azul-escuro); margin-bottom: 6px; }
+.pop-qualidade h3 .selo-q { padding: 2px 10px; border: 1px solid; border-radius: 999px; font-size: 11.5px; }
+.pop-qualidade .pq-leitura { font-size: 12.5px; line-height: 1.5; color: var(--tinta); margin-bottom: 10px; }
+.pop-qualidade dl { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; margin: 0 0 10px; font-size: 12px; }
+.pop-qualidade dt { color: var(--tinta-fraca); }
+.pop-qualidade dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--azul-escuro); text-align: right; }
+.pop-qualidade h4 { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-suave); margin: 4px 0 4px; }
+.pop-qualidade ul { margin: 0 0 8px; padding-left: 18px; font-size: 12px; line-height: 1.5; color: var(--tinta); }
+.pop-qualidade li { margin: 2px 0; }
+.pop-qualidade .pq-rodape { font-size: 11px; line-height: 1.45; color: var(--tinta-fraca); border-top: 1px solid var(--linha); padding-top: 8px; }
+.grupo .rot-ind { margin-left: 6px; font-size: 10.5px; font-weight: 600; color: #7A4E00; white-space: nowrap; }
+.grupo .rot-atual { display: block; margin-top: 1px; font-size: 11px; font-weight: 400; color: var(--tinta-fraca); }
+.drawer-sub .rot-atual-drawer { color: var(--tinta-fraca); }

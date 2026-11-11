@@ -24,6 +24,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import build
+from . import qualidade as modulo_qualidade
+from . import rotulos as modulo_rotulos
 from .grade import grade as combinacoes_grade
 from .kb import ProjetoScimat
 from .mappers import MAPEADORES
@@ -136,7 +138,8 @@ def _recalcula(analise: dict) -> None:
         if analise.get("rede") is None:
             # O layout é a etapa mais cara: só roda quando a tela pede a rede
             # ou a figura, não na própria prévia.
-            analise["rede"] = layout_halo(analise["resultado"])
+            analise["rede"] = layout_halo(analise["resultado"],
+                                          rotulos=analise.get("rotulos"))
     _poda_pesados()
 
 
@@ -461,11 +464,14 @@ def analisa(dados: dict) -> dict:
         paises = (colaboracao_do_periodo(kb, periodo.id, config.minimo_frequencia)
                   if config.unidade == "Countries"
                   and config.matriz == "CoOccurrence" else None)
+        # Qualidade e rótulos novos: falhar aqui nunca derruba a análise.
+        qual, rotulos_novos, anos = _qualidade_e_rotulos(kb, resultado)
 
     grupos = sorted(resultado.grupos,
                     key=lambda grupo: (-len(grupo.nos), grupo.rotulo or "Sem grupo"))
     faixas = {"motor": 0, "nicho": 0, "emergente": 0, "basico": 0}
     saida_grupos = []
+    posicao_original = {id(g): i for i, g in enumerate(resultado.grupos)}
 
     for indice, grupo in enumerate(grupos, start=1):
         quadrante = _quadrante(grupo.centralidade_faixa, grupo.densidade_faixa)
@@ -473,6 +479,8 @@ def analisa(dados: dict) -> dict:
         saida_grupos.append({
             "selo": indice,
             "rotulo": grupo.rotulo,
+            **_campos_novos(grupo, posicao_original.get(id(grupo)), qual,
+                            rotulos_novos, anos),
             "itens": len(grupo.nos),
             "centralidade": round(grupo.centralidade, 1),
             "densidade": round(grupo.densidade, 1),
@@ -525,7 +533,7 @@ def analisa(dados: dict) -> dict:
                            "diagrama": diagrama_dados,
                            "periodo_id": periodo.id,
                            "periodo": periodo.nome, "resultado": resultado,
-                           "config": config}
+                           "config": config, "rotulos": rotulos_novos}
         while len(ANALISES) > MAXIMO_ANALISES:
             ANALISES.popitem(last=False)
     _poda_pesados()
@@ -544,14 +552,16 @@ def analisa(dados: dict) -> dict:
             halo.write_text(
                 halo_svg(registro["resultado"],
                          f"Rede de {UNIDADE_TITULO.get(unidade, 'itens')} — "
-                         f"{periodo_nome}", layout=registro["rede"]),
+                         f"{periodo_nome}", layout=registro["rede"],
+                         rotulos=registro.get("rotulos")),
                 encoding="utf-8")
 
         figuras["halo"] = f"/figura/{_registra(halo, FIGURAS, gera_halo)}"
 
         estrategico = pasta / "estrategico.svg"
         estrategico.write_text(
-            diagrama_svg(resultado, f"Diagrama estratégico — {periodo.nome}"),
+            diagrama_svg(resultado, f"Diagrama estratégico — {periodo.nome}",
+                         rotulos=rotulos_novos),
             encoding="utf-8")
         figuras["estrategico"] = f"/figura/{_registra(estrategico, FIGURAS)}"
 
@@ -629,6 +639,7 @@ def analisa(dados: dict) -> dict:
                 sum(g.densidade for g in grupos) / total, 1) if total else 0.0,
         },
         "grupos": saida_grupos,
+        "qualidade": _qualidade_publica(qual, grupos, posicao_original),
         "quadrantes": faixas,
         "figuras": figuras,
         "paises": ({
@@ -642,6 +653,61 @@ def analisa(dados: dict) -> dict:
             "grau_maximo": paises["grau_maximo"],
         } if paises else None),
     }
+
+
+def _qualidade_e_rotulos(kb, resultado) -> tuple[dict | None, dict, dict]:
+    """Qualidade, rótulos novos e anos dos documentos; cada parte falha sozinha."""
+    try:
+        qual = modulo_qualidade.avalia(resultado)
+    except Exception:
+        qual = None
+    try:
+        rotulos_novos = modulo_rotulos.rotula_grupos(kb, resultado) or {}
+    except Exception:
+        rotulos_novos = {}
+    try:
+        ids: set[int] = set()
+        for grupo in resultado.grupos:
+            ids |= set(grupo.documentos_nucleo)
+        anos = modulo_qualidade.anos_dos_documentos(kb, ids) if ids else {}
+    except Exception:
+        anos = {}
+    return qual, rotulos_novos, anos
+
+
+def _campos_novos(grupo, original, qual, rotulos_novos, anos) -> dict:
+    """`rotulo_novo`, `rotulo_indicativo`, `silhueta` e `ano_medio` de um agrupamento."""
+    from .viz.halo import texto_rotulo_novo
+
+    r = rotulos_novos.get(original) if original is not None else None
+    silhueta = None
+    if qual and original is not None:
+        silhueta = (qual.get("silhueta_por_grupo") or {}).get(original)
+    try:
+        anos_grupo = [anos[d] for d in grupo.documentos_nucleo if d in anos]
+    except Exception:
+        anos_grupo = []
+    return {
+        "rotulo_novo": r.get("rotulo") if r else None,
+        "rotulo_novo_curto": texto_rotulo_novo(r) if r else None,
+        "rotulo_indicativo": bool(r.get("indicativo")) if r else None,
+        "silhueta": None if silhueta is None else round(silhueta, 3),
+        "ano_medio": round(sum(anos_grupo) / len(anos_grupo), 1) if anos_grupo else None,
+    }
+
+
+def _qualidade_publica(qual, grupos, posicao_original) -> dict | None:
+    """Qualidade do período para a UI; a silhueta por grupo passa a vir por selo."""
+    if not qual:
+        return None
+    saida = {k: (None if isinstance(v, float) and v != v else v)   # NaN não é JSON
+             for k, v in qual.items() if k != "silhueta_por_grupo"}
+    por_grupo = qual.get("silhueta_por_grupo") or {}
+    saida["silhueta_por_selo"] = {
+        str(selo): (None if por_grupo.get(posicao_original.get(id(g))) is None
+                    else round(por_grupo[posicao_original[id(g)]], 3))
+        for selo, g in enumerate(grupos, start=1)}
+    return saida
 
 
 LIMITE_GENERICO = 0.35
@@ -877,6 +943,14 @@ def sugere_grafias(dados: dict) -> dict:
 
 
 def edita_base(dados: dict) -> dict:
+    """Edita a base de um projeto; depois, esquece o que foi guardado em cache dos rótulos."""
+    try:
+        return _edita_base(dados)
+    finally:
+        modulo_rotulos.limpa_cache()
+
+
+def _edita_base(dados: dict) -> dict:
     from . import edit
 
     projeto = _valida_projeto(dados.get("caminho") or dados.get("projeto", ""))

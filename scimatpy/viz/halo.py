@@ -81,6 +81,59 @@ def _rotulo_curto(texto: str, unidade: str, limite: int = 30) -> str:
     return texto
 
 
+def texto_rotulo_novo(rotulo, termos: int = 2) -> str | None:
+    """Texto curto (até `termos` termos) de um rótulo novo.
+
+    Aceita a saída de ``rotulos.rotula_grupos`` (dict com "termos"/"rotulo") ou um
+    texto simples; devolve None se não houver rótulo utilizável.
+    """
+    if rotulo is None:
+        return None
+    if isinstance(rotulo, dict):
+        lista = [t for t in (rotulo.get("termos") or []) if t]
+        texto = " · ".join(lista[:termos]) if lista else str(rotulo.get("rotulo") or "")
+    else:
+        texto = str(rotulo)
+    texto = " ".join(texto.split())
+    return texto or None
+
+
+def nomes_por_rotulo(resultado, rotulos: dict | None) -> dict[int, str]:
+    """Índice do agrupamento em ``resultado.grupos`` → rótulo novo curto.
+
+    Só os agrupamentos com rótulo novo. A chave é o índice (identidade do
+    agrupamento), não o texto do rótulo atual, que pode se repetir entre
+    agrupamentos (ou ser "Sem grupo" em vários).
+    """
+    nomes: dict[int, str] = {}
+    if not rotulos:
+        return nomes
+    for indice in range(len(resultado.grupos)):
+        texto = texto_rotulo_novo(rotulos.get(indice))
+        if texto:
+            nomes[indice] = texto
+    return nomes
+
+
+def _nome_do_halo(indices, nomes: dict[int, str] | None) -> str | None:
+    """Rótulo novo de uma entrada do halo; só se ela for um agrupamento só.
+
+    (Agrupamentos de mesmo rótulo atual são desenhados juntos num halo só; aí
+    nenhum dos nomes novos vale pelo conjunto e a legenda fica com o atual.)
+    """
+    indices = list(indices or ())
+    return (nomes or {}).get(indices[0]) if len(indices) == 1 else None
+
+
+def _nome_curto(texto: str, unidade: str, novo: str | None,
+                limite: int = 30) -> str:
+    """Rótulo novo (`novo`, quando existe) ou o atual, abreviado para a legenda."""
+    if novo:
+        novo = novo[:1].upper() + novo[1:]
+        return novo if len(novo) <= limite else novo[:limite - 1] + "…"
+    return _rotulo_curto(texto, unidade, limite)
+
+
 def _tamanhos_por_posto(valores: dict[int, int]) -> dict[int, float]:
     """Três classes de espessura (7, 11, 15 px) por posto de frequência."""
     if not valores:
@@ -232,15 +285,22 @@ def _relaxa_soltos(nodepos: dict, soltos: list[int], centros: np.ndarray,
 
 
 def layout_halo(resultado, largura: int = 1280, altura: int = 780,
-                legenda_largura: int = 300) -> dict:
-    """Calcula posições de nós, halos, selos e arestas de uma rede."""
+                legenda_largura: int = 300, rotulos: dict | None = None) -> dict:
+    """Calcula posições de nós, halos, selos e arestas de uma rede.
+
+    `rotulos` (opcional): índice em ``resultado.grupos`` → rótulo novo; quando
+    existe, vira o `rotulo_curto` do agrupamento. Não altera a posição de nada.
+    """
     unidade = resultado.configuracao.unidade
+    nomes_novos = nomes_por_rotulo(resultado, rotulos)
     rede = resultado.rede
 
     grupos: dict[str, list[int]] = collections.defaultdict(list)
+    origem: dict[str, list[int]] = collections.defaultdict(list)
     soltos: list[int] = []
-    for grupo in resultado.grupos:
+    for posicao, grupo in enumerate(resultado.grupos):
         grupos[grupo.rotulo or "Sem grupo"].extend(grupo.nos)
+        origem[grupo.rotulo or "Sem grupo"].append(posicao)
     for no in rede.nos:
         if no not in resultado.conjunto.grupo_do_no:
             soltos.append(no)
@@ -438,7 +498,9 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
         grupos_dados.append({
             "indice": i + 1,
             "rotulo": ordem[i],
-            "rotulo_curto": _rotulo_curto(ordem[i], unidade),
+            "indices": list(origem[ordem[i]]),
+            "rotulo_curto": _nome_curto(
+                ordem[i], unidade, _nome_do_halo(origem[ordem[i]], nomes_novos)),
             "cor": cores[i],
             "nos": len(membros),
             "x": round(float(pos[i][0]), 2),
@@ -492,11 +554,16 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
 
 def halo_svg(resultado, titulo: str, subtitulo: str = "", largura: int = 1280,
              altura: int = 780, legenda_largura: int = 300,
-             layout: dict | None = None) -> str:
-    """Desenha a rede completa de um `ResultadoPeriodo` como SVG."""
+             layout: dict | None = None, rotulos: dict | None = None) -> str:
+    """Desenha a rede completa de um `ResultadoPeriodo` como SVG.
+
+    `rotulos` (opcional): índice em ``resultado.grupos`` → rótulo novo (saída de
+    ``rotulos.rotula_grupos``); a legenda usa o novo (2 termos) quando existe.
+    """
     dados = layout or layout_halo(resultado, largura, altura, legenda_largura)
     unidade = resultado.configuracao.unidade
     rede = resultado.rede
+    nomes_novos = nomes_por_rotulo(resultado, rotulos)
 
     largura = dados["largura"]
     altura = dados["altura"]
@@ -607,7 +674,7 @@ def halo_svg(resultado, titulo: str, subtitulo: str = "", largura: int = 1280,
                 f'font-weight="700" fill="{grupo["cor"]}" '
                 f'font-family="{FONTE}">{grupo["indice"]}</text>'
                 f'<text x="{x + 18}" y="{y + 1}" font-size="12" fill="{TINTA}" '
-                f'font-family="{FONTE}">{html.escape(_rotulo_curto(grupo["rotulo"], unidade))} '
+                f'font-family="{FONTE}">{html.escape(_nome_curto(grupo["rotulo"], unidade, _nome_do_halo(grupo.get("indices"), nomes_novos)))} '
                 f'<tspan fill="{TINTA_FRACA}">({grupo["nos"]})</tspan></text>')
         elif tipo == "soltos":
             legenda_svg += (

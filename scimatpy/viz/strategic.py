@@ -13,7 +13,7 @@ import html
 import math
 
 from .halo import (CINZA, FONTE, LARGURA_COLUNA_LEGENDA, PALETA, TINTA,
-                   TINTA_FRACA, _rotulo_curto, geometria_legenda)
+                   TINTA_FRACA, _nome_curto, geometria_legenda, nomes_por_rotulo)
 
 QUADRANTES = {
     "motor": ("Temas motores", "#2F2BFF", "#EDEBFF"),
@@ -81,17 +81,25 @@ def _quadrante(x: float, y: float) -> str:
 
 def diagrama_svg(resultado, titulo: str, largura: int = 1120, altura: int = 820,
                  legenda_largura: int = 330, metrica: str | None = None,
-                 rotulo_metrica: str | None = None) -> str:
+                 rotulo_metrica: str | None = None,
+                 rotulos: dict | None = None) -> str:
+    """Diagrama estratégico (Callon) de um período.
+
+    `rotulos` (opcional): índice em ``resultado.grupos`` → rótulo novo (saída de
+    ``rotulos.rotula_grupos``); a legenda mostra o novo (2 termos) quando existe
+    e o atual nos demais. Sem ele, o desenho é o de sempre.
+    """
     grupos = resultado.grupos
     if not grupos:
         raise ValueError("não há agrupamentos para desenhar")
 
     unidade = resultado.configuracao.unidade
-    rotulos = _quadrantes(unidade)
+    quadros = _quadrantes(unidade)
+    nomes_novos = nomes_por_rotulo(resultado, rotulos)
     ordem = sorted(range(len(grupos)),
                    key=lambda i: -len(grupos[i].nos))
-    cores = {chave: valor[1] for chave, valor in rotulos.items()}
-    fundos = {chave: valor[2] for chave, valor in rotulos.items()}
+    cores = {chave: valor[1] for chave, valor in quadros.items()}
+    fundos = {chave: valor[2] for chave, valor in quadros.items()}
 
     pw = largura - legenda_largura
     legenda = geometria_legenda(len(grupos), altura, topo=118, base=206)
@@ -160,7 +168,7 @@ def diagrama_svg(resultado, titulo: str, largura: int = 1120, altura: int = 820,
         blocos += (f'<rect x="{pw + 18}" y="{linha_y - 9}" width="16" height="12" rx="2" '
                    f'fill="{fundos[chave]}" stroke="{cores[chave]}"/>'
                    f'<text x="{pw + 40}" y="{linha_y + 1}" font-size="11.5" '
-                   f'fill="{TINTA}" font-family="{FONTE}">{rotulos[chave][0]}</text>')
+                   f'fill="{TINTA}" font-family="{FONTE}">{quadros[chave][0]}</text>')
 
     eixos = (
         f'<rect x="{x0}" y="{y0}" width="{x1 - x0}" height="{y1 - y0}" '
@@ -220,7 +228,7 @@ def diagrama_svg(resultado, titulo: str, largura: int = 1120, altura: int = 820,
     for posicao, i in enumerate(entradas):
         grupo = grupos[i]
         cor = cores[_quadrante(grupo.centralidade_faixa, grupo.densidade_faixa)]
-        nome = _rotulo_curto(grupo.rotulo, unidade)
+        nome = _nome_curto(grupo.rotulo, unidade, nomes_novos.get(i))
         coluna, linha = divmod(posicao, linhas)
         x = pw + 26 + coluna * LARGURA_COLUNA_LEGENDA
         y = 122 + linha * passo
@@ -270,7 +278,10 @@ def dados_diagrama(grupos: list[dict], unidade: str) -> dict:
             grupo["centralidade_faixa"], grupo["densidade_faixa"])
         pontos.append({
             "selo": int(grupo["selo"]),
-            "nome": grupo.get("rotulo") or f"Agrupamento {grupo['selo']}",
+            "nome": (grupo.get("rotulo_novo_curto") or grupo.get("rotulo_novo")
+                     or grupo.get("rotulo")
+                     or f"Agrupamento {grupo['selo']}"),
+            "nome_atual": grupo.get("rotulo") or f"Agrupamento {grupo['selo']}",
             "x": float(grupo["centralidade_faixa"]),
             "y": float(grupo["densidade_faixa"]),
             "nos": int(grupo["itens"]),
