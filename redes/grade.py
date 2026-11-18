@@ -1,4 +1,4 @@
-"""Grade de análises: combinações usadas na avaliação do CELII.
+"""Grade de análises: combinações de parâmetros para comparar configurações.
 
 Cada linha da grade acrescenta um eixo ao caso base (unidade de análise,
 coocorrência, centros simples, índice de equivalência, frequência 2,
@@ -18,7 +18,7 @@ ALGORITMOS = ("CentersSimples", "AverageLink", "CompleteLink", "SingleLink",
               "SumLink", "Louvain")
 MEDIDAS = ("AssociationStrength", "EquivalenceIndex", "InclusionIndex",
            "JaccardIndex", "SaltonCosine")
-# Eixo final do script do CELII: um mapeador e oito medidas de desempenho.
+# Eixo final da grade: um mapeador e oito medidas de desempenho.
 RECORTES = ("interseccao", "h", "g", "hg", "q2", "media", "soma", "minimo", "maximo")
 
 
