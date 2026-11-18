@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "Se você usar o Redes, cite-o como abaixo."
+title: "Redes: mapeamento científico e análise de redes da produção acadêmica"
+type: software
+version: "0.1.1"
+date-released: "2026-11-18"
+license: GPL-3.0-or-later
+repository-code: "https://github.com/gerlansilva/redes"
+authors:
+  - family-names: "Silva"
+    given-names: "Gerlan Silva da"
+    orcid: "https://orcid.org/0000-0002-9996-9983"
+    affiliation: "Universidade Federal de São Carlos (UFSCar)"
+keywords:
+  - bibliometria
+  - cientometria
+  - análise de redes
+  - Educação Estatística
+abstract: "Ferramenta local, em português, para mapeamento científico e análise de redes da produção acadêmica: temas, autores, referências e colaboração, período a período."
