@@ -69,9 +69,25 @@ class Evolucao:
     sobreposicao: list[list[float]] = field(default_factory=list)
     transicoes: list[dict] = field(default_factory=list)
     medida: str = "EquivalenceIndex"
+    # Parâmetros da análise de cada período, em texto (aparece na figura).
+    parametros: str = ""
 
     def nos_do_periodo(self, indice: int) -> list[No]:
         return [no for no in self.nos if no.periodo == indice]
+
+
+def descreve_parametros(config: Configuracao) -> str:
+    """Parâmetros que definem os temas, em uma linha (legenda da figura).
+
+    O relatório e a interface usam esta mesma frase, para que uma diferença de
+    contagem entre os dois possa ser explicada olhando só para a figura.
+    """
+    texto = (f"frequência mínima {config.minimo_frequencia} · "
+             f"coocorrência mínima {config.minimo_coocorrencia} · "
+             f"rede de {config.tamanho_minimo} a {config.tamanho_maximo} itens")
+    if config.corte:
+        texto += f" · corte {config.corte:g}"
+    return texto
 
 
 def mede_conjuntos(medida: str, origem: set[int], destino: set[int]) -> float:
@@ -95,7 +111,8 @@ def constroi(kb, config: Configuracao, periodos, medida: str = "EquivalenceIndex
 
     if resultados is None:
         resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
-    mapa = Evolucao(periodos=[p.nome for p in periodos], medida=medida)
+    mapa = Evolucao(periodos=[p.nome for p in periodos], medida=medida,
+                    parametros=descreve_parametros(config))
 
     for indice, resultado in enumerate(resultados):
         grupos = sorted(resultado.grupos,
@@ -192,11 +209,15 @@ def evolucao_svg(mapa: Evolucao, titulo: str = "Mapa de evolução",
     """Desenha o mapa de evolução em SVG, com uma coluna por período."""
     periodos = len(mapa.periodos)
     altura_faixa = 34
-    margem_topo = 74
+    # Título (y=28), duas linhas de legenda (y=46 e y=62) e, bem abaixo, os
+    # rótulos dos períodos (y=margem_topo - 14): o rótulo do período do meio
+    # fica sob o centro da legenda e não pode encostar nela.
+    margem_topo = 100
     margem_base = 44
     margem_lado = 34
     coluna = max(200, (largura - 2 * margem_lado) // max(1, periodos)
                  if periodos else largura)
+    largura = max(largura, 2 * margem_lado + coluna * max(1, periodos))
     maior = max((len(mapa.nos_do_periodo(i)) for i in range(periodos)), default=1)
     altura = margem_topo + margem_base + altura_faixa * max(1, maior)
 
@@ -216,14 +237,19 @@ def evolucao_svg(mapa: Evolucao, titulo: str = "Mapa de evolução",
         f'<text x="{largura/2}" y="30" text-anchor="middle" '
         'font-family="Inter, Arial, sans-serif" font-size="16" fill="#14204A">'
         f'{html.escape(titulo)}</text>',
-        f'<text x="{largura/2}" y="50" text-anchor="middle" '
+        f'<text x="{largura/2}" y="48" text-anchor="middle" '
         'font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#64748B">'
         f'medida de sobreposição: {html.escape(_nome_medida(mapa.medida))}</text>',
     ]
+    if mapa.parametros:
+        partes.append(
+            f'<text x="{largura/2}" y="64" text-anchor="middle" '
+            'font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#64748B">'
+            f'{html.escape(mapa.parametros)}</text>')
 
     for indice, nome in enumerate(mapa.periodos):
         partes.append(
-            f'<text x="{x(indice)}" y="{margem_topo - 12}" text-anchor="middle" '
+            f'<text x="{x(indice)}" y="{margem_topo - 14}" text-anchor="middle" '
             'font-family="Helvetica, Arial, sans-serif" font-size="11" '
             f'font-weight="600" fill="#33405E">{html.escape(nome)}</text>')
 

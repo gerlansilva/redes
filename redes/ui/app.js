@@ -2573,8 +2573,16 @@ async function gerarRelatorioCompleto(formato = "unico") {
   item.disabled = true;
   texto.textContent = "Gerando…";
   try {
+    // Os parâmetros da tela valem no relatório: a evolução temática dele e a da aba
+    // "Evolução temática" usam a mesma frequência mínima e os mesmos limites.
+    const tela = parametros();
     const dados = { projeto: estado.projeto.caminho, ignorar: estado.ignorar, formato,
-                    avancado: estado.avancado };
+                    avancado: estado.avancado,
+                    similaridade: tela.similaridade, algoritmo: tela.algoritmo,
+                    minimo_frequencia: tela.minimo_frequencia,
+                    minimo_coocorrencia: tela.minimo_coocorrencia,
+                    tamanho_minimo: tela.tamanho_minimo, tamanho_maximo: tela.tamanho_maximo,
+                    corte: tela.corte };
     const relatorio = await api("/api/relatorio-completo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -1,5 +1,16 @@
 # Mudanças
 
+## Não publicada
+
+### Correções
+- Evolução temática: o *Relatório completo* e a aba *Evolução temática* mostravam contagens diferentes para o mesmo corpus (Celi, 2008-2014, 2015-2020, 2021-2026: 3 temas no relatório e 22 na aba). Causa: não era sobreposição nem contagem diferente de "temas", e sim a **frequência mínima**. A aba usava a da tela (1); o relatório ignorava a tela e escolhia sozinho a maior entre 3, 2 e 1 que ainda dava agrupamento em todos os períodos (3, com um tema por período). Agora o relatório gerado pela interface usa os parâmetros da tela (frequência e co-ocorrência mínimas, corte, tamanho da rede, similaridade e algoritmo); sem frequência informada (uso direto da API), mantém a escolha automática e a descreve no texto da seção ("escolhida automaticamente" ou "a mesma da tela").
+- O mapa de evolução (relatório e interface) traz na própria figura os parâmetros que definem os temas ("frequência mínima 1 · coocorrência mínima 1 · rede de 2 a 15 itens"), para que qualquer diferença entre duas figuras seja explicável olhando só para elas.
+- Mapa de evolução SVG: o rótulo do período do meio (ex.: 2015–2020) encostava no subtítulo; margem superior ampliada (74 para 100 px), legenda em duas linhas e largura mínima proporcional ao número de períodos. Conferido em corpora de 3 e 4 períodos.
+- Textos do pacote: referências ao nome do projeto de origem em `grade.py` e no campo "nome do projeto" da interface passam a texto neutro.
+
+### Números
+- As análises por período **não mudam** para os mesmos parâmetros (há teste). Muda apenas a frequência mínima padrão do *Relatório completo* aberto pela interface, que passa a ser a da tela em vez da automática; com a automática por padrão na tela (frequência 1), os relatórios de corpora pequenos terão mais temas por período que antes (ex.: Celi, 3 para 22 temas na evolução). Para reproduzir o relatório antigo, informe `minimo_frequencia` igual ao valor antigo (ex.: 3) ou omita-o na API.
+
 ## 0.1.1
 
 ### Correções

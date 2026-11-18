@@ -1526,7 +1526,11 @@ def gera_relatorio_completo(dados: dict) -> dict:
 
     caminho = _valida_projeto(dados.get("projeto", ""))
     base = {k: v for k, v in dados.items()
-            if k in ("similaridade", "algoritmo", "ignorar", "tamanho_minimo", "tamanho_maximo")}
+            if k in ("similaridade", "algoritmo", "ignorar", "tamanho_minimo", "tamanho_maximo",
+                     "minimo_coocorrencia", "corte")}
+    # Frequência mínima vinda da interface vale para todas as análises, como na tela;
+    # sem ela, cada análise escolhe a sua (`_escolhe_frequencia`).
+    frequencia_fixa = dados.get("minimo_frequencia")
     medida = dados.get("medida_temporal", "EquivalenceIndex")
     avancado = bool(dados.get("avancado"))
 
@@ -1559,8 +1563,8 @@ def gera_relatorio_completo(dados: dict) -> dict:
             if disponivel < minimo:
                 ignoradas.append({"rotulo": rotulo, "motivo": motivo + "."})
                 continue
-            escolhida = _escolhe_frequencia(kb, periodos, base, parametros,
-                                            (dados.get("frequencias") or {}).get(chave))
+            fixa = (dados.get("frequencias") or {}).get(chave) or frequencia_fixa
+            escolhida = _escolhe_frequencia(kb, periodos, base, parametros, fixa)
             if escolhida is None:
                 ignoradas.append({"rotulo": rotulo,
                                   "motivo": "nenhum agrupamento se formou com os dados disponíveis."})
@@ -1578,8 +1582,11 @@ def gera_relatorio_completo(dados: dict) -> dict:
                 nota = " Há período sem agrupamentos (poucos documentos nele)."
             if poucos_informativa:
                 nota += f" Atenção: {modulo_avisos.POUCO_INFORMATIVO}."
+            origem = ("a mesma da tela" if fixa else
+                      "escolhida automaticamente: a maior entre 3, 2 e 1 que mantém "
+                      "agrupamentos em todos os períodos")
             secoes.append({"rotulo": rotulo,
-                           "descricao": descricao + f" Frequência mínima {frequencia}." + nota,
+                           "descricao": descricao + f" Frequência mínima {frequencia} ({origem})." + nota,
                            "pasta": pasta, "config": config, "resultados": resumo["resultados"]})
             aquecedor.submete(secoes[-1])
         aquecedor.espera()
