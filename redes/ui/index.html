@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redes — análise da produção científica</title>
+<link rel="icon" href="/static/logo-mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<section class="tela apresentacao" id="apresentacao" aria-labelledby="apresentacaoTitulo">
+  <div class="apresentacao-miolo">
+    <img class="apresentacao-logo" src="/static/logo-mark.svg" alt="" width="132" height="132">
+    <h1 id="apresentacaoTitulo">Redes</h1>
+    <p class="apresentacao-frase">Mapeie a produção científica de um campo: temas, autores, países e referências, a partir do arquivo exportado da sua base.</p>
+    <button type="button" class="botao escuro grande" id="btnComecar">Começar</button>
+    <p class="apresentacao-local">Versão local · nenhum dado sai desta máquina</p>
+    <p class="apresentacao-autor">Criada por <b>Gerlan Silva da Silva</b> · Doutorando em Educação, UFSCar<br>
+      <a href="mailto:gerlanmatfis@gmail.com">gerlanmatfis@gmail.com</a> ·
+      <a href="https://orcid.org/0000-0002-9996-9983" target="_blank" rel="noopener noreferrer">ORCID 0000-0002-9996-9983</a></p>
+  </div>
+</section>
+
+<div class="app" id="app" hidden>
+
+  <aside class="sidebar">
+    <a class="marca" href="#" id="marcaInicio" title="Voltar ao início">
+      <img src="/static/logo-mark.svg" alt="" width="40" height="40">
+      <span class="marca-texto">
+        <span class="nome">Redes</span>
+        <span class="sub">análise da produção científica</span>
+      </span>
+    </a>
+
+    <nav class="nav-analises" aria-label="Análises">
+      <button type="button" class="nav-analise" data-analise="visao" title="Visão geral — Visão geral descritiva" aria-label="Visão geral — Visão geral descritiva">
+        <svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span class="nav-texto">Visão geral</span>
+      </button>
+      <div class="grupo">
+        <p class="grupo-titulo">Fontes</p>
+        <button type="button" class="nav-analise" data-analise="veiculos" title="Periódicos — Periódicos citados" aria-label="Periódicos — Periódicos citados"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4a2 2 0 0 1 2-2h12v17H7a2 2 0 0 0-2 2z"/><path d="M5 19V4M9 7h6"/></svg><span class="nav-texto">Periódicos</span></button>
+      </div>
+      <div class="grupo">
+        <p class="grupo-titulo">Estrutura conceitual</p>
+        <button type="button" class="nav-analise" data-analise="conceitual" title="Temas — Temas das palavras-chave" aria-label="Temas — Temas das palavras-chave"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/></svg><span class="nav-texto">Temas</span></button>
+      </div>
+      <div class="grupo">
+        <p class="grupo-titulo">Estrutura intelectual</p>
+        <button type="button" class="nav-analise" data-analise="citados" title="Autores — Cocitação de autores" aria-label="Autores — Cocitação de autores"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span class="nav-texto">Autores</span></button>
+        <button type="button" class="nav-analise" data-analise="referencias" title="Referências — Cocitação de referências" aria-label="Referências — Cocitação de referências"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6l-1 1M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6l1-1"/></svg><span class="nav-texto">Referências</span></button>
+        <button type="button" class="nav-analise" data-analise="frentes" title="Frentes — Frentes de pesquisa" aria-label="Frentes — Frentes de pesquisa"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg><span class="nav-texto">Frentes</span></button>
+      </div>
+      <div class="grupo">
+        <p class="grupo-titulo">Estrutura social</p>
+        <button type="button" class="nav-analise" data-analise="autores" title="Coautoria — Colaboração entre autores" aria-label="Coautoria — Colaboração entre autores"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M16 15c3 0 5 1.5 5 4"/></svg><span class="nav-texto">Coautoria</span></button>
+        <button type="button" class="nav-analise so-se-focal" data-analise="paises" title="Países — Colaboração entre países" aria-label="Países — Colaboração entre países"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><span class="nav-texto">Países</span><span class="nav-pouco" title="pouco informativo para este corpus" aria-label="pouco informativo para este corpus">aviso</span></button>
+        <button type="button" class="nav-analise so-se-focal" data-analise="instituicoes" title="Instituições — Colaboração entre instituições" aria-label="Instituições — Colaboração entre instituições"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg><span class="nav-texto">Instituições</span><span class="nav-pouco" title="pouco informativo para este corpus" aria-label="pouco informativo para este corpus">aviso</span></button>
+      </div>
+    </nav>
+
+    <nav class="nav" aria-label="Projeto">
+      <button type="button" class="nav-item" data-nav="relatorio" id="navRelatorio" title="Gera um relatório HTML com todas as análises que a base permite, período a período">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg>
+        <span class="nav-texto">Relatório completo</span>
+      </button>
+      <button type="button" class="nav-item" data-nav="periodos" title="Base de conhecimento">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+        <span class="nav-texto">Base</span>
+      </button>
+      <button type="button" class="nav-item" data-nav="ajuda" title="Ajuda">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2-2.4 3.4"/><path d="M12 17h.01"/></svg>
+        <span class="nav-texto">Ajuda</span>
+      </button>
+      <button type="button" class="nav-item" data-nav="sobre" title="Sobre a ferramenta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+        <span class="nav-texto">Sobre</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-modo">
+      <label class="alternador-modo" for="modoAvancado"
+             title="Mostra todos os parâmetros, abas e a grade completa">
+        <input type="checkbox" id="modoAvancado">
+        <span class="chave" aria-hidden="true"></span>
+        <span class="modo-texto">Modo avançado</span>
+      </label>
+    </div>
+
+    <div class="rodape">
+      Redes · versão local<br>
+      Nenhum dado sai desta máquina
+    </div>
+  </aside>
+
+  <button type="button" class="recolher" id="btnRecolher" aria-label="Recolher menu" aria-expanded="true" title="Recolher menu">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+  </button>
+
+  <div class="conteudo">
+
+    <header class="topo">
+      <button type="button" class="projeto" id="btnProjeto" title="Abrir ou trocar de projeto">
+        <span class="icone">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+          </svg>
+        </span>
+        <span class="texto">
+          <span class="linha1"><span id="projetoNome">Nenhum projeto</span> <span id="projetoArquivo"></span></span>
+          <span class="linha2" id="projetoMeta">Abra um projeto ou importe um corpus</span>
+        </span>
+        <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+
+      <div class="espaco"></div>
+
+      <div class="selo-estado" id="estado"><span class="ponto"></span><span id="estadoTexto">Sem projeto</span></div>
+
+      <label class="chip-tempo">Período
+        <select id="periodo" disabled>
+          <option>—</option>
+        </select>
+      </label>
+    </header>
+
+    <main class="principal">
+      <section class="parametros">
+        <div class="parametros-topo">
+          <div>
+            <div class="sobre" id="sobreAnalise">Visão geral</div>
+            <h2 id="tituloAnalise">Análise de redes</h2>
+            <p id="subtituloAnalise">Escolha os parâmetros e execute uma configuração ou a grade completa.</p>
+            <select id="analise" hidden aria-hidden="true" tabindex="-1">
+              <option value="conceitual">Estrutura conceitual</option>
+              <option value="autores">Colaboração entre autores</option>
+              <option value="paises">Colaboração entre países</option>
+              <option value="instituicoes">Colaboração entre instituições</option>
+              <option value="citados">Cocitação de autores</option>
+              <option value="referencias">Cocitação de referências</option>
+              <option value="frentes">Frentes de pesquisa</option>
+              <option value="veiculos">Periódicos citados</option>
+              <option value="personalizada">Personalizada</option>
+            </select>
+          </div>
+          <span class="etiqueta-suave so-avancado" id="seloPrevia">Prévia sob demanda</span>
+        </div>
+
+        <p class="analise-fixa so-avancado" id="analiseFixa" hidden></p>
+
+        <details class="mais-opcoes" id="maisOpcoes">
+          <summary>Mais opções</summary>
+          <div class="campos">
+            <div class="campo fixo">
+              <label for="unidade">Unidade</label>
+              <div class="controle"><select id="unidade">
+                <option value="Words">Palavras</option>
+                <option value="Authors">Autores</option>
+                <option value="References">Referências</option>
+                <option value="AuthorsReference">Autores de referência</option>
+                <option value="ReferenceSources">Fontes de referência</option>
+                <option value="Countries">Países</option>
+                <option value="Institutions">Instituições (IES)</option>
+              </select>
+                <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+            <div class="campo fixo">
+              <label for="matriz">Matriz</label>
+              <div class="controle"><select id="matriz">
+                <option value="CoOccurrence">Co-ocorrência</option>
+                <option value="BasicCoupling">Acoplamento</option>
+                <option value="AggregatedCouplingBasedOnAuthor">Acoplamento agregado (autor)</option>
+                <option value="AggregatedCouplingBasedOnJournal">Acoplamento agregado (periódico)</option>
+              </select>
+                <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+            <div class="campo min">
+              <label title="Número mínimo de vezes que um item precisa aparecer no corpus para entrar na análise.">Frequência mínima</label>
+              <div class="controle stepper">
+                <button class="passo" id="freqMenos" aria-label="Diminuir frequência">−</button>
+                <span class="valor" id="freqValor">1</span>
+                <button class="passo" id="freqMais" aria-label="Aumentar frequência">+</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="predefinicoes" role="radiogroup" aria-label="Predefinição de rigor">
+            <span class="predef-rotulo" id="predefRotulo">Predefinição</span>
+            <button type="button" class="predef ativa" role="radio" data-predef="padrao" aria-checked="true"
+                    title="Frequência mínima escolhida automaticamente, co-ocorrência mínima 1">Padrão</button>
+            <button type="button" class="predef" role="radio" data-predef="estrito" aria-checked="false"
+                    title="Frequência mínima 3 e co-ocorrência mínima 2: menos temas, mais sustentados">Mais estrita</button>
+            <button type="button" class="predef" role="radio" data-predef="amplo" aria-checked="false"
+                    title="Frequência mínima 1 e co-ocorrência mínima 1: todos os itens entram">Mais ampla</button>
+          </div>
+
+          <p class="nota-auto" id="notaAuto" role="status" hidden></p>
+
+        </details>
+
+        <details class="avancado so-avancado" id="avancado">
+          <summary>Parâmetros avançados</summary>
+          <div class="campos avancado-campos">
+            <div class="campo">
+              <label for="similaridade">Similaridade</label>
+              <div class="controle"><select id="similaridade">
+                <option value="EquivalenceIndex">Equivalência</option>
+                <option value="AssociationStrength">Associação</option>
+                <option value="InclusionIndex">Inclusão</option>
+                <option value="JaccardIndex">Jaccard</option>
+                <option value="SaltonCosine">Salton</option>
+              </select>
+                <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="algoritmo">Algoritmo</label>
+              <div class="controle"><select id="algoritmo">
+                <option value="CentersSimples">Centros simples</option>
+                <option value="AverageLink">Média</option>
+                <option value="CompleteLink">Completa</option>
+                <option value="SingleLink">Simples</option>
+                <option value="SumLink">Soma</option>
+                <option value="Louvain">Louvain</option>
+              </select>
+                <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="mapeadores">Mapeadores</label>
+              <div class="controle"><select id="mapeadores">
+                <option value="nucleo,interseccao" selected>Núcleo + interseção</option>
+                <option value="nucleo">Núcleo</option>
+                <option value="interseccao">Interseção</option>
+                <option value="uniao">União</option>
+                <option value="secundarios">Secundários</option>
+                <option value="kcore">k-core</option>
+                <option value="acoplamento" disabled hidden>Acoplamento</option>
+                <option value="nucleo,interseccao,secundarios,kcore,uniao">Todos</option>
+              </select>
+                <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="palavras">Palavras</label>
+              <div class="controle"><select id="palavras">
+                <option value="autor,fonte" selected>Autor + fonte</option>
+                <option value="autor">Do autor</option>
+                <option value="fonte">Da fonte</option>
+                <option value="adicionada">Adicionadas</option>
+                <option value="">Todas</option>
+              </select>
+                <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+            <div class="campo min">
+              <label for="coocMin" title="Número mínimo de documentos em que dois itens aparecem juntos para existir uma aresta entre eles.">Co-ocorrência mínima</label>
+              <div class="controle"><input id="coocMin" type="number" min="1" step="1" value="1" style="width:100%;border:0;outline:0;background:transparent;font:inherit;color:inherit"></div>
+            </div>
+            <div class="campo min">
+              <label for="corte" title="Similaridade mínima para unir dois temas nos algoritmos de ligação. O algoritmo Centros simples não usa este valor.">Corte</label>
+              <div class="controle"><input id="corte" type="number" min="0" step="0.05" value="0" title="Similaridade mínima para unir temas (0 = unir tudo)." style="width:100%;border:0;outline:0;background:transparent;font:inherit;color:inherit"></div>
+            </div>
+            <div class="campo min" id="campoComponente" hidden>
+              <label for="componenteMin" title="Redes de autores, países e instituições: componentes conexos com menos nós que isto não viram agrupamento e ficam sem agrupamento (fora dos halos). Nenhum nó nem aresta é apagado e a frequência mínima não muda.">Tam. mín. do agrupamento</label>
+              <div class="controle"><input id="componenteMin" type="number" min="1" step="1" value="3" title="Menor componente (em nós) que pode virar agrupamento. 1 = sem filtro. Padrão: 3 em instituições, 1 em autores e países." style="width:100%;border:0;outline:0;background:transparent;font:inherit;color:inherit"></div>
+            </div>
+            <div class="campo rede">
+              <label for="rede" title="Número mínimo e máximo de itens em cada agrupamento.">Tamanho do grupo</label>
+              <div class="controle"><select id="rede">
+                <option value="2-15" selected>2 a 15 itens</option>
+                <option value="3-8">3 a 8 itens</option>
+                <option value="4-10">4 a 10 itens</option>
+                <option value="4-4">4 itens</option>
+              </select>
+                <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div class="acoes so-avancado">
+          <div class="espaco"></div>
+          <button class="botao escuro so-avancado" id="btnPreview" disabled>Pré-visualizar</button>
+          <button class="botao so-avancado" id="btnGrade" disabled>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+            <span id="rotuloGrade">Grade completa</span>
+          </button>
+        </div>
+
+        <div class="progresso" id="progresso" hidden>
+          <div class="trilho"><i id="progressoBarra"></i></div>
+          <span class="texto" id="progressoTexto">0 de 0</span>
+          <button class="botao perigo" id="btnCancelar" style="height:28px;padding:0 10px">Cancelar</button>
+        </div>
+      </section>
+
+      <section class="visao-geral" id="visaoGeral">
+        <div class="visao-geral-cab">
+          <div class="sobre">Corpus</div>
+          <h2>Visão geral descritiva</h2>
+          <p>Produção, impacto e distribuição de autores, fontes, países e palavras-chave do corpus.</p>
+        </div>
+        <div id="visaoBibliometria" class="bib-conteudo"><p class="bib-vazio">Abra um projeto para ver o corpus.</p></div>
+        <div class="info-geral" hidden>
+          <article class="info-cartao"><span class="rotulo">Período</span><strong id="vgPeriodo">—</strong><span class="detalhe">anos cobertos</span></article>
+          <article class="info-cartao"><span class="rotulo">Documentos</span><strong id="vgDocumentos">—</strong><span class="detalhe">no corpus</span></article>
+          <article class="info-cartao"><span class="rotulo">Períodos</span><strong id="vgPeriodos">—</strong><span class="detalhe">recortes</span></article>
+          <article class="info-cartao"><span class="rotulo">Unidades</span><strong id="vgUnidades">—</strong><span class="detalhe">disponíveis</span></article>
+        </div>
+        <h3 class="bib-subtitulo">Última análise executada</h3>
+        <section class="visao" aria-label="Resumo da análise">
+          <article class="visao-cartao">
+            <span class="ponto-visao ponto-documentos"></span>
+            <span class="rotulo-visao">Documentos</span>
+            <strong id="visaoDocumentos">—</strong>
+            <span class="detalhe">no período analisado</span>
+          </article>
+          <article class="visao-cartao">
+            <span class="ponto-visao ponto-nos"></span>
+            <span class="rotulo-visao">Nós</span>
+            <strong id="visaoNos">—</strong>
+            <span class="detalhe">itens na rede</span>
+          </article>
+          <article class="visao-cartao">
+            <span class="ponto-visao ponto-arestas"></span>
+            <span class="rotulo-visao">Arestas</span>
+            <strong id="visaoArestas">—</strong>
+            <span class="detalhe">vínculos de co-ocorrência</span>
+          </article>
+          <article class="visao-cartao">
+            <span class="ponto-visao ponto-grupos"></span>
+            <span class="rotulo-visao">Agrupamentos</span>
+            <strong id="visaoGrupos">—</strong>
+            <span class="detalhe" id="visaoGruposDetalhe">temas identificados</span>
+          </article>
+        </section>
+      </section>
+
+      <div class="faixa-avisos" id="faixaAvisos" role="status" aria-live="polite" hidden></div>
+
+      <div class="barra-resultados">
+      <div class="abas" role="tablist" aria-label="Resultados">
+        <div class="aba oculta" data-aba="evolucao" role="tab" tabindex="0" aria-selected="false" title="Evolução temática" aria-label="Evolução temática"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 6c6 0 4 6 10 6M7 18c6 0 4-6 10-6"/></svg><span class="aba-texto">Evolução temática</span></div>
+        <div class="aba aba-grupo oculta" id="abaDetalhe" role="button" tabindex="0" aria-expanded="false"
+             aria-controls="resultados" title="Mostra as visões de cada período, uma de cada vez">Detalhe por período <span class="seta" aria-hidden="true">▸</span></div>
+        <div class="aba ativa" data-aba="resumo" role="tab" tabindex="0" aria-selected="true" title="Resumo" aria-label="Resumo"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="aba-texto">Resumo</span></div>
+        <div class="aba" data-aba="rede" role="tab" tabindex="0" aria-selected="false" title="Rede" aria-label="Rede"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="7" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6.5l8 .5M7 8l4 8M17 9l-4 7"/></svg><span class="aba-texto">Rede</span></div>
+        <div class="aba" data-aba="paises" role="tab" tabindex="0" aria-selected="false" title="Países" aria-label="Países"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><span class="aba-texto">Países</span></div>
+        <div class="aba" data-aba="ies" role="tab" tabindex="0" aria-selected="false" title="Variantes unidas" aria-label="Variantes unidas"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg><span class="aba-texto">Variantes unidas</span></div>
+        <div class="aba" data-aba="diagrama" role="tab" tabindex="0" aria-selected="false" title="Diagrama estratégico" aria-label="Diagrama estratégico"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 12h18"/></svg><span class="aba-texto">Diagrama estratégico</span></div>
+        <div class="aba" data-aba="agrupamentos" role="tab" tabindex="0" aria-selected="false" title="Rede de agrupamentos" aria-label="Rede de agrupamentos"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="9" r="5"/><circle cx="16" cy="10" r="4"/><circle cx="11" cy="16" r="4"/></svg><span class="aba-texto">Rede de agrupamentos</span></div>
+        <div class="aba" data-aba="grupos" role="tab" tabindex="0" aria-selected="false" title="Agrupamentos" aria-label="Agrupamentos"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg><span class="aba-texto">Agrupamentos</span></div>
+        <div class="aba" data-aba="indices" role="tab" tabindex="0" aria-selected="false" title="Índices" aria-label="Índices"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span class="aba-texto">Índices</span></div>
+        <div class="aba" data-aba="documentos" role="tab" tabindex="0" aria-selected="false" title="Documentos" aria-label="Documentos"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg><span class="aba-texto">Documentos</span></div>
+        <div class="aba" data-aba="dendrograma" role="tab" tabindex="0" aria-selected="false" title="Dendrograma" aria-label="Dendrograma"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6h7M3 18h7M10 6v12M10 12h5M15 8v8M15 8h6M15 16h6"/></svg><span class="aba-texto">Dendrograma</span></div>
+        <div class="aba" data-aba="linhatempo" role="tab" tabindex="0" aria-selected="false" title="Linha do tempo" aria-label="Linha do tempo"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12h18M6 6v4M12 14v4M18 6v4"/><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg><span class="aba-texto">Linha do tempo</span></div>
+        <div class="aba" data-aba="densidade" role="tab" tabindex="0" aria-selected="false" title="Densidade" aria-label="Densidade"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="2"/></svg><span class="aba-texto">Densidade</span></div>
+        <div class="aba" data-aba="duplomapa" role="tab" tabindex="0" aria-selected="false" title="Duplo mapa" aria-label="Duplo mapa"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 8h12M14 5l3 3-3 3M19 16H7M10 13l-3 3 3 3"/></svg><span class="aba-texto">Duplo mapa</span></div>
+        <div class="aba" data-aba="similitude" role="tab" tabindex="0" aria-selected="false" title="Similitude" aria-label="Similitude"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="2"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="5" cy="18" r="1.8"/><circle cx="19" cy="18" r="1.8"/><path d="M10.5 10.5L6.5 7.5M13.5 10.5l4-3M10.5 13.5l-4 3M13.5 13.5l4 3"/></svg><span class="aba-texto">Similitude</span></div>
+        <div class="aba" data-aba="longitudinal" role="tab" tabindex="0" aria-selected="false" title="Comparar períodos" aria-label="Comparar períodos"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="7" height="14" rx="1"/><rect x="14" y="5" width="7" height="14" rx="1"/><path d="M10 12h4M12 10l2 2-2 2"/></svg><span class="aba-texto">Comparar períodos</span></div>
+      </div>
+      <div class="qualidade-caixa" id="qualidadeCaixa" hidden>
+        <button type="button" class="selo-qualidade" id="seloQualidade" aria-haspopup="dialog"
+                aria-expanded="false" aria-controls="popQualidade">
+          <span class="sq-icone" id="sqIcone" aria-hidden="true"></span>
+          <span class="sq-texto">Qualidade: <b id="sqNivel">—</b></span>
+          <span class="sq-resumo" id="sqResumo"></span>
+        </button>
+        <div class="pop-qualidade" id="popQualidade" role="dialog" aria-labelledby="popQualidadeTitulo"
+             tabindex="-1" hidden></div>
+      </div>
+      </div>
+
+      <div class="resultados" id="resultados">
+        <section class="cartao" id="blocoEvolucao" data-bloco="blocoEvolucao">
+          <header>
+            <div class="cartao-titulo">
+              <h2>Evolução temática</h2>
+              <span class="meta" id="metaEvolucao">como os temas mudam de um período para o outro</span>
+            </div>
+            <div class="espaco"></div>
+            <a class="link" id="downloadEvolucaoTema" href="#" hidden>Pajek</a>
+          </header>
+          <div class="evolucao-figura">
+            <div class="vazio" id="vazioEvolucao">Escolha uma análise para ver a evolução dos temas.</div>
+            <img id="figEvolucaoTema" alt="Mapa de evolução temática" hidden>
+          </div>
+          <p class="evolucao-legenda" id="legendaEvolucao" hidden>
+            Cada coluna é um período e cada círculo, um tema. Um elo liga temas de períodos seguidos que
+            compartilham itens; elos azuis indicam o mesmo nó principal, e os cinza, sobreposições menores.
+          </p>
+          <div class="evolucao-tabela" id="tabelaEvolucao"></div>
+        </section>
+
+        <section class="cartao" id="blocoResumo" data-bloco="blocoResumo">
+          <header>
+            <div class="cartao-titulo">
+              <h2>Resumo</h2>
+              <span class="meta" id="metaResumo">—</span>
+            </div>
+          </header>
+          <div class="resumo-corpo" id="resumoCorpo">
+            <p class="resumo-vazio">Escolha uma análise para ver o resumo.</p>
+          </div>
+        </section>
+
+        <section class="cartao" id="blocoRede" data-bloco="blocoRede">
+          <header>
+            <div class="cartao-titulo">
+              <h2>Rede em halos</h2>
+              <span class="meta" id="metaHalo">—</span>
+            </div>
+            <div class="espaco"></div>
+            <span class="etiqueta-suave" id="metaRede">interativa</span>
+          </header>
+          <div class="barra-rede" id="acoesRede" hidden>
+              <label class="campo-mini" title="Mostrar rótulos dos nós">
+                <span>Rótulos</span>
+                <select id="rotulosRede">
+                  <option value="nenhum">nenhum</option>
+                  <option value="principais">principais</option>
+                  <option value="todos">todos</option>
+                </select>
+              </label>
+              <label class="campo-mini" title="Nós exibidos, por grau">
+                <span>Nós</span>
+                <select id="focoRede">
+                  <option value="0">todos</option>
+                  <option value="50">top 50</option>
+                  <option value="200">top 200</option>
+                </select>
+              </label>
+              <button class="botao-mini" id="ajustarRede" title="Ajustar a rede à área">Ajustar</button>
+              <button class="botao-mini" id="svgRede" title="Abrir a figura SVG">SVG</button>
+          </div>
+          <div class="aviso-volume" id="avisoVolume" hidden></div>
+          <div class="corpo-fig" id="caixaHalo">
+            <canvas id="canvasHalo" aria-label="Rede interativa em halos" hidden></canvas>
+            <img id="figHalo" alt="Rede em halos" hidden>
+            <div class="vazio" id="vazioHalo">Nenhuma rede para mostrar</div>
+            <div class="carregando-figura" id="carregandoHalo" hidden>
+              <div><div class="gira"></div>calculando a rede…</div>
+            </div>
+            <div class="dica-no" id="dicaNo" hidden></div>
+            <div class="zoom" id="zoomHalo" hidden>
+              <button type="button" data-zoom="mais" title="Ampliar">+</button>
+              <button type="button" data-zoom="menos" title="Reduzir">−</button>
+              <button type="button" data-zoom="reset" title="Ajustar">⤢</button>
+            </div>
+          </div>
+          <div class="legenda-rede" id="legendaRede" hidden></div>
+          <div class="estatisticas" id="estatHalo"></div>
+        </section>
+
+        <section class="cartao" id="blocoPaises" data-bloco="blocoPaises">
+          <header>
+            <div class="cartao-titulo">
+              <h2>Mapa de colaboração</h2>
+              <span class="meta" id="metaMapa">disponível na unidade Países</span>
+            </div>
+            <div class="espaco"></div>
+            <button class="botao-mini" id="svgMapa" title="Abrir a figura SVG" hidden>SVG</button>
+            <span class="etiqueta-suave">países</span>
+          </header>
+          <div class="corpo-fig" id="caixaMapa">
+            <canvas id="canvasMapa" class="interativa"
+                    aria-label="Mapa interativo de colaboração entre países" hidden></canvas>
+            <img id="figMapa" alt="Mapa de colaboração entre países" hidden>
+            <div class="vazio" id="vazioMapa">Selecione a unidade Países para ver o mapa</div>
+            <div class="dica-no" id="dicaMapa" hidden></div>
+            <div class="zoom" id="zoomMapa" hidden>
+              <button type="button" data-zoom="mais" title="Ampliar">+</button>
+              <button type="button" data-zoom="menos" title="Reduzir">−</button>
+              <button type="button" data-zoom="reset" title="Ajustar">⤢</button>
+            </div>
+            <p class="mapa-nota" id="notaMapa" hidden>esfera = documentos · clique em um país para destacar · arraste para mover</p>
+          </div>
+          <div class="estatisticas" id="estatMapa"></div>
+        </section>
+
+        <section class="cartao" id="blocoDiagrama" data-bloco="blocoDiagrama">
+          <header>
+            <div class="cartao-titulo">
+              <h2>Diagrama estratégico</h2>
+              <span class="meta" id="metaEstrategico">Callon · faixas normalizadas</span>
+            </div>
+            <div class="espaco"></div>
+            <label class="campo-mini" title="Mostrar os nomes dos agrupamentos">
+              <span>Rótulos</span>
+              <select id="rotulosDiagrama">
+                <option value="nenhum">nenhum</option>
+                <option value="principais">principais</option>
+                <option value="todos">todos</option>
+              </select>
+            </label>
+            <button class="botao-mini" id="svgEstrategico" title="Abrir a figura SVG" hidden>SVG</button>
+            <span class="etiqueta-suave">quadrantes</span>
+          </header>
+          <div class="corpo-fig" id="caixaEstrategico">
+            <canvas id="canvasEstrategico" class="interativa"
+                    aria-label="Diagrama estratégico interativo" hidden></canvas>
+            <img id="figEstrategico" alt="Diagrama estratégico" hidden>
+            <div class="vazio" id="vazioEstrategico">Nenhum agrupamento para mostrar</div>
+            <div class="carregando-figura" id="carregandoEstrategico" hidden>
+              <div><div class="gira"></div>calculando os quadrantes…</div>
+            </div>
+            <div class="dica-no" id="dicaDiagrama" hidden></div>
+            <div class="zoom" id="zoomEstrategico" hidden>
+              <button type="button" data-zoom="mais" title="Ampliar">+</button>
+              <button type="button" data-zoom="menos" title="Reduzir">−</button>
+              <button type="button" data-zoom="reset" title="Ajustar">⤢</button>
+            </div>
+          </div>
+          <div class="estatisticas" id="estatEstrategico"></div>
+          <div class="legenda-diagrama" id="legendaDiagrama" hidden>
+            <button type="button" class="legenda-cabeca" id="alternarLegenda"
+                    aria-expanded="false" aria-controls="legendaLista">
+              <span class="legenda-titulo">Legenda</span>
+              <span class="legenda-qtd" id="legendaQtd"></span>
+              <span class="legenda-sinal" aria-hidden="true">+</span>
+            </button>
+            <div class="legenda-lista" id="legendaLista" hidden></div>
+          </div>
+          <p class="nota-cartao" id="notaDiagrama" hidden>esfera = nós · números = agrupamentos · passe o mouse para ver os detalhes</p>
+        </section>
+
+        <section class="cartao" id="blocoAgrupamentos" data-bloco="blocoAgrupamentos">
+          <header>
+            <div class="cartao-titulo">
+              <h2>Rede de agrupamentos</h2>
+              <span class="meta" id="metaAgrupamentos">temas ligados pela associação entre seus itens</span>
+            </div>
+            <div class="espaco"></div>
+            <button class="botao-mini" id="svgAgrupamentos" title="Abrir a figura SVG" hidden>SVG</button>
+            <span class="etiqueta-suave">temas</span>
+          </header>
+          <div class="corpo-fig" id="caixaAgrupamentos">
+            <img id="figAgrupamentos" alt="Rede de agrupamentos" hidden>
+            <div class="vazio" id="vazioAgrupamentos">Nenhum agrupamento para mostrar</div>
+          </div>
+          <p class="nota-cartao">esfera = agrupamento · tamanho = itens · cor = quadrante do diagrama estratégico · aresta = associação entre temas</p>
+        </section>
+      </div>
+
+      <section class="tabela-bloco" id="blocoGrupos" data-bloco="blocoGrupos">
+        <header>
+          <h2>Agrupamentos</h2>
+          <span class="meta" id="metaGrupos">ordenados por número de itens</span>
+          <div class="espaco"></div>
+          <span class="link" id="linkGrupos" style="cursor:default">—</span>
+        </header>
+        <div class="tabela-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:52px">Selo</th>
+                <th>Agrupamento</th>
+                <th class="num" style="width:64px">Itens</th>
+                <th class="num" style="width:76px" title="Coesão média dos itens do agrupamento, de −1 a 1; — quando há menos de 3 itens">Silhueta</th>
+                <th class="num" style="width:76px" title="Ano médio dos documentos do núcleo">Ano médio</th>
+                <th class="num" style="width:150px">Centralidade</th>
+                <th class="num" style="width:150px">Densidade</th>
+                <th style="width:150px">Quadrante</th>
+                <th style="width:36px"></th>
+              </tr>
+            </thead>
+            <tbody id="gruposCorpo">
+              <tr><td colspan="9" style="color:#8A94A6">Nenhuma análise executada.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rodape-tabela" id="rodapeTabela">Quadrantes pela mediana das faixas normalizadas de centralidade e densidade de Callon.</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoIes" data-bloco="blocoIes">
+        <header>
+          <h2>Variantes unidas</h2>
+          <span class="meta" id="metaIes">disponível na unidade Instituições (IES)</span>
+        </header>
+        <div class="tabela-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome adotado</th>
+                <th>Variante</th>
+                <th class="num" style="width:96px">Documentos</th>
+                <th style="width:260px">Motivo da união</th>
+              </tr>
+            </thead>
+            <tbody id="iesCorpo">
+              <tr><td colspan="4" style="color:#8A94A6">Nenhuma análise de instituições executada.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rodape-tabela" id="rodapeIes">Só se unem nomes cuja normalização é inequívoca (caixa, acentos, pontuação, Univ./University, sigla entre parênteses, país depois de hífen).</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoIndices" data-bloco="blocoIndices">
+        <header>
+          <h2>Índices por agrupamento</h2>
+          <span class="meta" id="metaIndices">documentos, h, g, hg, Q2 e citações</span>
+          <div class="espaco"></div>
+          <span class="link" id="linkIndices" style="cursor:default">—</span>
+        </header>
+        <div class="pivos-bloco" id="pivosBloco" hidden>
+          <h3>Pontos de virada</h3>
+          <p class="pivos-nota" id="pivosIntro">Itens de intermediação alta cujos vizinhos estão em dois ou mais agrupamentos: ligam temas que, sem eles, ficariam mais separados.</p>
+          <div class="pivos-aviso" id="pivosAviso" hidden></div>
+          <div class="pivos-adiado" id="pivosAdiado" hidden>
+            <span id="pivosAdiadoTexto">A rede é grande; o cálculo leva alguns segundos.</span>
+            <button type="button" class="botao" id="pivosCalcular">Calcular pontos de virada</button>
+          </div>
+          <div class="tabela-scroll" id="pivosTabelaCaixa">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:44px">Nº</th>
+                  <th>Item</th>
+                  <th class="num" title="Intermediação normalizada, de 0 a 1">Intermediação</th>
+                  <th class="num" title="Agrupamentos em que o item e seus vizinhos estão">Agrupamentos vizinhos</th>
+                  <th>Grupo</th>
+                  <th class="num">Frequência</th>
+                  <th class="num" id="pivosColSigma" title="(intermediação + 1) elevado à força da rajada" hidden>Sigma</th>
+                </tr>
+              </thead>
+              <tbody id="pivosCorpo"></tbody>
+            </table>
+          </div>
+          <p class="pivos-nota" id="pivosDescritores" hidden></p>
+        </div>
+        <div class="tabela-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:52px">Selo</th>
+                <th>Agrupamento</th>
+                <th style="width:130px">Mapeador</th>
+                <th class="num">Docs</th>
+                <th class="num">h</th>
+                <th class="num">g</th>
+                <th class="num">hg</th>
+                <th class="num">Q2</th>
+                <th class="num">Média</th>
+                <th class="num">Total</th>
+                <th class="num">Mín</th>
+                <th class="num">Máx</th>
+              </tr>
+            </thead>
+            <tbody id="indicesCorpo">
+              <tr><td colspan="12" style="color:#8A94A6">Nenhuma análise executada.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rodape-tabela">Cada linha usa os documentos do mapeador indicado; as citações vêm do período analisado.</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoDocumentos" data-bloco="blocoDocumentos">
+        <header>
+          <h2>Documentos do período</h2>
+          <span class="meta" id="metaDocumentos">—</span>
+          <div class="espaco"></div>
+          <input id="buscaDocumentos" placeholder="buscar título, autor ou fonte" spellcheck="false"
+                 style="height:32px;border:1px solid #DCE3F0;border-radius:8px;padding:0 11px;font-size:12px;min-width:240px">
+        </header>
+        <div class="tabela-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:52px">#</th>
+                <th>Título</th>
+                <th style="width:210px">Autores</th>
+                <th class="num" style="width:60px">Ano</th>
+                <th style="width:190px">Fonte</th>
+                <th class="num" style="width:80px">Citações</th>
+              </tr>
+            </thead>
+            <tbody id="documentosCorpo">
+              <tr><td colspan="6" style="color:#8A94A6">Nenhuma análise executada.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rodape-tabela" id="rodapeDocumentos">—</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoLongitudinal" data-bloco="blocoLongitudinal">
+        <header>
+          <h2>Comparação entre períodos</h2>
+          <span class="meta" id="metaLongitudinal">evolução temática e sobreposição</span>
+          <div class="espaco"></div>
+          <a class="link" id="downloadEvolucao" href="#" hidden>Pajek</a>
+        </header>
+        <div class="mapas-caixa" style="padding:14px 18px 4px">
+          <div class="vazio" id="vazioLongitudinal">Execute a comparação para ver os mapas.</div>
+          <div class="grade-mapas" id="mapasLongitudinais" hidden>
+            <figure>
+              <img id="figEvolucao" alt="Mapa de evolução dos temas" hidden>
+              <figcaption>Mapa de evolução: cada coluna é um período e cada elo, uma sobreposição de itens.</figcaption>
+            </figure>
+            <figure class="figura-sobreposicao">
+              <img id="figSobreposicao" alt="Mapa de sobreposição entre períodos" hidden>
+              <figcaption>Matriz de sobreposição entre todos os períodos.</figcaption>
+            </figure>
+          </div>
+        </div>
+        <div class="rodape-tabela" id="rodapeLongitudinal">A comparação usa os mesmos parâmetros da análise.</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoDendrograma" data-bloco="blocoDendrograma">
+        <header>
+          <h2>Dendrograma</h2>
+          <span class="meta" id="metaDendrograma">agrupamento hierárquico dos itens mais frequentes</span>
+        </header>
+        <div class="dendro-controles">
+          <label class="campo-mini">Ligação
+            <select id="dendroLigacao">
+              <option value="media">Média</option>
+              <option value="completa">Completa</option>
+              <option value="simples">Simples</option>
+            </select>
+          </label>
+          <label class="campo-mini dendro-grupos">Nº de grupos: <b id="dendroGruposValor">—</b>
+            <input type="range" id="dendroGrupos" min="1" max="2" value="1" disabled aria-label="Número de grupos do corte">
+          </label>
+          <button type="button" class="botao" id="dendroSugerido" hidden>Usar o sugerido</button>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioDendrograma">Execute uma análise para ver o dendrograma.</div>
+          <div class="dendro-figura" id="dendroFigura" hidden></div>
+        </div>
+        <ul class="dendro-frases" id="dendroFrases"></ul>
+        <div class="rodape-tabela" id="rodapeDendrograma">Distância = 1 − similaridade; a linha tracejada marca o corte.</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoLinhaDoTempo" data-bloco="blocoLinhaDoTempo">
+        <header>
+          <h2>Linha do tempo</h2>
+          <span class="meta" id="metaLinhaDoTempo">agrupamentos do corpus completo ao longo dos anos</span>
+        </header>
+        <div class="dendro-controles">
+          <label class="campo-mini dendro-grupos">Nº máximo de nós: <b id="ltNosValor">40</b>
+            <input type="range" id="ltNos" min="10" max="60" step="5" value="40" aria-label="Número máximo de nós da figura">
+          </label>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioLinhaDoTempo">Execute uma análise para ver a linha do tempo.</div>
+          <div class="lt-figura" id="ltFigura" hidden></div>
+        </div>
+        <ul class="dendro-frases" id="ltAvisos"></ul>
+        <div class="rodape-tabela" id="rodapeLinhaDoTempo">Posição = ano médio dos documentos do item (nas referências, o ano da obra); anel vermelho = rajada (palavras-chave: só as dos autores). Usa o corpus completo, não só o período.</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoDensidade" data-bloco="blocoDensidade">
+        <header>
+          <h2>Mapa de densidade</h2>
+          <span class="meta" id="metaDensidade">itens mais frequentes do corpus completo, por vizinhança</span>
+        </header>
+        <div class="dendro-controles">
+          <label class="campo-mini dendro-grupos">Nº de itens: <b id="dnNosValor">150</b>
+            <input type="range" id="dnNos" min="20" max="200" step="10" value="150" aria-label="Número máximo de itens do mapa">
+          </label>
+          <label class="campo-mini dendro-grupos">Suavização: <b id="dnSuavValor">4</b>
+            <input type="range" id="dnSuav" min="1" max="9" step="1" value="4" aria-label="Suavização do mapa de densidade">
+          </label>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioDensidade">Execute uma análise para ver o mapa de densidade.</div>
+          <div class="dn-figura" id="dnFigura" hidden></div>
+        </div>
+        <div class="rodape-tabela" id="rodapeDensidade">Cor = densidade de itens frequentes e fortemente ligados (branco: pouca; amarelo: muita). Usa o corpus completo, não só o período; só os rótulos que cabem aparecem.</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoDuploMapa" data-bloco="blocoDuploMapa">
+        <header>
+          <h2>Duplo mapa de áreas das revistas</h2>
+          <span class="meta" id="metaDuploMapa">revistas que publicam o corpus e revistas citadas, por área</span>
+        </header>
+        <div class="dendro-controles">
+          <label class="campo-mini dendro-grupos">Revistas que publicam: <b id="dmEsqValor">10</b>
+            <input type="range" id="dmEsq" min="3" max="30" step="1" value="10" aria-label="Número de revistas que publicam o corpus">
+          </label>
+          <label class="campo-mini dendro-grupos">Revistas citadas: <b id="dmDirValor">16</b>
+            <input type="range" id="dmDir" min="5" max="40" step="1" value="16" aria-label="Número de revistas citadas">
+          </label>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioDuploMapa">Execute uma análise para ver o duplo mapa.</div>
+          <div class="dm-figura" id="dmFigura" hidden></div>
+        </div>
+        <p class="dm-aviso" id="dmAviso" hidden></p>
+        <div class="tabela-scroll dm-tabela" id="dmTabelaCaixa" hidden>
+          <table>
+            <caption>Revista → área, para conferência (classificação aproximada por palavras do nome)</caption>
+            <thead>
+              <tr>
+                <th>Revista</th>
+                <th style="width:190px">Área (aproximada)</th>
+                <th style="width:170px" title="Termo da lista de áreas que decidiu a classificação">Termo que decidiu</th>
+                <th class="num" style="width:96px" title="Citações feitas pelos documentos do corpus publicados na revista">Citações feitas</th>
+                <th class="num" style="width:108px" title="Citações recebidas das revistas do corpus">Citações recebidas</th>
+                <th style="width:92px">Desenhada</th>
+              </tr>
+            </thead>
+            <tbody id="dmCorpo"></tbody>
+          </table>
+        </div>
+        <div class="rodape-tabela" id="rodapeDuploMapa">Esquerda: revistas que publicam os documentos do corpus; direita: revistas citadas por elas; faixa = citações entre áreas. A área é inferida por palavras do NOME da revista (aproximada): confira a tabela. Usa o corpus completo, não só o período.</div>
+      </section>
+
+      <section class="tabela-bloco" id="blocoSimilitude" data-bloco="blocoSimilitude">
+        <header>
+          <h2>Similitude dos resumos</h2>
+          <span class="meta" id="metaSimilitude">palavras dos resumos que aparecem juntas, em blocos temáticos</span>
+        </header>
+        <div class="dendro-controles sm-controles">
+          <label class="campo-mini">Idioma
+            <select id="smIdioma" aria-label="Idioma dos resumos">
+              <option value="todos">todos</option>
+              <option value="en">inglês</option>
+              <option value="pt">português</option>
+              <option value="es">espanhol</option>
+            </select>
+          </label>
+          <label class="campo-mini">Período
+            <select id="smPeriodo" aria-label="Período dos resumos">
+              <option value="todos">todos</option>
+            </select>
+          </label>
+          <label class="campo-mini">Índice
+            <select id="smIndice" aria-label="Índice de associação">
+              <option value="jaccard">Jaccard</option>
+              <option value="cosseno">cosseno</option>
+              <option value="binomial">binomial</option>
+              <option value="cooc">coocorrência</option>
+            </select>
+          </label>
+          <label class="campo-mini">Segmento
+            <select id="smSegmento" aria-label="Segmento de texto">
+              <option value="resumo">resumo inteiro</option>
+              <option value="frase">grupos de frases</option>
+            </select>
+          </label>
+          <label class="campo-mini dendro-grupos">Palavras: <b id="smNValor">60</b>
+            <input type="range" id="smN" min="30" max="100" step="5" value="60" aria-label="Número de palavras no grafo">
+          </label>
+          <label class="campo-mini dendro-grupos">Arestas extras: <b id="smExtrasValor">20%</b>
+            <input type="range" id="smExtras" min="0" max="50" step="5" value="20" aria-label="Porcentagem de arestas extras tracejadas">
+          </label>
+          <label class="campo-mini sm-ignorar">Ignorar
+            <input type="text" id="smIgnorar" maxlength="400" placeholder="palavras separadas por vírgula" aria-label="Palavras a ignorar, separadas por vírgula">
+          </label>
+        </div>
+        <div class="dendro-caixa">
+          <div class="vazio" id="vazioSimilitude">Execute uma análise para ver a similitude dos resumos.</div>
+          <div class="sm-figura" id="smFigura" hidden></div>
+        </div>
+        <ul class="sm-avisos" id="smAvisos" hidden></ul>
+        <p class="dm-aviso" id="smNota" hidden></p>
+        <div class="tabela-scroll dm-tabela" id="smTabelaCaixa" hidden>
+          <table>
+            <caption>Palavras do grafo: frequência, bloco e grau</caption>
+            <thead>
+              <tr>
+                <th>Palavra</th>
+                <th style="width:70px">Idioma</th>
+                <th class="num" style="width:96px" title="Segmentos (resumos, ou grupos de frases) em que a palavra aparece">Frequência</th>
+                <th class="num" style="width:80px" title="Resumos em que a palavra aparece">Resumos</th>
+                <th class="num" style="width:100px" title="Vezes que a palavra aparece, contando repetições">Ocorrências</th>
+                <th class="num" style="width:64px" title="Bloco temático (comunidade de Louvain)">Bloco</th>
+                <th class="num" style="width:64px" title="Número de ligações desenhadas (árvore e extras)">Grau</th>
+              </tr>
+            </thead>
+            <tbody id="smCorpo"></tbody>
+          </table>
+        </div>
+        <div class="rodape-tabela" id="rodapeSimilitude">Cada ponto é uma palavra dos resumos (forma básica); linha cheia = árvore máxima dos laços mais fortes, tracejada = laços extras; cores = blocos temáticos. O idioma de cada resumo é detectado (en, pt, es) e palavras de idiomas diferentes não se juntam. Usa os resumos do corpus (do período escolhido).</div>
+      </section>
+
+      <section class="acoes-finais">
+        <div>
+          <div class="rotulo-secao">Exportar e compartilhar</div>
+          <p class="dica">Relatórios em HTML e os dados desta análise.</p>
+        </div>
+        <div class="espaco"></div>
+        <div class="menu-exportar" id="menuExportar">
+          <button type="button" class="botao escuro" id="btnExportarMenu"
+                  aria-haspopup="menu" aria-expanded="false" aria-controls="listaExportar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
+            </svg>
+            Exportar
+            <svg class="chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="menu-lista" id="listaExportar" role="menu" aria-label="Exportar" hidden>
+            <div class="menu-grupo" role="group" aria-labelledby="mgRelatorio">
+              <div class="menu-titulo" id="mgRelatorio" role="presentation">Relatório</div>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="relatorio-unico">Relatório completo (arquivo único)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="relatorio-pastas">Relatório completo (pasta de páginas)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="relatorio-analise" data-precisa="resultado">Relatório desta análise (HTML)</button>
+            </div>
+            <div class="menu-grupo" role="group" aria-labelledby="mgDados">
+              <div class="menu-titulo" id="mgDados" role="presentation">Dados</div>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="indices-tsv" data-precisa="resultado">Índices (TSV)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="rede-pajek" data-precisa="resultado">Rede (Pajek)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="rede-graphml" data-precisa="resultado">Rede (GraphML)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="grupos-xml" data-precisa="resultado">Grupos da base (XML)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="documentos-tsv" data-precisa="resultado">Documentos do período (TSV)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="dendrograma-svg" data-precisa="resultado">Dendrograma do período (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="linhatempo-svg" data-precisa="resultado">Linha do tempo (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="densidade-svg" data-precisa="resultado">Mapa de densidade (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="duplomapa-svg" data-precisa="resultado">Duplo mapa de áreas (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="similitude-svg" data-precisa="resultado">Similitude dos resumos (SVG)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="similitude-graphml" data-precisa="resultado">Similitude dos resumos (GraphML)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="similitude-csv" data-precisa="resultado">Similitude: palavras (CSV)</button>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="fluxo-svg">Fluxo Autor – País – IES (SVG)</button>
+            </div>
+            <p class="menu-aviso" id="avisoExportar" hidden>Escolha uma análise no menu lateral para liberar os dados.</p>
+            <div class="menu-grupo so-avancado" role="group" aria-labelledby="mgGrade">
+              <div class="menu-titulo" id="mgGrade" role="presentation">Avançado</div>
+              <button type="button" role="menuitem" tabindex="-1" data-exp="grade" data-precisa="grade">Grade completa de análises</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<div class="overlay" id="modalBase" hidden>
+  <div class="modal largo-modal" role="dialog" aria-modal="true" aria-labelledby="tituloBase">
+    <header>
+      <div>
+        <h2 id="tituloBase">Base de conhecimento</h2>
+        <p id="baseResumo">—</p>
+      </div>
+      <div class="espaco"></div>
+      <button class="fechar" id="fecharBase" aria-label="Fechar">×</button>
+    </header>
+
+    <div class="secao">
+      <div class="rotulo-secao">Períodos</div>
+      <div id="basePeriodos" class="lista-base"></div>
+      <div class="linha-base" style="margin:10px 0">
+        <label class="campo-mini"><span>Quantos períodos</span>
+          <select id="sugestaoQuantidade">
+            <option value="">Automático</option>
+            <option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option>
+          </select></label>
+        <button class="botao" type="button" id="btnSugerirPeriodos">Sugerir períodos pelos anos dos documentos</button>
+      </div>
+      <form class="form-periodo" id="formPeriodo">
+        <div class="campo-form"><label for="periodoNome">Novo período</label>
+          <input id="periodoNome" placeholder="2027–2030" required></div>
+        <div class="campo-form"><label for="periodoInicio">Ano inicial</label>
+          <input id="periodoInicio" type="number" value="2027" required></div>
+        <div class="campo-form"><label for="periodoFim">Ano final</label>
+          <input id="periodoFim" type="number" value="2030" required></div>
+        <div class="campo-form"><label>&nbsp;</label>
+          <button class="botao escuro" type="submit">Criar período</button></div>
+      </form>
+    </div>
+
+    <div class="secao" id="secaoGrafias">
+      <div class="rotulo-secao">Revisar grafias e agrupar</div>
+      <p class="dica">Encontra variantes do mesmo autor, palavra-chave, instituição ou país e propõe uma grafia única. Se quiser, informe as grafias corretas: o programa procura as variantes de cada uma.</p>
+      <div class="linha-base">
+        <label class="campo-mini"><span>O que revisar</span>
+          <select id="grafiaTipo">
+            <option value="autor">Autores</option>
+            <option value="palavra">Palavras-chave</option>
+            <option value="ies">Instituições (IES)</option>
+            <option value="pais">Países</option>
+          </select></label>
+        <button class="botao escuro" type="button" id="btnGrafiaBuscar">Buscar variantes</button>
+        <span class="dica" id="grafiaResumo"></span>
+      </div>
+      <details class="grafia-lista">
+        <summary>Informar grafias corretas (opcional)</summary>
+        <textarea id="grafiaLista" rows="5" spellcheck="false"
+          placeholder="Uma por linha. Apelidos depois de =, separados por |&#10;Universidade Federal de São Carlos = UFSCar | Fed. Univ. São Carlos&#10;Silva, Gerlan M.&#10;Educação Estatística"></textarea>
+        <span class="dica">A lista fica guardada neste navegador, por tipo.</span>
+      </details>
+      <div id="grafiaResultado" class="grafia-resultado"></div>
+      <div class="linha-base" id="grafiaAcoes" hidden>
+        <button class="botao" type="button" id="btnGrafiaAlta">Marcar só as de confiança alta</button>
+        <button class="botao" type="button" id="btnGrafiaLimpar">Desmarcar tudo</button>
+        <button class="botao escuro" type="button" id="btnGrafiaAplicar">Agrupar selecionados</button>
+      </div>
+    </div>
+
+    <div class="secao">
+      <div class="rotulo-secao">Grupos</div>
+      <div class="linha-base">
+        <label class="campo-mini"><span>Tipo</span>
+          <select id="baseTipo">
+            <option value="palavra">Palavras</option>
+            <option value="autor">Autores</option>
+            <option value="referencia">Referências</option>
+            <option value="autor_referencia">Autores de referência</option>
+            <option value="fonte">Fontes de referência</option>
+          </select>
+        </label>
+        <label class="campo-mini campo-busca"><span>Buscar</span>
+          <input id="buscaBase" placeholder="fonte, autor ou referência" spellcheck="false">
+        </label>
+        <span class="dica" id="baseGrupoTotal">—</span>
+      </div>
+      <div id="baseGrupos" class="lista-base"></div>
+      <div class="linha-base">
+        <label class="campo-mini"><span>Juntar</span><select id="baseOrigem"></select></label>
+        <label class="campo-mini"><span>em</span><select id="baseDestino"></select></label>
+        <button class="botao" id="btnJuntar">Juntar grupos</button>
+      </div>
+      <form class="form-substituir" id="formSubstituir">
+        <div class="campo-form"><label for="substituirDe">Grafia atual</label>
+          <input id="substituirDe" required></div>
+        <div class="campo-form"><label for="substituirPara">Nova grafia</label>
+          <input id="substituirPara" required></div>
+        <div class="campo-form"><label>&nbsp;</label>
+          <button class="botao escuro" type="submit">Substituir</button></div>
+      </form>
+    </div>
+
+    <div class="secao">
+      <div class="linha-base">
+        <button class="botao" id="btnDesfazerBase">Desfazer última alteração</button>
+        <span class="dica" id="baseUndo">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="tela tela-importar" id="modal" aria-labelledby="tituloModal" hidden>
+  <div class="tela-miolo">
+    <header class="tela-topo">
+      <img src="/static/logo-mark.svg" alt="" width="36" height="36">
+      <span class="tela-marca">Redes</span>
+      <div class="espaco"></div>
+      <button type="button" class="botao" id="fecharModal" hidden>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        Voltar ao projeto
+      </button>
+    </header>
+
+    <h1 id="tituloModal" tabindex="-1">Importe um corpus para começar</h1>
+    <p class="tela-sub">Escolha o arquivo exportado da sua base bibliográfica. O formato é reconhecido pelo conteúdo.</p>
+
+    <button type="button" class="continuar" id="btnContinuar" hidden>
+      <span class="continuar-texto">
+        <span class="continuar-rotulo">Continuar com <b id="continuarNome"></b></span>
+        <span class="continuar-meta" id="continuarMeta">último projeto aberto</span>
+      </span>
+      <span class="continuar-seta" aria-hidden="true">→</span>
+    </button>
+
+    <form id="formImportar" class="form-importar">
+      <label class="soltar" id="areaSoltar" for="arquivo">
+        <svg class="soltar-icone" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        <span class="texto" id="textoArquivo"><b>Arraste o arquivo para cá</b><br>ou clique para escolher</span>
+        <span class="soltar-formatos">Scopus · Web of Science · OpenAlex · Zotero · BibTeX · RIS · CSV</span>
+      </label>
+      <input type="file" id="arquivo" class="so-leitor" accept=".csv,.bib,.bibtex,.ris,.txt">
+
+      <details class="opcoes-importar" id="opcoesImportar">
+        <summary>Opções</summary>
+        <div class="form-grade">
+          <div class="campo-form">
+            <label for="formato">Formato</label>
+            <select id="formato">
+              <option value="auto">Detectar automaticamente</option>
+              <option value="csv">CSV tabulado (Redes/WoS)</option>
+              <option value="bibtex">BibTeX</option>
+              <option value="ris">RIS</option>
+              <option value="openalex">CSV do OpenAlex</option>
+              <option value="wos">Web of Science (texto)</option>
+              <option value="scopus">CSV da Scopus</option>
+              <option value="zotero">CSV do Zotero</option>
+            </select>
+          </div>
+          <div class="campo-form">
+            <label for="nomeProjeto">Nome do projeto</label>
+            <input id="nomeProjeto" placeholder="Por exemplo: celii">
+          </div>
+          <div class="campo-form largo">
+            <label for="periodos">Períodos</label>
+            <input id="periodos" placeholder="Vazio: divisão automática. Ou: 2008-2014, 2015-2020, 2021-2026">
+            <div class="dica">Vazio: a ferramenta escolhe de 1 a 4 períodos com volume parecido de documentos. Para um período só, escreva “unico”; ou liste as faixas, separadas por vírgula.</div>
+          </div>
+        </div>
+      </details>
+
+      <div class="acoes-form">
+        <span class="dica" id="importando" role="status" hidden>Importando e construindo a base…</span>
+        <div class="espaco"></div>
+        <button type="submit" class="botao escuro grande" id="btnImportar">Importar e abrir</button>
+      </div>
+    </form>
+
+    <section class="recentes-bloco" aria-labelledby="rotuloRecentes">
+      <h2 class="rotulo-secao" id="rotuloRecentes">Projetos recentes</h2>
+      <div class="recentes" id="recentes">
+        <div class="dica">Nenhum projeto ainda.</div>
+      </div>
+    </section>
+
+    <details class="existente" id="abrirExistente">
+      <summary>Abrir projeto existente</summary>
+      <div class="caminho-linha">
+        <input id="caminhoProjeto" placeholder="/caminho/para/dados.redes" spellcheck="false" aria-label="Caminho de um projeto .redes">
+        <button type="button" class="botao escuro" id="btnAbrirCaminho" style="flex:none">Abrir</button>
+      </div>
+      <div class="dica" id="workspace"></div>
+    </details>
+
+    <p class="tela-rodape">Redes · versão local. Nenhum dado sai desta máquina.</p>
+  </div>
+</section>
+
+<div class="overlay" id="modalSobre" hidden>
+  <div class="modal sobre-modal" role="dialog" aria-modal="true" aria-labelledby="tituloSobre">
+    <header>
+      <div>
+        <h2 id="tituloSobre">Sobre o Redes</h2>
+        <p>Uso, escopo e créditos da ferramenta.</p>
+      </div>
+      <div class="espaco"></div>
+      <button class="fechar" id="fecharSobre" aria-label="Fechar">×</button>
+    </header>
+
+    <div class="secao">
+      <div class="rotulo-secao">O que é</div>
+      <p class="texto-sobre">O Redes foi criado por Gerlan Silva da Silva (UFSCar) para as análises da sua tese de doutorado. Escrito em Python, com estatística rodada em NetworkX e NumPy e interface web local.</p>
+      <p class="texto-sobre">O Redes importa corpus de Scopus, OpenAlex, Web of Science, RIS, BibTeX e CSV, organiza períodos e grupos, monta redes de coocorrência e acoplamento, calcula medidas de centralidade e densidade, desenha halos e diagramas estratégicos e gera relatórios em HTML.</p>
+    </div>
+
+    <div class="secao">
+      <div class="rotulo-secao">Como usar</div>
+      <div class="ajuda-passos">
+        <div><b>1. Importe o corpus</b><span>Escolha o arquivo; o formato é reconhecido pelo conteúdo. O projeto é gravado com a extensão <code>.redes</code>.</span></div>
+        <div><b>2. Defina os períodos</b><span>Uma faixa por período, na importação ou depois, na tela Base.</span></div>
+        <div><b>3. Ajuste a análise</b><span>Escolha unidade (palavras, autores, referências, fontes ou países), matriz, similaridade e agrupamento.</span></div>
+        <div><b>4. Explore e exporte</b><span>Pré-visualize, rode a grade completa, consulte índices e documentos e gere o relatório HTML.</span></div>
+      </div>
+      <p class="dica" style="margin-top:14px">Tudo roda na sua máquina; nenhum dado é enviado para fora.</p>
+    </div>
+
+    <div class="secao">
+      <div class="rotulo-secao">Créditos</div>
+      <div class="creditos">
+        <p class="credito-nome">Desenvolvido por Gerlan Silva da Silva</p>
+        <p>Doutorando em Educação — Programa de Pós-Graduação em Educação</p>
+        <p>Universidade Federal de São Carlos (UFSCar)</p>
+        <p><a href="https://orcid.org/0000-0002-9996-9983" target="_blank" rel="noopener">ORCID 0000-0002-9996-9983</a></p>
+      </div>
+      <p class="dica" style="margin-top:12px">Redes · versão local.</p>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modalAjuda" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloAjuda">
+    <header>
+      <div>
+        <h2 id="tituloAjuda">Como usar</h2>
+        <p>Um roteiro curto para chegar aos resultados.</p>
+      </div>
+      <div class="espaco"></div>
+      <button class="fechar" id="fecharAjuda" aria-label="Fechar">×</button>
+    </header>
+    <div class="secao">
+      <div class="ajuda-passos">
+        <div><b>1. Abra o corpus</b><span>Use "Abrir projeto" para um <code>.redes</code> existente ou importe CSV, BibTeX, RIS, OpenAlex, Web of Science ou Scopus.</span></div>
+        <div><b>2. Ajuste, se quiser</b><span>A frequência mínima é escolhida automaticamente no modo simples, para evitar dezenas de temas minúsculos. Os demais parâmetros ficam no modo avançado. O período fica no topo.</span></div>
+        <div><b>3. Execute</b><span>No modo simples a análise roda sozinha ao escolher o tema ou o período. No modo avançado (rodapé do menu), "Pré-visualizar" roda uma configuração e "Grade completa" percorre todas as combinações.</span></div>
+        <div><b>4. Explore</b><span>O Resumo traz os temas por quadrante; clique em um tema para ver itens e documentos. Rede, diagrama estratégico e comparação de períodos ficam nas outras abas; índices, agrupamentos e documentos, no modo avançado.</span></div>
+        <div><b>5. Exporte</b><span>Ao final, baixe a grade, exporte índices e redes ou gere o relatório HTML.</span></div>
+      </div>
+      <p class="dica" style="margin-top:16px">Tudo roda na sua máquina; nenhum dado é enviado para fora. Atalho: <kbd>Esc</kbd> fecha janelas abertas.</p>
+    </div>
+  </div>
+</div>
+
+<div class="overlay-drawer" id="drawer" hidden>
+  <div class="drawer-painel" role="dialog" aria-modal="true" aria-labelledby="drawerTitulo">
+    <header class="drawer-topo">
+      <span class="selo" id="drawerSelo">1</span>
+      <div class="drawer-identidade">
+        <h2 id="drawerTitulo">Agrupamento</h2>
+        <div class="drawer-sub" id="drawerQuadrante"></div>
+      </div>
+      <button class="fechar" id="fecharDrawer" aria-label="Fechar">×</button>
+    </header>
+    <div class="drawer-metricas" id="drawerMetricas"></div>
+    <div class="drawer-corpo" id="drawerCorpo">
+      <section class="drawer-secao">
+        <div class="rotulo-secao">Itens <span id="drawerItensQtd"></span></div>
+        <div id="drawerItens"></div>
+      </section>
+      <section class="drawer-secao">
+        <div class="rotulo-secao">Documentos <span id="drawerDocsQtd"></span></div>
+        <div id="drawerDocumentos"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" hidden>
+  <button class="fechar-luz" id="fecharLightbox" aria-label="Fechar">×</button>
+  <a class="baixar-luz" id="baixarLightbox" href="#" download>Baixar SVG</a>
+  <img id="imagemLightbox" alt="">
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="/static/app.js"></script>
+<script src="/static/bibliometria.js"></script>
+<script src="/static/exportar_bib.js"></script>
+<script src="/static/grafias.js"></script>
+</body>
+</html>

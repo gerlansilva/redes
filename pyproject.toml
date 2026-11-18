@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "redes"
+dynamic = ["version"]
+description = "Redes: mapeamento científico (bibliometria) e análise de redes da produção científica, com interface web local em português"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Gerlan Silva da Silva" }]
+keywords = ["bibliometria", "cientometria", "mapeamento científico", "análise de redes", "Scopus", "OpenAlex"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Natural Language :: Portuguese (Brazilian)",
+]
+dependencies = ["networkx>=3.0", "numpy>=1.24"]
+
+[project.optional-dependencies]
+teste = ["pytest>=7", "playwright>=1.40"]
+
+[project.urls]
+ORCID = "https://orcid.org/0000-0002-9996-9983"
+
+[project.scripts]
+redes = "redes.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["redes*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "redes.__version__" }
+
+[tool.setuptools.package-data]
+redes = ["ui/*", "assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
