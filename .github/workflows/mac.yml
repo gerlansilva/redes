@@ -1,0 +1,49 @@
+name: Redes para macOS
+
+on:
+  push:
+    branches: [rust-mac]
+    paths: ["rust/**", ".github/workflows/mac.yml"]
+  pull_request:
+    paths: ["rust/**", ".github/workflows/mac.yml"]
+  workflow_dispatch:
+
+jobs:
+  dmg:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Testes
+        run: cargo test -p redes-app
+
+      - name: Ícone
+        run: |
+          brew install librsvg
+          scripts/gerar_icns.sh packaging/Redes.icns
+
+      - name: Empacotar Redes.app e .dmg (universal)
+        run: scripts/empacotar_mac.sh
+
+      - name: Conferir o pacote
+        run: |
+          lipo -info dist/Redes.app/Contents/MacOS/redes
+          plutil -lint dist/Redes.app/Contents/Info.plist
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Redes-macOS-dmg
+          path: rust/dist/*.dmg
+          if-no-files-found: error

@@ -1,0 +1,25 @@
+[package]
+name = "redes-app"
+version = "0.1.0"
+edition = "2021"
+description = "Redes: mapeamento científico, aplicativo nativo para macOS"
+license = "MIT"
+
+[lib]
+name = "redes_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "redes"
+path = "src/main.rs"
+
+[dependencies]
+redes-core = { path = "../redes-core", optional = true }
+eframe = { version = "0.31", default-features = false, features = ["glow", "default_fonts", "x11"] }
+rfd = "0.15"
+resvg = { version = "0.45", default-features = false, features = ["text", "system-fonts"] }
+
+[features]
+# Núcleo real ligado por padrão; `--no-default-features` volta ao mock.
+default = ["nucleo"]
+nucleo = ["dep:redes-core"]
