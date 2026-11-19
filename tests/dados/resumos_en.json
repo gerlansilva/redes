@@ -1,0 +1,117 @@
+[
+ {
+  "titulo": "Teachers' professional knowledge for teaching statistics",
+  "resumo": "This study investigates the professional knowledge of primary school teachers who teach statistics. Through interviews and classroom observations, we analyzed how teachers understand graphs, tables and measures of center. The findings indicate that reflection on teaching practice supported changes in lesson planning and in the way teachers pose questions to students.",
+  "ano": 2018
+ },
+ {
+  "titulo": "Preservice teachers and statistical thinking",
+  "resumo": "We examine the statistical thinking of preservice teachers in an introductory course. Data from written tasks and interviews show that future teachers value real data, but feel unsure when discussing variability and uncertainty. We argue that teacher education programs should give more attention to statistical reasoning.",
+  "ano": 2019
+ },
+ {
+  "titulo": "Professional development in statistics education",
+  "resumo": "This paper discusses professional development programs in statistics education. A review of studies shows that the most effective programs combine content study, analysis of classroom tasks, and collaboration among teachers who share their teaching experiences.",
+  "ano": 2021
+ },
+ {
+  "titulo": "Statistical literacy of high school students",
+  "resumo": "The study assesses the statistical literacy of high school students reading news reports that include data and graphs. Students struggled to evaluate statistical claims critically and to recognize bias in samples. Statistical literacy requires a critical reading of data in social contexts.",
+  "ano": 2017
+ },
+ {
+  "titulo": "Variability and statistical reasoning in middle school",
+  "resumo": "We investigate how middle school students reason about variability and distribution. Tasks showed that students notice variation but rarely connect it with the shape of the distribution and with the uncertainty of conclusions drawn from samples.",
+  "ano": 2019
+ },
+ {
+  "titulo": "Developing statistical reasoning with real data",
+  "resumo": "This article examines how working with real data helps students develop statistical reasoning. Students formulated questions, collected data and compared distributions, and the results suggest that investigations support understanding of variability, sampling and inference.",
+  "ano": 2020
+ },
+ {
+  "titulo": "Teaching probability through games and experiments",
+  "resumo": "This study analyzes the teaching of probability in elementary grades through games and random experiments. Children explored the sample space and compared the likelihood of events, and results indicate that playful activities support the understanding of randomness and chance.",
+  "ano": 2016
+ },
+ {
+  "titulo": "Students' conceptions of randomness and uncertainty",
+  "resumo": "We investigate students' conceptions of randomness and uncertainty. Data reveal deterministic beliefs and the idea that random events follow predictable patterns. We propose simulation activities so that students can confront their probabilistic intuitions with experimental results.",
+  "ano": 2018
+ },
+ {
+  "titulo": "Conditional probability: difficulties and teaching strategies",
+  "resumo": "This article reports research on the difficulties students have with conditional probability. The most frequent errors involved confusing dependent and independent events. We suggest two-way tables and tree diagrams as strategies for teaching conditional probability.",
+  "ano": 2021
+ },
+ {
+  "titulo": "Using spreadsheets to teach statistics",
+  "resumo": "The aim of this work is to analyze the use of spreadsheets in teaching statistics in secondary classrooms. Students built graphs and calculated measures from data they collected. Results show that technology expanded the possibilities for exploring data.",
+  "ano": 2017
+ },
+ {
+  "titulo": "Simulation and informal statistical inference",
+  "resumo": "This article examines how computer simulation can support informal statistical inference. With dynamic software, participants generated random samples and compared distributions, which helped them understand sampling variability and the uncertainty of inference.",
+  "ano": 2019
+ },
+ {
+  "titulo": "Digital technology in statistics education: a review",
+  "resumo": "We review research on digital technology in statistics education. Studies report the use of software such as Tinkerplots, Excel and R, as well as mobile applications. Most studies highlight that technological resources support the visualization of data and investigation.",
+  "ano": 2020
+ },
+ {
+  "titulo": "Statistics in the school curriculum",
+  "resumo": "We analyze how statistics is presented in the school curriculum for primary and secondary education. The documents propose content on data and probability, with guidelines that value investigation and graph reading. We discuss gaps and challenges for curriculum implementation in schools.",
+  "ano": 2019
+ },
+ {
+  "titulo": "Textbooks and the teaching of statistics",
+  "resumo": "This study analyzes statistics tasks in mathematics textbooks for middle school. We found a predominance of tasks about computing measures and reading ready-made graphs, with few proposals for investigation and data collection.",
+  "ano": 2018
+ },
+ {
+  "titulo": "Students' understanding of graphs",
+  "resumo": "We investigate students' understanding of bar and line graphs. The analysis of responses showed difficulties in interpreting scales and reading trends. Students tend to read single values without comparing information or drawing conclusions.",
+  "ano": 2016
+ },
+ {
+  "titulo": "Misconceptions about the mean",
+  "resumo": "We analyze students' conceptions of the arithmetic mean and other measures of center. Results indicate that many students reduce the mean to an algorithm and do not relate it to the distribution of data, which limits interpretation in real situations.",
+  "ano": 2018
+ },
+ {
+  "titulo": "Assessment of statistical learning",
+  "resumo": "This work discusses instruments for assessing statistical learning in schools. Based on a review, we propose open tasks that assess the interpretation of data, argumentation and communication of results, besides computational procedures.",
+  "ano": 2023
+ },
+ {
+  "titulo": "Statistical investigation projects in the classroom",
+  "resumo": "We report an experience with statistical investigation projects in middle school classes. Students formulated questions about their school, collected data, built graphs and communicated conclusions. Projects supported autonomy and understanding of the investigative cycle.",
+  "ano": 2018
+ },
+ {
+  "titulo": "Critical statistics education and modeling",
+  "resumo": "We discuss the connection between mathematical modeling and critical statistics education in projects that start from social themes chosen by students. The data allowed debates on inequality and consumption, and the study shows that modeling broadens student participation in classroom decisions.",
+  "ano": 2021
+ },
+ {
+  "titulo": "Learning to teach statistics with technology",
+  "resumo": "This paper describes a course in which teachers learned to teach statistics with technology. Participants analyzed data, discussed the role of simulation and planned lessons. The course improved their confidence in teaching variability and sampling.",
+  "ano": 2022
+ },
+ {
+  "titulo": "Probability reasoning in secondary school",
+  "resumo": "We study how secondary school students reason about probability in tasks about repeated experiments. Students recognized that relative frequencies stabilize but often expected short sequences to look random, a belief known as the representativeness heuristic.",
+  "ano": 2020
+ },
+ {
+  "titulo": "Primary school children and data representation",
+  "resumo": "This study explores how primary school children represent data. Students organized data in tables and pictographs and progressively used bar graphs. Teachers' questions and the use of real contexts supported children's reasoning about categories and counts.",
+  "ano": 2019
+ },
+ {
+  "titulo": "Statistical literacy in the news",
+  "resumo": "We analyze how citizens interpret statistical information in the news. Participants frequently accepted claims without questioning how data were collected, and we propose classroom activities that develop critical evaluation of statistics in public discourse.",
+  "ano": 2021
+ }
+]

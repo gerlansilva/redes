@@ -122,6 +122,10 @@ def divide_segmentos(valor: str) -> list[str]:
     return [s for s in saida if s]
 
 
+# segunda parte do nome em dois pedaços: "C.", "C.E.", "J.-D." ou até duas maiúsculas soltas
+_SO_INICIAIS = re.compile(r"^(?:(?:[A-ZÀ-Ý]\.-?){1,4}[A-Z]?|[A-ZÀ-Ý]{1,2})$")
+
+
 def le_autor_afiliacao(valor: str) -> list[tuple[str, str]]:
     """Lê "Authors with affiliations" em pares (autor, afiliação).
 
@@ -136,8 +140,12 @@ def le_autor_afiliacao(valor: str) -> list[tuple[str, str]]:
             pares.append((entre.group(1).strip(), entre.group(2).strip()))
             continue
         partes = [p.strip() for p in segmento.split(",")]
-        if len(partes) >= 3:
+        # "Sobrenome, Iniciais, Instituição..." (nome em duas partes) ou
+        # "Sobrenome Iniciais, Instituição..." (formato da Scopus, nome em uma só).
+        if len(partes) >= 3 and _SO_INICIAIS.match(partes[1]):
             pares.append((", ".join(partes[:2]), ", ".join(partes[2:])))
+        elif len(partes) >= 2:
+            pares.append((partes[0], ", ".join(partes[1:])))
     return pares
 
 

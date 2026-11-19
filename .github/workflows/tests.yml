@@ -1,0 +1,71 @@
+name: testes
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unittest:
+    name: unittest (Python ${{ matrix.python }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Instalar o pacote
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Testes (unittest)
+        # Os testes que dependem de projetos reais (/home/claude/t/...) ou do Playwright
+        # pulam sozinhos quando o recurso não existe.
+        run: python -m unittest discover -s tests -v
+
+  interface:
+    # Opcional: só roda os testes de interface (Playwright) e não bloqueia o restante.
+    name: interface (Playwright, opcional)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Instalar o pacote e o Playwright
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[teste]"
+          python -m playwright install --with-deps chromium
+      - name: Testes (unittest, com a interface)
+        run: python -m unittest discover -s tests -v
+
+  pacote:
+    name: instalação limpa e entrada `redes`
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Instalar fora do modo editável e subir a interface
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install .
+          cd /tmp
+          /tmp/venv/bin/redes --help
+          /tmp/venv/bin/redes web --porta 8799 --nao-abrir --projetos /tmp/projetos &
+          sleep 4
+          curl --fail --silent --output /dev/null http://127.0.0.1:8799/
+          curl --fail --silent --output /dev/null http://127.0.0.1:8799/static/app.js
+          kill %1
