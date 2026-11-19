@@ -1,13 +1,15 @@
 //! Leitura de um projeto `.redes` (SQLite, somente leitura): porta de `kb.py`.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
+use std::rc::Rc;
 
 use rusqlite::{Connection, OpenFlags, Row};
 
 use crate::dataset::{Agregado, Dataset};
 use crate::erro::{Erro, Resultado};
+use crate::ies::{indice_de_ies, IndiceIes};
 use crate::parametros::Unidade;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
@@ -21,6 +23,7 @@ pub struct Projeto {
     pub caminho: String,
     conexao: Connection,
     grupos: RefCell<HashMap<&'static str, HashMap<i64, (String, bool)>>>,
+    ies: RefCell<Option<Rc<IndiceIes>>>,
 }
 
 const SQL_PUBLISHDATES: &str = "SELECT pu.idPublishDate FROM PublishDate_Period pdp, PublishDate pu \
@@ -56,7 +59,7 @@ impl Projeto {
         if conexao.query_row("SELECT 1 FROM Period LIMIT 1;", [], |_| Ok(())).is_err() {
             return Err(Erro::ProjetoInvalido(texto));
         }
-        Ok(Projeto { caminho: texto, conexao, grupos: RefCell::new(HashMap::new()) })
+        Ok(Projeto { caminho: texto, conexao, grupos: RefCell::new(HashMap::new()), ies: RefCell::new(None) })
     }
 
     pub fn periodos(&self) -> Resultado<Vec<Periodo>> {
@@ -65,6 +68,62 @@ impl Projeto {
             .query_map([], |r| {
                 Ok(Periodo { id: r.get(0)?, nome: r.get::<_, Option<String>>(1)?.unwrap_or_default(), posicao: r.get(2)? })
             })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(v)
+    }
+
+    /// Total de documentos do projeto (todos os períodos).
+    pub fn total_documentos(&self) -> Resultado<usize> {
+        let n: i64 = self.conexao.query_row("SELECT COUNT(*) FROM Document", [], |r| r.get(0))?;
+        Ok(n as usize)
+    }
+
+    /// Instituições do projeto com as variantes unidas (calculado uma vez).
+    pub fn indice_ies(&self) -> Resultado<Rc<IndiceIes>> {
+        if let Some(i) = self.ies.borrow().as_ref() {
+            return Ok(i.clone());
+        }
+        let i = Rc::new(indice_de_ies(&self.conexao)?);
+        *self.ies.borrow_mut() = Some(i.clone());
+        Ok(i)
+    }
+
+    /// Título e resumo dos documentos pedidos (para os rótulos por tema).
+    pub fn textos_documentos(&self, ids: &[i64]) -> Resultado<BTreeMap<i64, (String, String)>> {
+        use rusqlite::types::Value;
+        let texto = |v: Value| match v {
+            Value::Null => String::new(),
+            Value::Text(t) => t,
+            Value::Integer(i) => i.to_string(),
+            Value::Real(f) => f.to_string(),
+            Value::Blob(_) => String::new(),
+        };
+        let mut saida = BTreeMap::new();
+        for lote in ids.chunks(500) {
+            let marcas = vec!["?"; lote.len()].join(",");
+            let sql = format!("SELECT idDocument, title, docAbstract FROM Document WHERE idDocument IN ({marcas})");
+            let Ok(mut st) = self.conexao.prepare(&sql) else { return Ok(saida) };
+            let linhas = st.query_map(rusqlite::params_from_iter(lote.iter()), |r| {
+                Ok((r.get::<_, i64>(0)?, r.get::<_, Value>(1)?, r.get::<_, Value>(2)?))
+            })?;
+            for l in linhas {
+                let (d, t, a) = l?;
+                saida.insert(d, (texto(t), texto(a)));
+            }
+        }
+        Ok(saida)
+    }
+
+    /// (documento, nome) das palavras-chave dos autores, com o grupo quando existe.
+    pub fn palavras_chave_autor(&self) -> Resultado<Vec<(i64, String)>> {
+        let mut st = self.conexao.prepare(
+            "SELECT dw.Document_idDocument, COALESCE(g.groupName, w.wordName) \
+             FROM Document_Word dw JOIN Word w ON w.idWord = dw.Word_idWord \
+             LEFT JOIN WordGroup g ON g.idWordGroup = w.WordGroup_idWordGroup \
+             WHERE dw.isAuthorWord = 1 AND COALESCE(g.stopGroup, 0) = 0",
+        )?;
+        let v = st
+            .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, Option<String>>(1)?.unwrap_or_default())))?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(v)
     }
@@ -216,7 +275,12 @@ impl Projeto {
                 }
             }
             Unidade::Institutions => {
-                return Err(Erro::NaoSuportado("unidade Institutions".into()));
+                let indice = self.indice_ies()?;
+                if let Some(lista) = indice.por_documento.get(&doc) {
+                    for ies in lista {
+                        ds.adiciona_item_ao_documento(doc, *ies, &indice.nomes[ies]);
+                    }
+                }
             }
         }
         Ok(())

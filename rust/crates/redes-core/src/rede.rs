@@ -117,6 +117,34 @@ impl Rede {
         pares
     }
 
+    /// Componentes conexos, cada um em ordem crescente (nó isolado conta como componente).
+    pub fn componentes(&self) -> Vec<Vec<i64>> {
+        let n = self.nos.len();
+        let mut visto = vec![false; n];
+        let mut saida = Vec::new();
+        for ini in 0..n {
+            if visto[ini] {
+                continue;
+            }
+            visto[ini] = true;
+            let mut pilha = vec![ini];
+            let mut membros = Vec::new();
+            while let Some(i) = pilha.pop() {
+                membros.push(self.nos[i]);
+                for v in self.adj[i].keys() {
+                    let j = self.idx[v];
+                    if !visto[j] {
+                        visto[j] = true;
+                        pilha.push(j);
+                    }
+                }
+            }
+            membros.sort_unstable();
+            saida.push(membros);
+        }
+        saida
+    }
+
     pub fn filtra_por_valor(&mut self, minimo: f64) {
         for (a, b, v) in self.arestas() {
             if v < minimo {

@@ -4,15 +4,19 @@
 use anyhow::{bail, Context, Result};
 use redes_core::pipeline::{linha_tsv, CABECALHO_TSV};
 use redes_core::{executar_periodos, Algoritmo, Mapeador, Matriz, Parametros, Projeto, Similaridade, Unidade};
+use redes_core::longitudinal::evolucao;
 
 const AJUDA: &str = "uso: redes-cli analisa <projeto.redes> [opções]
-  --unidade Words|Authors|References|AuthorsReference|ReferenceSources|Countries
+       redes-cli longitudinal <projeto.redes> [opções] [--medida M] [--limite-elos N] [--pajek ARQUIVO.net]
+  --unidade Words|Authors|References|AuthorsReference|ReferenceSources|Countries|Institutions
   --matriz CoOccurrence|BasicCoupling|AggregatedCouplingBasedOnAuthor|AggregatedCouplingBasedOnJournal
   --algoritmo CentersSimples|AverageLink|CompleteLink|SingleLink|SumLink|Louvain
   --similaridade AssociationStrength|EquivalenceIndex|InclusionIndex|JaccardIndex|SaltonCosine
   --min-freq N  --min-cooc N  --rede-min N  --rede-max N  --corte X  --k-core N
   --mapeadores nucleo interseccao secundarios kcore uniao acoplamento
   --palavras autor fonte adicionada      --ignorar ITEM...
+  --componente-minimo N                  (Authors/Countries/Institutions; padrão 3 em Institutions, 1 nas demais)
+  --extras centralidades pivos qualidade rotulos   (cálculos opcionais anexados ao resultado)
   --periodo NOME...                      (padrão: todos os períodos)
   --formato json|tsv                     (padrão: json)
   --sem-rede                             (JSON sem a lista de nós e arestas)";
@@ -47,9 +51,13 @@ fn executa() -> Result<()> {
         println!("{AJUDA}");
         return Ok(());
     }
-    if args[0] != "analisa" {
-        bail!("comando desconhecido: {} (use `analisa`)\n{AJUDA}", args[0]);
+    if args[0] != "analisa" && args[0] != "longitudinal" {
+        bail!("comando desconhecido: {} (use `analisa` ou `longitudinal`)\n{AJUDA}", args[0]);
     }
+    let longitudinal = args[0] == "longitudinal";
+    let mut medida = Similaridade::EquivalenceIndex;
+    let mut limite_elos = 3usize;
+    let mut pajek: Option<String> = None;
     let mut caminho: Option<String> = None;
     let mut p = Parametros::default();
     let mut periodos: Vec<String> = Vec::new();
@@ -81,6 +89,21 @@ fn executa() -> Result<()> {
                     .filter(|s| !s.is_empty())
                     .collect()
             }
+            "--componente-minimo" => p.componente_minimo = Some(valor(&args, &mut i, &a)?.parse()?),
+            "--extras" => {
+                for e in lista(&args, &mut i) {
+                    match e.as_str() {
+                        "centralidades" => p.extras.centralidades = true,
+                        "pivos" => p.extras.pivos = true,
+                        "qualidade" => p.extras.qualidade = true,
+                        "rotulos" => p.extras.rotulos = true,
+                        _ => bail!("extra desconhecido: {e}"),
+                    }
+                }
+            }
+            "--medida" => medida = Similaridade::de_texto(&valor(&args, &mut i, &a)?)?,
+            "--limite-elos" => limite_elos = valor(&args, &mut i, &a)?.parse()?,
+            "--pajek" => pajek = Some(valor(&args, &mut i, &a)?),
             "--periodo" => periodos = lista(&args, &mut i),
             "--formato" => formato = valor(&args, &mut i, &a)?,
             "--sem-rede" => sem_rede = true,
@@ -96,6 +119,15 @@ fn executa() -> Result<()> {
     }
     let caminho = caminho.context("informe o projeto .redes")?;
     let projeto = Projeto::abrir(&caminho)?;
+    if longitudinal {
+        let mapa = evolucao(&projeto, &p, medida, limite_elos)?;
+        if let Some(arq) = pajek {
+            std::fs::write(&arq, mapa.pajek()).with_context(|| format!("gravando {arq}"))?;
+        }
+        use std::io::Write;
+        let _ = writeln!(std::io::stdout().lock(), "{}", serde_json::to_string(&mapa)?);
+        return Ok(());
+    }
     let mut resultados = executar_periodos(&projeto, &p, &periodos)?;
 
     match formato.as_str() {

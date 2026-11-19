@@ -4,13 +4,13 @@ use unicode_normalization::UnicodeNormalization;
 
 use crate::parametros::Unidade;
 
-const SIGLAS: &[&str] = &[
+pub(crate) const SIGLAS: &[&str] = &[
     "SPSS", "PISA", "ICME", "TIMSS", "PIRLS", "TALIS", "ENEM", "SAEB", "SAEP", "BNCC", "TIC", "TICS", "ICT", "NCTM",
     "GAISE", "STEM", "STEAM", "PCK", "TPACK", "IASE", "ICOTS", "ANOVA", "IRT", "RME", "PNAIC", "PNLD", "PCN", "LDB",
     "EJA", "IDEB", "MOOC", "MOOCS", "COVID", "CAQDAS", "SIPEM", "IRAMUTEQ", "SBEM",
 ];
 
-const NOMES_PROPRIOS: &[(&str, &str)] = &[
+pub(crate) const NOMES_PROPRIOS: &[(&str, &str)] = &[
     ("GEOGEBRA", "GeoGebra"),
     ("WHATSAPP", "WhatsApp"),
     ("YOUTUBE", "YouTube"),
@@ -177,13 +177,102 @@ pub fn exibe_termo(unidade: Unidade, texto: &str) -> String {
 
 /// Chave de comparação: caixa, acento, pontuação e espaço não contam.
 pub fn chave(nome: &str) -> String {
-    let sem: String = nome.nfd().filter(|c| !is_marca(*c)).collect();
+    let sem: String = nome.nfd().filter(|c| !e_marca(*c)).collect();
     sem.to_lowercase().replace('&', "and").chars().filter(|c| c.is_ascii_lowercase() || c.is_ascii_digit()).collect()
 }
 
-fn is_marca(c: char) -> bool {
+/// `sem_acentos` do Python: NFD sem as marcas combinantes.
+pub fn sem_acentos(nome: &str) -> String {
+    nome.nfd().filter(|c| !e_marca(*c)).collect()
+}
+
+pub(crate) fn e_marca(c: char) -> bool {
     // categoria Mn (marcas combinantes), faixas principais
     matches!(c as u32, 0x0300..=0x036F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF | 0xFE20..=0xFE2F)
+}
+
+// ------------------------------------------------- singular e plural (text_utils)
+
+fn mesmo_plural(a: &str, b: &str) -> bool {
+    let par = |x: &str, y: &str| -> bool {
+        // x no singular, y no plural (maiúsculas ou minúsculas)
+        let mut s = String::new();
+        s.push_str(x);
+        s.push('S');
+        if s == y {
+            return true;
+        }
+        s.pop();
+        s.push_str("ES");
+        if s == y {
+            return true;
+        }
+        if let Some(r) = x.strip_suffix('Y') {
+            if format!("{r}IES") == y {
+                return true;
+            }
+        }
+        let s2 = format!("{x}s");
+        if s2 == y || format!("{x}es") == y {
+            return true;
+        }
+        if let Some(r) = x.strip_suffix('y') {
+            if format!("{r}ies") == y {
+                return true;
+            }
+        }
+        false
+    };
+    par(a, b) || par(b, a)
+}
+
+const SUFIXOS_IRREGULARES: &[(&str, &str)] = &[
+    ("AO", "OES"),
+    ("AO", "AES"),
+    ("AO", "AOS"),
+    ("M", "NS"),
+    ("AL", "AIS"),
+    ("EL", "EIS"),
+    ("OL", "OIS"),
+    ("UL", "UIS"),
+    ("Z", "CES"),
+    ("IS", "ES"),
+];
+
+fn plural_irregular(singular: &str, plural: &str) -> bool {
+    if singular.chars().count() < 5 {
+        return false;
+    }
+    for (fs, fp) in SUFIXOS_IRREGULARES {
+        if let (Some(rs), Some(rp)) = (singular.strip_suffix(fs), plural.strip_suffix(fp)) {
+            if rs == rp {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn mesmo_plural_token(a: &str, b: &str) -> bool {
+    a == b || mesmo_plural(a, b) || plural_irregular(a, b) || plural_irregular(b, a)
+}
+
+/// Singular e plural ou grafia sem acento, palavra por palavra (`mesmo_termo`).
+pub fn mesmo_termo(a: &str, b: &str) -> bool {
+    if a == b {
+        return false;
+    }
+    if mesmo_plural(a, b) {
+        return true;
+    }
+    let sa = sem_acentos(a).to_uppercase();
+    let sb = sem_acentos(b).to_uppercase();
+    if sa == sb {
+        return true;
+    }
+    let ta: Vec<&str> = sa.split('-').collect();
+    let tb: Vec<&str> = sb.split('-').collect();
+    ta.len() == tb.len() && ta.iter().zip(&tb).all(|(x, y)| mesmo_plural_token(x, y))
 }
 
 #[cfg(test)]

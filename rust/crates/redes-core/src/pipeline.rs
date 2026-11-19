@@ -6,8 +6,16 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::agrupamento::agrupa;
+use std::collections::HashMap;
+
+use crate::agrupamento::{agrupa, Conjunto};
+use crate::centralidade::{self, CentralidadeNo};
 use crate::dataset::{Agregado, Dataset};
+use crate::ies::Uniao;
+use crate::pivos::{self, PontosDeVirada};
+use crate::qualidade::{self, Qualidade};
+use crate::rede::Rede;
+use crate::rotulos::{self, RotuloTema};
 use crate::erro::{Erro, Resultado as Res};
 use crate::medidas::*;
 use crate::parametros::{Mapeador, Matriz, Parametros, Unidade};
@@ -35,6 +43,28 @@ pub struct Grupo {
     pub documentos: BTreeMap<String, Vec<i64>>,
     /// Índices de desempenho por mapeador ("nucleo:h", "nucleo:g", ...).
     pub medidas: BTreeMap<String, f64>,
+    /// Soma das citações dos documentos do tema (núcleo; no acoplamento básico, os próprios nós).
+    #[serde(default)]
+    pub citacoes: Option<i64>,
+    /// Rótulo por termos distintivos (LLR), só em Words e References e se pedido em `Extras::rotulos`.
+    #[serde(default)]
+    pub tema: Option<RotuloTema>,
+}
+
+impl Grupo {
+    /// Nome para mostrar: o rótulo por tema, quando há; senão o do líder do agrupamento.
+    pub fn nome_exibido(&self) -> &str {
+        match &self.tema {
+            Some(t) if !t.exibicao.is_empty() => &t.exibicao,
+            _ => {
+                if self.exibicao.is_empty() {
+                    &self.rotulo
+                } else {
+                    &self.exibicao
+                }
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -68,7 +98,11 @@ pub struct Ponto {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Resumo {
     pub periodo: String,
+    /// Documentos do período.
     pub documentos: usize,
+    /// Documentos do projeto inteiro (todos os períodos).
+    #[serde(default)]
+    pub documentos_projeto: usize,
     pub itens: usize,
     pub itens_reduzidos: usize,
     pub grupos: usize,
@@ -82,6 +116,30 @@ pub struct Resumo {
     pub medidas_medias: BTreeMap<String, f64>,
 }
 
+/// Efeito do tamanho mínimo do agrupamento (Authors, Countries e Institutions).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct FiltroAgrupamento {
+    pub minimo: usize,
+    pub grupos_antes: usize,
+    pub grupos_depois: usize,
+    /// Componentes pequenos com mais de um nó.
+    pub componentes_pequenos: usize,
+    pub isolados: usize,
+    pub nos_sem_agrupamento: usize,
+}
+
+/// Rede de instituições: uniões de variantes feitas e componentes deixados sem agrupamento.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct InfoIes {
+    pub componente_minimo: usize,
+    pub unioes: Vec<Uniao>,
+    pub variantes_unidas: usize,
+    /// Tamanhos dos componentes, do maior para o menor.
+    pub componentes: Vec<usize>,
+    pub componentes_pequenos: Vec<Vec<String>>,
+    pub isolados: usize,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Resultado {
     pub parametros: Parametros,
@@ -91,6 +149,112 @@ pub struct Resultado {
     /// Pontos do diagrama estratégico de Callon (um por grupo).
     pub estrategico: Vec<Ponto>,
     pub resumo: Resumo,
+    #[serde(default)]
+    pub filtro_agrupamento: Option<FiltroAgrupamento>,
+    #[serde(default)]
+    pub ies: Option<InfoIes>,
+    /// Com `Extras::centralidades`: centralidades de todos os nós, na ordem de `nos` da rede.
+    #[serde(default)]
+    pub centralidades: Option<Vec<CentralidadeNo>>,
+    /// Com `Extras::pivos`.
+    #[serde(default)]
+    pub pontos_de_virada: Option<PontosDeVirada>,
+    /// Com `Extras::qualidade`.
+    #[serde(default)]
+    pub qualidade: Option<Qualidade>,
+}
+
+/// Resultado de um período com as estruturas internas (rede, conjuntos documentais, agrupamentos).
+pub struct Analise {
+    pub resultado: Resultado,
+    pub rede: Rede,
+    pub original: Dataset,
+    pub dataset: Dataset,
+    pub conjunto: Conjunto,
+    pub agregado: Option<Agregado>,
+    pub titulos: HashMap<i64, String>,
+}
+
+impl Analise {
+    /// Rótulo de um nó para exibição (título do documento ou nome do item).
+    pub fn rotulo(&self, no: i64) -> String {
+        match self.titulos.get(&no) {
+            Some(t) => t.clone(),
+            None => exibe_termo(
+                self.resultado.parametros.unidade,
+                self.dataset.itens.get(&no).map(|s| s.as_str()).unwrap_or(&no.to_string()),
+            ),
+        }
+    }
+
+    /// Frequência do nó (documentos do item, ou itens do documento no acoplamento).
+    pub fn frequencia(&self, no: i64) -> usize {
+        let p = &self.resultado.parametros;
+        match (&self.agregado, &p.matriz) {
+            (Some(ag), _) => ag.frequencia_documento_item(no),
+            (None, Matriz::CoOccurrence) => self.dataset.frequencia_item(no),
+            _ => self.dataset.frequencia_documento_item(no),
+        }
+    }
+
+    /// Documentos do núcleo de cada grupo (mapeador `nucleo`, mesmo com outro mapeador escolhido).
+    pub fn documentos_nucleo(&self) -> Vec<BTreeSet<i64>> {
+        let fonte = self.fonte_documentos();
+        self.resultado.grupos.iter().map(|g| nucleo(&self.rede, &fonte, &g.nos)).collect()
+    }
+
+    fn fonte_documentos(&self) -> BTreeMap<i64, Vec<i64>> {
+        match &self.agregado {
+            Some(ag) => ag.documentos.clone(),
+            None => self.dataset.docs_por_item.clone(),
+        }
+    }
+
+    /// Centralidades de todos os nós (`Extras::centralidades`).
+    pub fn centralidades(&self) -> Vec<CentralidadeNo> {
+        centralidade::todas(&self.rede)
+    }
+
+    /// Pontos de virada; `intermediacao` reaproveita um cálculo já feito.
+    pub fn pontos_de_virada(&self, topo: usize, intermediacao: Option<Vec<f64>>) -> PontosDeVirada {
+        let p = &self.resultado.parametros;
+        let rot = |n: i64| self.rotulo(n);
+        let fr = |n: i64| self.frequencia(n);
+        pivos::pontos_de_virada(pivos::Entrada {
+            rede: &self.rede,
+            grupo_do_no: &self.conjunto.grupo_do_no,
+            tem_grupos: !self.resultado.grupos.is_empty(),
+            frequencia: &fr,
+            rotulo: &rot,
+            total_documentos: if p.matriz == Matriz::CoOccurrence { Some(self.original.quantidade_documentos()) } else { None },
+            intermediacao,
+            topo,
+        })
+    }
+
+    /// Qualidade do mapa (modularidade, silhueta, selo).
+    pub fn qualidade(&self) -> Qualidade {
+        qualidade::avalia(
+            &self.rede,
+            &self.conjunto.agrupamentos,
+            self.resultado.parametros.unidade == Unidade::Authors,
+            qualidade::LIMITE_NOS,
+        )
+    }
+
+    /// Rótulos por tema (LLR); vazio fora de Words e References.
+    pub fn rotulos_por_tema(&self, projeto: &Projeto) -> Res<BTreeMap<usize, RotuloTema>> {
+        if !matches!(self.resultado.parametros.unidade, Unidade::Words | Unidade::References) {
+            return Ok(BTreeMap::new());
+        }
+        rotulos::rotula_grupos(
+            projeto,
+            &self.original.lista_documentos(),
+            &self.documentos_nucleo(),
+            3,
+            rotulos::MINIMO_DOCUMENTOS,
+        )
+    }
 }
 
 /// Executa a análise do período indicado em `p.periodo` (ou o primeiro).
@@ -120,6 +284,11 @@ pub fn executar_periodos(projeto: &Projeto, p: &Parametros, nomes: &[String]) ->
 }
 
 pub fn executar_periodo(projeto: &Projeto, periodo_id: i64, periodo_nome: &str, p: &Parametros) -> Res<Resultado> {
+    Ok(executar_analise(projeto, periodo_id, periodo_nome, p)?.resultado)
+}
+
+/// Como `executar_periodo`, mas devolve também a rede e os conjuntos internos.
+pub fn executar_analise(projeto: &Projeto, periodo_id: i64, periodo_nome: &str, p: &Parametros) -> Res<Analise> {
     p.valida()?;
 
     let original = projeto.dataset(p.unidade, periodo_id, &p.palavras)?;
@@ -152,7 +321,43 @@ pub fn executar_periodo(projeto: &Projeto, periodo_id: i64, periodo_nome: &str, 
         _ => normaliza(&mut rede, p.similaridade, |i| dataset.frequencia_documento_item(i)),
     }
 
-    let conjunto = agrupa(p.algoritmo, &rede, p.rede_min, p.rede_max, p.corte)?;
+    let mut conjunto = agrupa(p.algoritmo, &rede, p.rede_min, p.rede_max, p.corte)?;
+
+    // Authors, Countries e Institutions: componentes menores que o mínimo não viram agrupamento.
+    let mut filtro_agrupamento = None;
+    let mut info_ies = None;
+    if matches!(p.unidade, Unidade::Authors | Unidade::Countries | Unidade::Institutions) {
+        let minimo = p.agrupamento_minimo();
+        let antes = conjunto.agrupamentos.len();
+        let comps = rede.componentes();
+        let (novo, pequenos) = descarta_componentes_pequenos(&rede, conjunto, &comps, minimo);
+        conjunto = novo;
+        let isolados = comps.iter().filter(|c| c.len() == 1).count();
+        filtro_agrupamento = Some(FiltroAgrupamento {
+            minimo,
+            grupos_antes: antes,
+            grupos_depois: conjunto.agrupamentos.len(),
+            componentes_pequenos: pequenos.len(),
+            isolados,
+            nos_sem_agrupamento: comps.iter().filter(|c| c.len() < minimo).map(|c| c.len()).sum(),
+        });
+        if p.unidade == Unidade::Institutions {
+            let indice = projeto.indice_ies()?;
+            let mut tamanhos: Vec<usize> = comps.iter().map(|c| c.len()).collect();
+            tamanhos.sort_unstable_by(|a, b| b.cmp(a));
+            info_ies = Some(InfoIes {
+                componente_minimo: minimo,
+                unioes: indice.unioes.clone(),
+                variantes_unidas: indice.quantidade_variantes_unidas(),
+                componentes: tamanhos,
+                componentes_pequenos: pequenos
+                    .iter()
+                    .map(|c| c.iter().map(|no| dataset.itens.get(no).cloned().unwrap_or_else(|| no.to_string())).collect())
+                    .collect(),
+                isolados,
+            });
+        }
+    }
 
     // No acoplamento os nós são documentos; o rótulo vem do título.
     let titulos = if p.matriz != Matriz::CoOccurrence { projeto.titulos(&rede.nos)? } else { Default::default() };
@@ -184,6 +389,8 @@ pub fn executar_periodo(projeto: &Projeto, periodo_id: i64, periodo_nome: &str, 
                 quadrante: String::new(),
                 documentos: BTreeMap::new(),
                 medidas: BTreeMap::new(),
+                citacoes: None,
+                tema: None,
             }
         })
         .collect();
@@ -219,6 +426,16 @@ pub fn executar_periodo(projeto: &Projeto, periodo_id: i64, periodo_nome: &str, 
             calcula_indices(&dataset, m.nome(), &ordenados, &mut g.medidas);
             g.documentos.insert(m.nome().to_string(), ordenados);
         }
+    }
+
+    // Citações por tema: núcleo (no acoplamento básico, os próprios documentos do grupo).
+    for g in &mut grupos {
+        let docs: Vec<i64> = if p.matriz == Matriz::BasicCoupling {
+            g.nos.clone()
+        } else {
+            nucleo(&rede, &fonte, &g.nos).into_iter().collect()
+        };
+        g.citacoes = Some(docs.iter().map(|&d| dataset.citacoes(d)).sum());
     }
 
     let frequencia = |no: i64| -> usize {
@@ -267,6 +484,7 @@ pub fn executar_periodo(projeto: &Projeto, periodo_id: i64, periodo_nome: &str, 
     let resumo = Resumo {
         periodo: periodo_nome.to_string(),
         documentos: documentos_originais,
+        documentos_projeto: projeto.total_documentos()?,
         itens: itens_originais,
         itens_reduzidos: dataset.quantidade_itens(),
         grupos: n,
@@ -279,7 +497,67 @@ pub fn executar_periodo(projeto: &Projeto, periodo_id: i64, periodo_nome: &str, 
         medidas_medias,
     };
 
-    Ok(Resultado { parametros: p.clone(), grupos, nos, arestas, estrategico, resumo })
+    let resultado = Resultado {
+        parametros: p.clone(),
+        grupos,
+        nos,
+        arestas,
+        estrategico,
+        resumo,
+        filtro_agrupamento,
+        ies: info_ies,
+        centralidades: None,
+        pontos_de_virada: None,
+        qualidade: None,
+    };
+    let mut analise = Analise { resultado, rede, original, dataset, conjunto, agregado, titulos };
+
+    let mut intermediacao: Option<Vec<f64>> = None;
+    if p.extras.centralidades {
+        let c = analise.centralidades();
+        intermediacao = Some(c.iter().map(|x| x.intermediacao).collect());
+        analise.resultado.centralidades = Some(c);
+    }
+    if p.extras.pivos {
+        let pv = analise.pontos_de_virada(10, intermediacao);
+        analise.resultado.pontos_de_virada = Some(pv);
+    }
+    if p.extras.qualidade {
+        let q = analise.qualidade();
+        analise.resultado.qualidade = Some(q);
+    }
+    if p.extras.rotulos {
+        let temas = analise.rotulos_por_tema(projeto)?;
+        for (i, t) in temas {
+            analise.resultado.grupos[i].tema = Some(t);
+        }
+    }
+    Ok(analise)
+}
+
+/// Tira dos agrupamentos os componentes conexos com menos de `minimo` nós; os nós deles ficam sem
+/// agrupamento. Devolve o conjunto e os componentes pequenos com mais de um nó.
+fn descarta_componentes_pequenos(
+    rede: &Rede,
+    conjunto: Conjunto,
+    comps: &[Vec<i64>],
+    minimo: usize,
+) -> (Conjunto, Vec<Vec<i64>>) {
+    if minimo <= 1 {
+        return (conjunto, Vec::new());
+    }
+    let pequenos: Vec<&Vec<i64>> = comps.iter().filter(|c| c.len() < minimo).collect();
+    if pequenos.is_empty() {
+        return (conjunto, Vec::new());
+    }
+    let fora: BTreeSet<i64> = pequenos.iter().flat_map(|c| c.iter().copied()).collect();
+    let mut novo = Conjunto::default();
+    for a in &conjunto.agrupamentos {
+        if !a.nos.iter().any(|n| fora.contains(n)) {
+            novo.adiciona(rede, &a.nos, a.principal);
+        }
+    }
+    (novo, pequenos.into_iter().filter(|c| c.len() > 1).cloned().collect())
 }
 
 fn remove_ignorados(ds: &mut Dataset, ignorar: &[String]) {

@@ -71,6 +71,20 @@ impl Mapeador {
     }
 }
 
+/// Cálculos opcionais, mais caros, que `executar_periodo` anexa ao `Resultado`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Extras {
+    /// Grau, intermediação, proximidade, autovetor e PageRank de cada nó.
+    pub centralidades: bool,
+    /// Pontos de virada (intermediação alta, vizinhos em 2+ agrupamentos).
+    pub pivos: bool,
+    /// Qualidade do mapa: modularidade, silhueta e selo.
+    pub qualidade: bool,
+    /// Rótulos por tema (LLR) em Words e References.
+    pub rotulos: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Parametros {
@@ -96,6 +110,12 @@ pub struct Parametros {
     pub ignorar: Vec<String>,
     /// Nome do período; `None` = o primeiro do projeto.
     pub periodo: Option<String>,
+    /// Authors, Countries e Institutions: componente conexo com menos nós que isto não vira
+    /// agrupamento (os nós ficam sem agrupamento; nada é apagado). `None` = padrão da unidade
+    /// (3 em Institutions, 1 = sem filtro nas demais).
+    pub componente_minimo: Option<usize>,
+    /// Cálculos opcionais anexados ao resultado.
+    pub extras: Extras,
 }
 
 impl Default for Parametros {
@@ -115,17 +135,22 @@ impl Default for Parametros {
             palavras: vec!["autor".into(), "fonte".into()],
             ignorar: Vec::new(),
             periodo: None,
+            componente_minimo: None,
+            extras: Extras::default(),
         }
     }
 }
 
 impl Parametros {
-    pub fn valida(&self) -> Resultado<()> {
-        if self.unidade == Unidade::Institutions {
-            return Err(Erro::NaoSuportado(
-                "unidade Institutions (depende da unificação de variantes de IES, ainda não portada)".into(),
-            ));
+    /// Tamanho mínimo efetivo do componente (1 = sem filtro).
+    pub fn agrupamento_minimo(&self) -> usize {
+        if !matches!(self.unidade, Unidade::Authors | Unidade::Countries | Unidade::Institutions) {
+            return 1;
         }
+        self.componente_minimo.unwrap_or(if self.unidade == Unidade::Institutions { crate::ies::COMPONENTE_MINIMO_PADRAO } else { 1 })
+    }
+
+    pub fn valida(&self) -> Resultado<()> {
         if self.mapeadores.contains(&Mapeador::Acoplamento) && self.matriz != Matriz::BasicCoupling {
             return Err(Erro::Parametro(format!(
                 "o mapeador \"acoplamento\" só vale com BasicCoupling (matriz atual: {})",
@@ -139,6 +164,9 @@ impl Parametros {
         }
         if !self.corte.is_finite() || self.corte < 0.0 {
             return Err(Erro::Parametro(format!("corte inválido: {}", self.corte)));
+        }
+        if self.componente_minimo == Some(0) {
+            return Err(Erro::Parametro("tamanho mínimo do componente inválido".into()));
         }
         if self.k_core < 1 {
             return Err(Erro::Parametro("k-core inválido".into()));
