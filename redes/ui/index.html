@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Redes — análise da produção científica</title>
+<title>Redes: análise da produção científica</title>
 <link rel="icon" href="/static/logo-mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -28,7 +28,6 @@
       <img src="/static/logo-mark.svg" alt="" width="40" height="40">
       <span class="marca-texto">
         <span class="nome">Redes</span>
-        <span class="sub">análise da produção científica</span>
       </span>
     </a>
 
@@ -86,10 +85,6 @@
       </label>
     </div>
 
-    <div class="rodape">
-      Redes · versão local<br>
-      Nenhum dado sai desta máquina
-    </div>
   </aside>
 
   <button type="button" class="recolher" id="btnRecolher" aria-label="Recolher menu" aria-expanded="true" title="Recolher menu">
@@ -127,7 +122,6 @@
       <section class="parametros">
         <div class="parametros-topo">
           <div>
-            <div class="sobre" id="sobreAnalise">Visão geral</div>
             <h2 id="tituloAnalise">Análise de redes</h2>
             <p id="subtituloAnalise">Escolha os parâmetros e execute uma configuração ou a grade completa.</p>
             <select id="analise" hidden aria-hidden="true" tabindex="-1">
@@ -142,7 +136,7 @@
               <option value="personalizada">Personalizada</option>
             </select>
           </div>
-          <span class="etiqueta-suave so-avancado" id="seloPrevia">Prévia sob demanda</span>
+          <span class="etiqueta-suave so-avancado" id="seloPrevia" hidden></span>
         </div>
 
         <p class="analise-fixa so-avancado" id="analiseFixa" hidden></p>
@@ -284,9 +278,7 @@
 
       <section class="visao-geral" id="visaoGeral">
         <div class="visao-geral-cab">
-          <div class="sobre">Corpus</div>
           <h2>Visão geral descritiva</h2>
-          <p>Produção, impacto e distribuição de autores, fontes, países e palavras-chave do corpus.</p>
         </div>
         <div id="visaoBibliometria" class="bib-conteudo"><p class="bib-vazio">Abra um projeto para ver o corpus.</p></div>
         <div class="info-geral" hidden>
@@ -373,8 +365,6 @@
               <h2>Rede em halos</h2>
               <span class="meta" id="metaHalo">—</span>
             </div>
-            <div class="espaco"></div>
-            <span class="etiqueta-suave" id="metaRede">interativa</span>
           </header>
           <div class="barra-rede" id="acoesRede" hidden>
               <label class="campo-mini" title="Mostrar rótulos dos nós">
@@ -423,7 +413,6 @@
             </div>
             <div class="espaco"></div>
             <button class="botao-mini" id="svgMapa" title="Abrir a figura SVG" hidden>SVG</button>
-            <span class="etiqueta-suave">países</span>
           </header>
           <div class="corpo-fig" id="caixaMapa">
             <canvas id="canvasMapa" class="interativa"
@@ -436,7 +425,6 @@
               <button type="button" data-zoom="menos" title="Reduzir">−</button>
               <button type="button" data-zoom="reset" title="Ajustar">⤢</button>
             </div>
-            <p class="mapa-nota" id="notaMapa" hidden>esfera = documentos · clique em um país para destacar · arraste para mover</p>
           </div>
           <div class="estatisticas" id="estatMapa"></div>
         </section>
@@ -457,7 +445,6 @@
               </select>
             </label>
             <button class="botao-mini" id="svgEstrategico" title="Abrir a figura SVG" hidden>SVG</button>
-            <span class="etiqueta-suave">quadrantes</span>
           </header>
           <div class="corpo-fig" id="caixaEstrategico">
             <canvas id="canvasEstrategico" class="interativa"
@@ -484,7 +471,6 @@
             </button>
             <div class="legenda-lista" id="legendaLista" hidden></div>
           </div>
-          <p class="nota-cartao" id="notaDiagrama" hidden>esfera = nós · números = agrupamentos · passe o mouse para ver os detalhes</p>
         </section>
 
         <section class="cartao" id="blocoAgrupamentos" data-bloco="blocoAgrupamentos">
@@ -495,13 +481,11 @@
             </div>
             <div class="espaco"></div>
             <button class="botao-mini" id="svgAgrupamentos" title="Abrir a figura SVG" hidden>SVG</button>
-            <span class="etiqueta-suave">temas</span>
           </header>
           <div class="corpo-fig" id="caixaAgrupamentos">
             <img id="figAgrupamentos" alt="Rede de agrupamentos" hidden>
             <div class="vazio" id="vazioAgrupamentos">Nenhum agrupamento para mostrar</div>
           </div>
-          <p class="nota-cartao">esfera = agrupamento · tamanho = itens · cor = quadrante do diagrama estratégico · aresta = associação entre temas</p>
         </section>
       </div>
 
@@ -839,10 +823,6 @@
       </section>
 
       <section class="acoes-finais">
-        <div>
-          <div class="rotulo-secao">Exportar e compartilhar</div>
-          <p class="dica">Relatórios em HTML e os dados desta análise.</p>
-        </div>
         <div class="espaco"></div>
         <div class="menu-exportar" id="menuExportar">
           <button type="button" class="botao escuro" id="btnExportarMenu"
@@ -1008,7 +988,7 @@
     </header>
 
     <h1 id="tituloModal" tabindex="-1">Importe um corpus para começar</h1>
-    <p class="tela-sub">Escolha o arquivo exportado da sua base bibliográfica. O formato é reconhecido pelo conteúdo.</p>
+    <p class="tela-sub">O formato do arquivo é reconhecido pelo conteúdo.</p>
 
     <button type="button" class="continuar" id="btnContinuar" hidden>
       <span class="continuar-texto">
@@ -1077,7 +1057,6 @@
       <div class="dica" id="workspace"></div>
     </details>
 
-    <p class="tela-rodape">Redes · versão local. Nenhum dado sai desta máquina.</p>
   </div>
 </section>
 
@@ -1113,11 +1092,10 @@
       <div class="rotulo-secao">Créditos</div>
       <div class="creditos">
         <p class="credito-nome">Desenvolvido por Gerlan Silva da Silva</p>
-        <p>Doutorando em Educação — Programa de Pós-Graduação em Educação</p>
+        <p>Doutorando em Educação, Programa de Pós-Graduação em Educação</p>
         <p>Universidade Federal de São Carlos (UFSCar)</p>
         <p><a href="https://orcid.org/0000-0002-9996-9983" target="_blank" rel="noopener">ORCID 0000-0002-9996-9983</a></p>
       </div>
-      <p class="dica" style="margin-top:12px">Redes · versão local.</p>
     </div>
   </div>
 </div>

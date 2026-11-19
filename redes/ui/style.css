@@ -104,7 +104,6 @@ a { color: var(--azul); }
 .app.recolhida .nav-analises,
 .app.recolhida .sidebar-bloco,
 .app.recolhida .execucoes,
-.app.recolhida .sidebar .rodape { display: none; }
 .app.recolhida .nav { width: 100%; }
 .app.recolhida .nav-item { justify-content: center; padding: 10px 8px; }
 
@@ -129,13 +128,6 @@ a { color: var(--azul); }
   letter-spacing: -.03em;
   color: var(--azul-escuro);
   line-height: 1.1;
-}
-.marca .sub {
-  font-size: 9.5px;
-  letter-spacing: .04em;
-  color: var(--tinta-suave);
-  margin-top: 3px;
-  text-transform: uppercase;
 }
 
 /* ------------------------------------------------------------------ navegação */
@@ -246,15 +238,6 @@ a { color: var(--azul); }
 .execucao .desc { line-height: 1.4; min-width: 0; }
 .execucao .hora { color: var(--tinta-suave); font-size: 10px; margin-top: 2px; }
 .execucao .ok { width: 6px; height: 6px; border-radius: 50%; background: var(--verde); margin-top: 5px; flex: none; }
-
-.sidebar .rodape {
-  margin-top: auto;
-  padding: 14px 11px 2px;
-  border-top: 1px solid var(--linha);
-  font-size: 10px;
-  line-height: 1.6;
-  color: var(--tinta-suave);
-}
 
 /* ------------------------------------------------------------------ topo */
 
@@ -375,14 +358,6 @@ a { color: var(--azul); }
 
 .cabecalho { display: flex; align-items: flex-end; gap: 18px; }
 .cabecalho .espaco { flex: 1; }
-.titulo-bloco .sobre {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .13em;
-  text-transform: uppercase;
-  color: var(--roxo);
-  margin-bottom: 6px;
-}
 h1 {
   font-size: 34px;
   font-weight: 700;
@@ -630,14 +605,6 @@ select.botao { appearance: none; padding-right: 30px; cursor: pointer;
 
 .visao-geral { margin-top: 4px; }
 .visao-geral-cab { margin-bottom: 14px; }
-.visao-geral-cab .sobre {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .13em;
-  text-transform: uppercase;
-  color: var(--roxo);
-  margin-bottom: 6px;
-}
 .visao-geral-cab h2 {
   font-size: 20px;
   font-weight: 750;
@@ -1482,7 +1449,7 @@ kbd {
   .nav-analises .grupo { margin: 0; flex-direction: row; gap: 2px; }
   .nav-analises .grupo-titulo { display: none; }
   .nav-analise { flex: none; width: auto; padding: 8px 10px; white-space: nowrap; }
-  .sidebar-bloco, .execucoes, .sidebar .rodape { display: none; }
+  .sidebar-bloco, .execucoes { display: none; }
   .topo { padding: 0 20px; }
   .principal { padding: 24px 20px 40px; }
 }
@@ -1520,19 +1487,6 @@ kbd {
   .aba { padding: 7px 11px; font-size: 12px; }
 }
 
-.mapa-nota {
-  position: absolute;
-  left: 14px;
-  bottom: 10px;
-  margin: 0;
-  font-size: 10.5px;
-  color: var(--tinta-fraca);
-  background: rgba(255, 255, 255, .82);
-  padding: 3px 7px;
-  border-radius: 6px;
-  pointer-events: none;
-}
-
 /* Atributos hidden precisam vencer regras de layout como display:block. */
 [hidden] { display: none !important; }
 
@@ -1543,12 +1497,6 @@ kbd {
   margin-right: 5px;
   border-radius: 2px;
   vertical-align: middle;
-}
-.nota-cartao {
-  margin: 0;
-  padding: 0 17px 10px;
-  font-size: 10.5px;
-  color: var(--tinta-fraca);
 }
 
 /* ------------------------------------------------- legenda do diagrama */
@@ -1664,7 +1612,6 @@ body:not(.modo-avancado) .so-avancado { display: none !important; }
 .nav-analises .grupo-unico .grupo-titulo { display: none; }
 
 .sidebar-modo { margin-top: auto; padding: 0 4px; }
-.sidebar .sidebar-modo + .rodape { margin-top: 0; padding-top: 12px; }
 .alternador-modo {
   position: relative;
   display: flex; align-items: center; gap: 10px;
@@ -1689,7 +1636,6 @@ body:not(.modo-avancado) .so-avancado { display: none !important; }
 .app.recolhida .sidebar-modo { margin-top: auto; padding: 0; }
 .app.recolhida .modo-texto { display: none; }
 .app.recolhida .alternador-modo { justify-content: center; padding: 8px 4px; }
-.app.recolhida .sidebar .sidebar-modo + .rodape { display: none; }
 
 /* No modo simples o cartão de parâmetros é só título e frequência mínima. */
 body:not(.modo-avancado) .parametros { padding: 16px 22px 18px; }
@@ -1721,7 +1667,6 @@ body.modo-avancado .parametros .campos + .nota-auto { margin-top: 12px; }
   border-radius: 12px;
   background: var(--apoio-lavanda);
 }
-.resumo-leitura .rotulo-secao { margin-bottom: 6px; color: var(--roxo); }
 .resumo-leitura p { font-size: 15px; line-height: 1.5; font-weight: 550; color: var(--azul-escuro); }
 .resumo-leitura p + p { margin-top: 2px; font-size: 13px; font-weight: 450; color: var(--tinta-fraca); }
 .resumo-aviso {
@@ -2064,7 +2009,6 @@ body:not(.modo-avancado) .selo-estado:not(.erro) { display: none; }
 @media (max-width: 760px) {
   .nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .nav .nav-item { flex: none; white-space: nowrap; }
-  .sidebar .rodape { display: none; }
   .sidebar-modo { margin-top: 0; }
   .recolher { display: none; }
   .menu-lista { right: auto; left: 0; }
