@@ -1,12 +1,14 @@
 //! Telas em egui: boas-vindas, importar, análise.
 
 use crate::app::{Aba, Estado, Tela};
-use crate::cena::{Ancora, Cena, Prim};
 use crate::exportar;
+use crate::grafico;
+use crate::painel;
+use crate::tela_importar;
 use crate::modelo::*;
 use crate::tema::{self, *};
 use eframe::egui::{
-    self, Align, Align2, Color32, CornerRadius, FontId, Layout, Margin, RichText, Sense, Stroke, Vec2,
+    self, Align, Color32, CornerRadius, FontId, Layout, Margin, RichText, Sense, Stroke, Vec2,
 };
 
 pub const EMAIL: &str = "gerlanmatfis@gmail.com";
@@ -21,26 +23,36 @@ impl RedesApp {
     pub fn novo(cc: &eframe::CreationContext<'_>, backend: Box<dyn crate::backend::Backend>) -> Self {
         tema::aplicar(&cc.egui_ctx);
         let mut estado = Estado::novo(backend);
-        // Atalho de desenvolvimento: REDES_DEMO=1 abre direto a análise de demonstração
-        // (REDES_ABA=rede|estrategico escolhe a aba; REDES_TELA=importar abre a tela de importar).
-        match std::env::var("REDES_TELA").as_deref() {
-            Ok("importar") => estado.tela = Tela::Importar,
-            _ => {}
+        // Atalhos de desenvolvimento (capturas e testes): REDES_DEMO=1 abre a análise de
+        // demonstração; REDES_ARQUIVO=<.redes> abre um projeto; REDES_TELA=importar;
+        // REDES_ABA=<slug da aba>; REDES_SELECIONAR=<n> abre o tema n; REDES_ZOOM=<fator>.
+        if matches!(std::env::var("REDES_TELA").as_deref(), Ok("importar")) {
+            estado.tela = Tela::Importar;
         }
         if let Some(arq) = std::env::var_os("REDES_ARQUIVO") {
             estado.abrir_caminho(std::path::Path::new(&arq));
-            match std::env::var("REDES_ABA").as_deref() {
-                Ok("rede") => estado.aba = Aba::Rede,
-                Ok("estrategico") => estado.aba = Aba::Estrategico,
-                _ => {}
-            }
         } else if std::env::var_os("REDES_DEMO").is_some() {
             estado.abrir_demonstracao();
-            match std::env::var("REDES_ABA").as_deref() {
-                Ok("rede") => estado.aba = Aba::Rede,
-                Ok("estrategico") => estado.aba = Aba::Estrategico,
-                _ => {}
+        }
+        // REDES_IMPORTAR=<arquivo> preenche o formulário de importação; com REDES_IMPORTAR_INICIAR=1 já inicia.
+        if let Some(ms) = std::env::var("REDES_PASSO_MS").ok().and_then(|t| t.parse::<u64>().ok()) {
+            estado.servicos.importador = Box::new(crate::servicos::ImportadorEmBreve { passo: std::time::Duration::from_millis(ms) });
+        }
+        if let Some(arq) = std::env::var_os("REDES_IMPORTAR") {
+            estado.importar_escolher(std::path::Path::new(&arq));
+            estado.importacao.periodos = std::env::var("REDES_PERIODOS").unwrap_or_default();
+            if std::env::var_os("REDES_IMPORTAR_INICIAR").is_some() {
+                estado.importar_iniciar();
             }
+        }
+        if estado.tela == Tela::Analise {
+            if let Some(a) = std::env::var("REDES_ABA").ok().and_then(|t| Aba::de_slug(&t)) {
+                estado.ir_para_aba(a);
+            }
+            if let Some(n) = std::env::var("REDES_SELECIONAR").ok().and_then(|t| t.parse::<usize>().ok()) {
+                estado.selecionar_grupo(Some(n));
+            }
+            estado.zoom_inicial = std::env::var("REDES_ZOOM").ok().and_then(|t| t.parse().ok());
         }
         RedesApp { estado, logo: None }
     }
@@ -66,24 +78,27 @@ impl eframe::App for RedesApp {
         // Arrastar e soltar um .redes abre o projeto.
         let soltos: Vec<_> = ctx.input(|i| i.raw.dropped_files.iter().filter_map(|f| f.path.clone()).collect());
         if let Some(p) = soltos.first() {
-            self.estado.abrir_caminho(p);
+            self.estado.importar_escolher(p);
+        }
+        if self.estado.importar_atualizar() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
         match self.estado.tela {
             Tela::BoasVindas => boas_vindas(ctx, &mut self.estado, logo),
-            Tela::Importar => importar(ctx, &mut self.estado, logo),
+            Tela::Importar => tela_importar::importar(ctx, &mut self.estado, logo),
             Tela::Analise => analise(ctx, &mut self.estado, logo),
         }
     }
 }
 
-fn centro<R>(ui: &mut egui::Ui, largura: f32, f: impl FnOnce(&mut egui::Ui) -> R) -> R {
+pub(crate) fn centro<R>(ui: &mut egui::Ui, largura: f32, f: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let disp = ui.available_rect_before_wrap();
     let x = disp.center().x - largura / 2.0;
     let r = egui::Rect::from_min_size(egui::pos2(x.max(disp.left()), disp.top()), Vec2::new(largura.min(disp.width()), disp.height()));
     ui.scope_builder(egui::UiBuilder::new().max_rect(r), f).inner
 }
 
-fn botao_primario(ui: &mut egui::Ui, texto: &str) -> egui::Response {
+pub(crate) fn botao_primario(ui: &mut egui::Ui, texto: &str) -> egui::Response {
     ui.add(
         egui::Button::new(RichText::new(texto).color(BRANCO).family(tema::negrito()))
             .fill(AZUL)
@@ -93,7 +108,7 @@ fn botao_primario(ui: &mut egui::Ui, texto: &str) -> egui::Response {
     )
 }
 
-fn botao_secundario(ui: &mut egui::Ui, texto: &str) -> egui::Response {
+pub(crate) fn botao_secundario(ui: &mut egui::Ui, texto: &str) -> egui::Response {
     ui.add(
         egui::Button::new(RichText::new(texto).color(AZUL_ESCURO))
             .fill(BRANCO)
@@ -150,62 +165,6 @@ fn boas_vindas(ctx: &egui::Context, s: &mut Estado, logo: egui::TextureId) {
             });
         });
     });
-}
-
-fn importar(ctx: &egui::Context, s: &mut Estado, logo: egui::TextureId) {
-    egui::CentralPanel::default().frame(egui::Frame::new().fill(FUNDO)).show(ctx, |ui| {
-        let alto = ui.available_height();
-        ui.add_space((alto - 380.0).max(24.0) / 2.0);
-        centro(ui, 520.0, |ui| {
-            egui::Frame::new()
-                .fill(BRANCO)
-                .stroke(Stroke::new(1.0f32, LINHA))
-                .corner_radius(CornerRadius::same(14))
-                .inner_margin(Margin::same(28))
-                .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.add(egui::Image::new((logo, Vec2::splat(32.0))));
-                        ui.label(RichText::new("Abrir projeto").size(22.0).family(tema::negrito()).color(AZUL_ESCURO));
-                    });
-                    ui.add_space(6.0);
-                    ui.label(RichText::new("Escolha um arquivo .redes, ou arraste-o para esta janela. O arquivo é lido nesta máquina.").color(TINTA_FRACA));
-                    ui.add_space(14.0);
-                    let (area, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 110.0), Sense::hover());
-                    ui.painter().rect(area, CornerRadius::same(12), apoio_lavanda(), Stroke::new(1.0f32, LINHA_FORTE), egui::StrokeKind::Inside);
-                    ui.painter().text(area.center() - Vec2::new(0.0, 12.0), Align2::CENTER_CENTER, "Solte o arquivo .redes aqui", FontId::proportional(14.0), AZUL_ESCURO);
-                    ui.painter().text(area.center() + Vec2::new(0.0, 12.0), Align2::CENTER_CENTER, "ou use o botão abaixo", FontId::proportional(12.0), TINTA_FRACA);
-                    ui.add_space(12.0);
-                    ui.horizontal(|ui| {
-                        if botao_primario(ui, "Escolher arquivo…").clicked() {
-                            if let Some(p) = rfd::FileDialog::new()
-                                .set_title("Abrir projeto Redes")
-                                .add_filter("Projeto Redes", &["redes"])
-                                .pick_file()
-                            {
-                                s.abrir_caminho(&p);
-                            }
-                        }
-                        if botao_secundario(ui, "Usar dados de demonstração").clicked() {
-                            s.abrir_demonstracao();
-                        }
-                    });
-                    if let Some(e) = &s.erro {
-                        ui.add_space(10.0);
-                        ui.label(RichText::new(e).color(Color32::from_rgb(0xB4, 0x23, 0x18)));
-                    }
-                    ui.add_space(8.0);
-                    ui.label(RichText::new(format!("Cálculo: {}", s.backend.origem())).size(11.0).color(TINTA_SUAVE));
-                });
-            ui.add_space(10.0);
-            if ui.link(RichText::new("Voltar").color(AZUL)).clicked() {
-                s.tela = Tela::BoasVindas;
-            }
-        });
-    });
-}
-
-fn apoio_lavanda() -> Color32 {
-    Color32::from_rgb(0xF4, 0xF2, 0xFF)
 }
 
 fn secao(ui: &mut egui::Ui, texto: &str) {
@@ -288,24 +247,13 @@ fn analise(ctx: &egui::Context, s: &mut Estado, logo: egui::TextureId) {
             });
         });
 
+    painel::lateral(ctx, s);
+
     egui::CentralPanel::default().frame(egui::Frame::new().fill(FUNDO).inner_margin(Margin::symmetric(28, 20))).show(ctx, |ui| {
-        ui.label(RichText::new(format!("Estrutura {}", s.params.estrutura.rotulo().to_lowercase())).size(22.0).family(tema::negrito()).color(AZUL_ESCURO));
-        ui.add_space(6.0);
         ui.horizontal(|ui| {
-            for a in Aba::TODAS {
-                let ativo = s.aba == a;
-                let t = RichText::new(a.rotulo()).color(if ativo { AZUL } else { TINTA }).family(tema::negrito());
-                let b = egui::Button::new(t)
-                    .fill(if ativo { LAVANDA } else { Color32::TRANSPARENT })
-                    .stroke(Stroke::NONE)
-                    .corner_radius(CornerRadius::same(8))
-                    .min_size(Vec2::new(0.0, 32.0));
-                if ui.add(b).clicked() {
-                    s.aba = a;
-                }
-            }
+            ui.label(RichText::new(format!("Estrutura {}", s.params.estrutura.rotulo().to_lowercase())).size(22.0).family(tema::negrito()).color(AZUL_ESCURO));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if s.aba != Aba::Resumo {
+                if s.aba.tem_cena() && s.cena(s.aba).is_ok() {
                     if botao_secundario(ui, "Exportar PNG").clicked() {
                         exportar_cena(s, "png");
                     }
@@ -314,6 +262,30 @@ fn analise(ctx: &egui::Context, s: &mut Estado, logo: egui::TextureId) {
                     }
                 }
             });
+        });
+        ui.add_space(4.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = Vec2::new(2.0, 4.0);
+            ui.spacing_mut().button_padding = Vec2::new(9.0, 6.0);
+            for a in Aba::TODAS {
+                let ativo = s.aba == a;
+                let livre = s.aba_disponivel(a);
+                let cor = if !livre { TINTA_SUAVE } else if ativo { AZUL } else { TINTA };
+                let t = RichText::new(a.rotulo()).color(cor).family(tema::negrito());
+                let b = egui::Button::new(t)
+                    .fill(if ativo { LAVANDA } else { Color32::TRANSPARENT })
+                    .stroke(Stroke::NONE)
+                    .corner_radius(CornerRadius::same(8))
+                    .min_size(Vec2::new(0.0, 32.0));
+                let r = ui.add_enabled(livre, b);
+                if livre {
+                    if r.clicked() {
+                        s.ir_para_aba(a);
+                    }
+                } else {
+                    r.on_disabled_hover_text(crate::servicos::EM_BREVE);
+                }
+            }
         });
         ui.add_space(8.0);
         if let Some(e) = s.erro.clone() {
@@ -327,7 +299,32 @@ fn analise(ctx: &egui::Context, s: &mut Estado, logo: egui::TextureId) {
         }
         match s.aba {
             Aba::Resumo => resumo(ui, s),
-            Aba::Rede | Aba::Estrategico => painel_cena(ui, s),
+            Aba::Relatorio => relatorio(ui, s),
+            Aba::Rede | Aba::Estrategico | Aba::Analise(_) => grafico::painel_grafico(ui, s),
+        }
+    });
+}
+
+fn relatorio(ui: &mut egui::Ui, s: &mut Estado) {
+    cartao().show(ui, |ui| {
+        ui.label(RichText::new("Relatório do projeto").size(16.0).family(tema::negrito()).color(AZUL_ESCURO));
+        ui.label(RichText::new("Reúne as análises em um documento para anexar ou imprimir.").color(TINTA_FRACA));
+        ui.add_space(8.0);
+        let formatos = s.servicos.relatorio.formatos();
+        ui.horizontal(|ui| {
+            ui.label("Formato");
+            egui::ComboBox::from_id_salt("formato_relatorio").selected_text(s.formato_relatorio.rotulo()).show_ui(ui, |ui| {
+                for f in formatos {
+                    ui.selectable_value(&mut s.formato_relatorio, f, f.rotulo());
+                }
+            });
+        });
+        ui.add_space(6.0);
+        if botao_primario(ui, "Gerar relatório…").clicked() {
+            let nome = format!("{}_relatorio.{}", s.info.as_ref().map(|i| i.nome.as_str()).unwrap_or("redes"), s.formato_relatorio.extensao());
+            if let Some(p) = rfd::FileDialog::new().set_title("Salvar relatório").set_file_name(nome).save_file() {
+                s.gerar_relatorio(&p);
+            }
         }
     });
 }
@@ -351,7 +348,7 @@ fn exportar_cena(s: &mut Estado, ext: &str) {
     }
 }
 
-fn cartao() -> egui::Frame {
+pub(crate) fn cartao() -> egui::Frame {
     egui::Frame::new()
         .fill(BRANCO)
         .stroke(Stroke::new(1.0f32, LINHA))
@@ -359,7 +356,8 @@ fn cartao() -> egui::Frame {
         .inner_margin(Margin::same(16))
 }
 
-fn resumo(ui: &mut egui::Ui, s: &Estado) {
+fn resumo(ui: &mut egui::Ui, s: &mut Estado) {
+    let mut abrir: Option<usize> = None;
     let r = s.resultado.as_ref().unwrap();
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
@@ -396,7 +394,10 @@ fn resumo(ui: &mut egui::Ui, s: &Estado) {
                             }
                             for g in grupos {
                                 ui.add_space(2.0);
-                                ui.label(RichText::new(&g.nome).family(tema::negrito()));
+                                let nome = ui.add(egui::Label::new(RichText::new(&g.nome).family(tema::negrito()).color(AZUL)).sense(Sense::click()));
+                                if nome.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Ver itens e documentos").clicked() {
+                                    abrir = Some(g.id);
+                                }
                                 let termos: Vec<String> = r.nos_do_grupo(g.id).iter().take(5).map(|n| n.rotulo.clone()).collect();
                                 ui.label(
                                     RichText::new(match g.citacoes {
@@ -414,78 +415,7 @@ fn resumo(ui: &mut egui::Ui, s: &Estado) {
             ui.add_space(12.0);
         }
     });
-}
-
-fn painel_cena(ui: &mut egui::Ui, s: &mut Estado) {
-    let aba = s.aba;
-    cartao().inner_margin(Margin::same(8)).show(ui, |ui| {
-        let disp = ui.available_size();
-        let (rect, resp) = ui.allocate_exact_size(Vec2::new(disp.x, (disp.y - 4.0).max(200.0)), Sense::hover());
-        let Some(cena) = s.cena(aba, rect.width(), rect.height()) else { return };
-        pintar(ui.painter_at(rect), rect.min, cena);
-        if let Some(p) = resp.hover_pos() {
-            if let Some(d) = cena.dica_em((p.x - rect.min.x, p.y - rect.min.y)) {
-                resp.on_hover_text_at_pointer(d.to_string());
-            }
-        }
-    });
-}
-
-fn cor32(c: [u8; 4]) -> Color32 {
-    // Pré-multiplicação simples em sRGB, o mesmo resultado do SVG (o egui, por padrão,
-    // pré-multiplica de forma "gama-correta" e clareia cores translúcidas).
-    let a = c[3] as u32;
-    let m = |v: u8| ((v as u32 * a + 127) / 255) as u8;
-    Color32::from_rgba_premultiplied(m(c[0]), m(c[1]), m(c[2]), c[3])
-}
-
-/// Pinta uma cena no egui, com a origem da cena em `o`.
-pub fn pintar(p: egui::Painter, o: egui::Pos2, cena: &Cena) {
-    let pt = |q: (f32, f32)| egui::pos2(o.x + q.0, o.y + q.1);
-    for prim in &cena.prims {
-        match prim {
-            Prim::Circulo { c, r, preench, borda, .. } => {
-                if let Some(f) = preench {
-                    p.circle_filled(pt(*c), *r, cor32(*f));
-                }
-                if let Some((cb, w)) = borda {
-                    p.circle_stroke(pt(*c), *r, Stroke::new(*w, cor32(*cb)));
-                }
-            }
-            Prim::Linha { a, b, cor, larg, tracejada } => {
-                let st = Stroke::new(*larg, cor32(*cor));
-                if *tracejada {
-                    p.extend(egui::Shape::dashed_line(&[pt(*a), pt(*b)], st, 6.0, 4.0));
-                } else {
-                    p.line_segment([pt(*a), pt(*b)], st);
-                }
-            }
-            Prim::Retangulo { min, max, preench, borda } => {
-                let rect = egui::Rect::from_min_max(pt(*min), pt(*max));
-                if let Some(f) = preench {
-                    p.rect_filled(rect, 0.0, cor32(*f));
-                }
-                if let Some((cb, w)) = borda {
-                    p.rect_stroke(rect, 0.0, Stroke::new(*w, cor32(*cb)), egui::StrokeKind::Inside);
-                }
-            }
-            Prim::Texto { pos, texto, tam, cor, ancora, negrito, vertical } => {
-                let fonte = if *negrito { FontId::new(*tam, tema::negrito()) } else { FontId::proportional(*tam) };
-                let c = cor32(*cor);
-                if *vertical {
-                    let galley = p.layout_no_wrap(texto.clone(), fonte, c);
-                    let (w, h) = (galley.size().x, galley.size().y);
-                    let topo_esq = egui::pos2(o.x + pos.0 - h / 2.0, o.y + pos.1 + w / 2.0);
-                    p.add(egui::epaint::TextShape::new(topo_esq, galley, c).with_angle(-std::f32::consts::FRAC_PI_2));
-                } else {
-                    let al = match ancora {
-                        Ancora::Esquerda => Align2::LEFT_CENTER,
-                        Ancora::Centro => Align2::CENTER_CENTER,
-                        Ancora::Direita => Align2::RIGHT_CENTER,
-                    };
-                    p.text(pt(*pos), al, texto, fonte.clone(), c);
-                }
-            }
-        }
+    if let Some(g) = abrir {
+        s.selecionar_grupo(Some(g));
     }
 }

@@ -1,12 +1,24 @@
 name: Redes para macOS
 
+# Gera o Redes.app universal e o Redes-<versão>.dmg.
+#  - push em rust-mac e pull requests: só o artefato do workflow;
+#  - tag v* (ex.: v0.2.0) ou execução manual com "versao": também cria ou
+#    atualiza o GitHub Release com o .dmg e o .sha256.
 on:
   push:
     branches: [rust-mac]
-    paths: ["rust/**", ".github/workflows/mac.yml"]
+    tags: ["v*"]
   pull_request:
     paths: ["rust/**", ".github/workflows/mac.yml"]
   workflow_dispatch:
+    inputs:
+      versao:
+        description: "Versão a publicar (ex.: 0.2.0). Vazio = só gera o artefato."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
 
 jobs:
   dmg:
@@ -25,25 +37,93 @@ jobs:
         with:
           workspaces: rust
 
+      - name: Versão e publicação
+        id: v
+        env:
+          REF: ${{ github.ref }}
+          REF_TYPE: ${{ github.ref_type }}
+          ENTRADA: ${{ github.event.inputs.versao }}
+        run: |
+          set -euo pipefail
+          cargo_v="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import sys,json; print([p for p in json.load(sys.stdin)["packages"] if p["name"]=="redes-app"][0]["version"])')"
+          publicar=false
+          versao="$cargo_v"
+          if [ "$REF_TYPE" = "tag" ]; then
+            versao="${REF#refs/tags/v}"; publicar=true
+          elif [ -n "${ENTRADA// /}" ]; then
+            versao="${ENTRADA//[[:space:]]/}"; versao="${versao#v}"; publicar=true
+          fi
+          case "$versao" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "Versão inválida: $versao" >&2; exit 1 ;;
+          esac
+          pre=false; case "$versao" in *-*) pre=true ;; esac
+          echo "versao=$versao" >> "$GITHUB_OUTPUT"
+          echo "publicar=$publicar" >> "$GITHUB_OUTPUT"
+          echo "pre=$pre" >> "$GITHUB_OUTPUT"
+          echo "Versão $versao (Cargo: $cargo_v), publicar: $publicar"
+
       - name: Testes
         run: cargo test -p redes-app
 
+      - name: Ferramentas do pacote
+        run: brew install librsvg create-dmg
+
       - name: Ícone
-        run: |
-          brew install librsvg
-          scripts/gerar_icns.sh packaging/Redes.icns
+        run: scripts/gerar_icns.sh packaging/Redes.icns
 
       - name: Empacotar Redes.app e .dmg (universal)
+        env:
+          VERSAO: ${{ steps.v.outputs.versao }}
         run: scripts/empacotar_mac.sh
 
       - name: Conferir o pacote
+        env:
+          VERSAO: ${{ steps.v.outputs.versao }}
         run: |
+          set -euo pipefail
           lipo -info dist/Redes.app/Contents/MacOS/redes
           plutil -lint dist/Redes.app/Contents/Info.plist
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/Redes.app/Contents/Info.plist)" = "$VERSAO"
+          codesign --verify --deep --strict dist/Redes.app
+          (cd dist && shasum -a 256 -c "Redes-$VERSAO.dmg.sha256")
           ls -lh dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: Redes-macOS-dmg
-          path: rust/dist/*.dmg
+          path: |
+            rust/dist/*.dmg
+            rust/dist/*.sha256
           if-no-files-found: error
+
+      - name: Criar ou atualizar o GitHub Release
+        if: steps.v.outputs.publicar == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSAO: ${{ steps.v.outputs.versao }}
+          PRE: ${{ steps.v.outputs.pre }}
+          SHA_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          tag="v$VERSAO"
+          dmg="dist/Redes-$VERSAO.dmg"
+          soma="$(cut -d' ' -f1 "$dmg.sha256")"
+          cat > notas.md <<NOTAS
+          Redes $VERSAO para macOS (Intel e Apple Silicon).
+
+          SHA-256 de \`Redes-$VERSAO.dmg\`:
+
+          \`$soma\`
+
+          O app não é notarizado pela Apple. Na primeira abertura, clique com o botão direito em Redes e escolha Abrir (veja o rust/LEIA-ME.md).
+          NOTAS
+          flags=()
+          [ "$PRE" = "true" ] && flags+=(--prerelease)
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$dmg" "$dmg.sha256" --clobber
+            gh release edit "$tag" --title "Redes $VERSAO" --notes-file notas.md ${flags[@]+"${flags[@]}"}
+          else
+            gh release create "$tag" "$dmg" "$dmg.sha256" --target "$SHA_COMMIT" --title "Redes $VERSAO" --notes-file notas.md ${flags[@]+"${flags[@]}"}
+          fi
+          echo "Release: $(gh release view "$tag" --json url -q .url)" >> "$GITHUB_STEP_SUMMARY"

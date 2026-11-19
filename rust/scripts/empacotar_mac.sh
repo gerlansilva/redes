@@ -5,12 +5,14 @@
 #   FEATURES="redes-core"   ativa o núcleo real (padrão: o que o Cargo.toml do app define)
 #   ASSINATURA="Developer ID Application: ..."   assina com codesign (padrão: ad hoc "-")
 #   SO_UM_ALVO=1            compila só para a arquitetura da máquina (mais rápido)
+#   VERSAO=0.2.1            sobrescreve a versão do Cargo.toml (nome do .dmg e Info.plist)
+# Saídas em dist/: Redes.app, Redes-<versão>.dmg e Redes-<versão>.dmg.sha256.
 set -euo pipefail
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$RAIZ"
 [ "$(uname -s)" = "Darwin" ] || { echo "Este script só roda no macOS." >&2; exit 1; }
 
-VERSAO="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import sys,json; print([p for p in json.load(sys.stdin)["packages"] if p["name"]=="redes-app"][0]["version"])')"
+VERSAO_CARGO="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import sys,json; print([p for p in json.load(sys.stdin)["packages"] if p["name"]=="redes-app"][0]["version"])')"
 DIST="$RAIZ/dist"; APP="$DIST/Redes.app"
 FEATURES_ARG=()
 [ -n "${FEATURES:-}" ] && FEATURES_ARG=(--features "$FEATURES")
@@ -43,11 +45,15 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 if [ ! -f packaging/Redes.icns ]; then scripts/gerar_icns.sh packaging/Redes.icns; fi
 cp packaging/Redes.icns "$APP/Contents/Resources/Redes.icns"
 
+# Assinatura ad hoc (sem conta de desenvolvedor): dá ao app uma identidade mínima,
+# necessária para rodar em Macs com Apple Silicon. Não a notariza; veja o LEIA-ME.md.
+xattr -cr "$APP" || true
 codesign --force --deep --sign "${ASSINATURA:--}" "$APP"
+codesign --verify --deep --strict --verbose=2 "$APP"
 
 DMG="$DIST/Redes-$VERSAO.dmg"
-STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
-cp -R "$APP" "$STAGE/"; ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Redes" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
-echo "Pronto: $APP"; echo "Pronto: $DMG"
+packaging/criar_dmg.sh "$APP" "$DMG"
+codesign --force --sign "${ASSINATURA:--}" "$DMG" || true
+(cd "$DIST" && shasum -a 256 "Redes-$VERSAO.dmg" > "Redes-$VERSAO.dmg.sha256")
+echo "Pronto: $APP"; echo "Pronto: $DMG"; cat "$DIST/Redes-$VERSAO.dmg.sha256"
 lipo -info "$APP/Contents/MacOS/redes" || true

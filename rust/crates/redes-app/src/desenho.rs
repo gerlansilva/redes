@@ -1,6 +1,6 @@
 //! Monta as cenas do grafo e do diagrama estratégico de Callon.
 
-use crate::cena::{Ancora, Cena, Prim};
+use crate::cena::{Alvo, Ancora, Cena, Lugar, Prim, Rotulo};
 use crate::layout;
 use crate::modelo::*;
 use crate::tema::{cor_grupo, PALETA};
@@ -15,8 +15,25 @@ fn q_cor(q: Quadrante) -> [u8; 4] {
     [c.r(), c.g(), c.b(), 0xFF]
 }
 
-/// Grafo com halo por agrupamento.
+/// Tamanho da cena interativa: cresce com o número de elementos para que 100 ou
+/// mais agrupamentos tenham espaço (o zoom ajusta a vista a cada janela).
+pub fn mundo(elementos: usize) -> (f32, f32) {
+    let f = (elementos as f32 / 50.0).sqrt().clamp(1.0, 4.0);
+    (900.0 * f, 620.0 * f)
+}
+
+/// Grafo com halo por agrupamento (cena estática, para exportar).
 pub fn rede(r: &Resultado, largura: f32, altura: f32) -> Cena {
+    rede_com(r, largura, altura, false)
+}
+
+/// Grafo para a tela: sem textos fixos, com rótulos por nível de detalhe.
+pub fn rede_interativa(r: &Resultado) -> Cena {
+    let (w, h) = mundo(r.nos.len());
+    rede_com(r, w, h, true)
+}
+
+fn rede_com(r: &Resultado, largura: f32, altura: f32, interativa: bool) -> Cena {
     let mut cena = Cena::nova(largura, altura);
     if r.nos.is_empty() {
         cena.push(Prim::Texto {
@@ -25,14 +42,16 @@ pub fn rede(r: &Resultado, largura: f32, altura: f32) -> Cena {
         });
         return cena;
     }
-    let margem = (largura.min(altura) * 0.15).max(64.0);
+    let margem = if interativa { 56.0 } else { (largura.min(altura) * 0.15).max(64.0) };
     let pos_n = layout::posicoes(r, 220);
     let pos: Vec<(f32, f32)> = pos_n
         .iter()
         .map(|p| (margem + p.0 * (largura - 2.0 * margem), margem + p.1 * (altura - 2.0 * margem)))
         .collect();
     let pmax = r.nos.iter().map(|n| n.peso).fold(1.0f64, f64::max);
-    let raio = |n: &No| 5.0 + 13.0 * (n.peso / pmax).sqrt() as f32;
+    // Com a cena maior, os nós crescem um pouco para continuarem visíveis na vista geral.
+    let k = if interativa { (largura / 900.0).powf(0.35) } else { 1.0 };
+    let raio = |n: &No| k * (5.0 + 13.0 * (n.peso / pmax).sqrt() as f32);
 
     // Halos.
     let mut halos: Vec<(f32, f32, f32)> = Vec::new();
@@ -53,13 +72,14 @@ pub fn rede(r: &Resultado, largura: f32, altura: f32) -> Cena {
             .iter()
             .map(|&i| ((pos[i].0 - cx).powi(2) + (pos[i].1 - cy).powi(2)).sqrt() + raio(&r.nos[i]))
             .fold(0.0f32, f32::max)
-            + 14.0;
+            + 14.0 * k;
         halos.push((cx, cy, rr));
         cena.push(Prim::Circulo {
             c: (cx, cy), r: rr,
             preench: Some(cor_grupo(g.id, 36)),
             borda: Some((cor_grupo(g.id, 110), 1.2)),
-            dica: None,
+            dica: Some(format!("{} · {}", g.nome, g.quadrante.curto())),
+            alvo: Some(Alvo::Grupo(g.id)),
         });
     }
     // Arestas.
@@ -83,6 +103,7 @@ pub fn rede(r: &Resultado, largura: f32, altura: f32) -> Cena {
             preench: Some(cor_grupo(n.grupo, 255)),
             borda: Some(([255, 255, 255, 255], 1.5)),
             dica: Some(format!("{} · peso {:.0} · {}", n.rotulo, n.peso, r.grupos.get(n.grupo).map(|g| g.nome.as_str()).unwrap_or(""))),
+            alvo: Some(Alvo::No(n.id)),
         });
     }
     // Títulos dos grupos acima dos halos e, ao lado, o termo mais pesado de cada nó principal.
@@ -91,7 +112,25 @@ pub fn rede(r: &Resultado, largura: f32, altura: f32) -> Cena {
     por_tamanho.sort_by(|&a, &b| r.grupos[b].tamanho.cmp(&r.grupos[a].tamanho));
     let titulados: Vec<usize> = por_tamanho.into_iter().take(if muitos { 10 } else { usize::MAX }).collect();
     for (g, (cx, cy, rr)) in r.grupos.iter().zip(halos.iter()) {
-        if !titulados.contains(&g.id) || *rr == 0.0 {
+        if *rr == 0.0 {
+            continue;
+        }
+        if interativa {
+            cena.rotulos.push(Rotulo {
+                pos: (*cx, *cy - *rr), texto: g.nome.clone(), tam: 12.5, cor: TINTA, negrito: true,
+                lugar: Lugar::Acima, prioridade: 1000.0 + g.tamanho as f32, raio: *rr, min_px: 12.0,
+                alvo: Some(Alvo::Grupo(g.id)),
+            });
+            for (ordem, n) in r.nos_do_grupo(g.id).into_iter().take(4).enumerate() {
+                cena.rotulos.push(Rotulo {
+                    pos: pos[n.id], texto: n.rotulo.clone(), tam: 10.5, cor: FRACA, negrito: false,
+                    lugar: Lugar::Direita, prioridade: (n.peso / pmax) as f32 - ordem as f32 * 0.1, raio: raio(n), min_px: 8.0,
+                    alvo: Some(Alvo::No(n.id)),
+                });
+            }
+            continue;
+        }
+        if !titulados.contains(&g.id) {
             continue;
         }
         cena.push(Prim::Texto {
@@ -125,6 +164,16 @@ const BRANCO: [u8; 4] = [255, 255, 255, 255];
 /// normalizadas (1..n)/n com o cruzamento em 0,5, como em `redes/viz/strategic.py`.
 /// Esferas numeradas, com a legenda ao lado para que nada se sobreponha.
 pub fn estrategico(r: &Resultado, largura: f32, altura: f32) -> Cena {
+    estrategico_com(r, largura, altura, false)
+}
+
+/// Diagrama para a tela: sem legenda lateral (o nome aparece por nível de detalhe e no painel).
+pub fn estrategico_interativo(r: &Resultado) -> Cena {
+    let (w, h) = mundo(r.grupos.len() * 6 / 5);
+    estrategico_com(r, w, h, true)
+}
+
+fn estrategico_com(r: &Resultado, largura: f32, altura: f32, interativa: bool) -> Cena {
     let mut cena = Cena::nova(largura, altura);
     if r.grupos.is_empty() {
         cena.push(Prim::Texto {
@@ -133,8 +182,8 @@ pub fn estrategico(r: &Resultado, largura: f32, altura: f32) -> Cena {
         });
         return cena;
     }
-    let legenda_larg = (largura * 0.28).clamp(190.0, 300.0);
-    let (ml, mr, mt, mb) = (62.0f32, legenda_larg + 24.0, 28.0f32, 60.0f32);
+    let legenda_larg = if interativa { 0.0 } else { (largura * 0.28).clamp(190.0, 300.0) };
+    let (ml, mr, mt, mb) = (62.0f32, if interativa { 56.0 } else { legenda_larg + 24.0 }, 28.0f32, 60.0f32);
     let (x0, x1, y0, y1) = (ml, largura - mr, mt, altura - mb);
     let px = |c: f64| x0 + (c.clamp(0.0, 1.0) as f32) * (x1 - x0);
     let py = |d: f64| y1 - (d.clamp(0.0, 1.0) as f32) * (y1 - y0);
@@ -180,12 +229,29 @@ pub fn estrategico(r: &Resultado, largura: f32, altura: f32) -> Cena {
             c: (px(g.faixa_c), py(g.faixa_d)), r: raio(g),
             preench: Some(cor_grupo(g.id, 170)), borda: Some((cor_grupo(g.id, 255), 1.5)),
             dica: Some(format!("{}. {} · {} · {} nós · {} documentos", g.id + 1, g.nome, g.quadrante.curto(), g.tamanho, g.documentos)),
+            alvo: Some(Alvo::Grupo(g.id)),
         });
     }
     for g in &ordem {
         let (cx, cy) = (px(g.faixa_c), py(g.faixa_d));
         let cor = if [0usize, 4].contains(&(g.id % crate::tema::PALETA.len())) { BRANCO } else { TINTA };
-        cena.push(Prim::Texto { pos: (cx, cy), texto: (g.id + 1).to_string(), tam: 11.0, cor, ancora: Ancora::Centro, negrito: true, vertical: false });
+        if interativa {
+            cena.rotulos.push(Rotulo {
+                pos: (cx, cy), texto: (g.id + 1).to_string(), tam: 11.0, cor, negrito: true,
+                lugar: Lugar::Dentro, prioridade: 2000.0 + g.tamanho as f32, raio: raio(g), min_px: 8.0,
+                alvo: Some(Alvo::Grupo(g.id)),
+            });
+            cena.rotulos.push(Rotulo {
+                pos: (cx, cy), texto: g.nome.clone(), tam: 11.0, cor: TINTA, negrito: false,
+                lugar: Lugar::Direita, prioridade: g.tamanho as f32, raio: raio(g), min_px: 7.0,
+                alvo: Some(Alvo::Grupo(g.id)),
+            });
+        } else {
+            cena.push(Prim::Texto { pos: (cx, cy), texto: (g.id + 1).to_string(), tam: 11.0, cor, ancora: Ancora::Centro, negrito: true, vertical: false });
+        }
+    }
+    if interativa {
+        return cena;
     }
 
     // Legenda numerada à direita.
@@ -198,7 +264,7 @@ pub fn estrategico(r: &Resultado, largura: f32, altura: f32) -> Cena {
     lista.sort_by_key(|g| g.id);
     for (k, g) in lista.iter().take(linhas).enumerate() {
         let y = y0 + 30.0 + k as f32 * passo;
-        cena.push(Prim::Circulo { c: (lx0 + 7.0, y), r: 6.0, preench: Some(cor_grupo(g.id, 255)), borda: None, dica: None });
+        cena.push(Prim::Circulo { c: (lx0 + 7.0, y), r: 6.0, preench: Some(cor_grupo(g.id, 255)), borda: None, dica: None, alvo: None });
         let mut nome = format!("{}. {}", g.id + 1, g.nome);
         if nome.chars().count() > max_chars {
             nome = nome.chars().take(max_chars.saturating_sub(1)).collect::<String>() + "…";
@@ -212,7 +278,7 @@ pub fn estrategico(r: &Resultado, largura: f32, altura: f32) -> Cena {
     cena
 }
 
-fn fmt_num(v: f64) -> String {
+pub fn fmt_num(v: f64) -> String {
     let s = format!("{:.2}", v);
     let s = s.trim_end_matches('0').trim_end_matches('.').replace('.', ",");
     if s.is_empty() { "0".into() } else { s }
@@ -233,9 +299,9 @@ mod testes {
     fn rede_tem_halo_por_grupo_e_no() {
         let r = dados();
         let c = rede(&r, 900.0, 640.0);
-        let circulos = c.prims.iter().filter(|p| matches!(p, Prim::Circulo { dica: None, .. })).count();
+        let circulos = c.prims.iter().filter(|p| matches!(p, Prim::Circulo { alvo: Some(Alvo::Grupo(_)), .. })).count();
         assert_eq!(circulos, r.grupos.len());
-        let nos = c.prims.iter().filter(|p| matches!(p, Prim::Circulo { dica: Some(_), .. })).count();
+        let nos = c.prims.iter().filter(|p| matches!(p, Prim::Circulo { alvo: Some(Alvo::No(_)), .. })).count();
         assert_eq!(nos, r.nos.len());
         for p in &c.prims {
             if let Prim::Circulo { c: ce, .. } = p {
@@ -253,6 +319,25 @@ mod testes {
         for b in bolhas {
             assert!(b.0 >= 62.0 && b.0 <= 900.0 && b.1 >= 28.0 && b.1 <= 640.0 - 60.0);
         }
+    }
+
+    #[test]
+    fn interativas_trocam_textos_por_rotulos_lod() {
+        let r = dados();
+        let c = rede_interativa(&r);
+        assert!(!c.prims.iter().any(|p| matches!(p, Prim::Texto { .. })));
+        assert!(c.rotulos.iter().filter(|l| l.alvo.is_some_and(|a| matches!(a, Alvo::Grupo(_)))).count() == r.grupos.len());
+        let e = estrategico_interativo(&r);
+        assert_eq!(e.rotulos.len(), 2 * r.grupos.len());
+        // Sem legenda lateral: nenhum círculo sem alvo.
+        assert!(e.prims.iter().all(|p| !matches!(p, Prim::Circulo { alvo: None, .. })));
+    }
+
+    #[test]
+    fn mundo_cresce_com_o_numero_de_elementos() {
+        assert_eq!(mundo(10), (900.0, 620.0));
+        assert!(mundo(640).0 > 2000.0);
+        assert_eq!(mundo(1_000_000).0, 3600.0);
     }
 
     #[test]

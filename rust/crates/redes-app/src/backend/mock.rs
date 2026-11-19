@@ -8,6 +8,15 @@ use std::path::Path;
 #[derive(Default)]
 pub struct Demonstracao {
     info: Option<InfoProjeto>,
+    /// Número fixo de agrupamentos (para testar com 100 ou mais); `None` = 6 a 8.
+    grupos: Option<usize>,
+}
+
+impl Demonstracao {
+    /// Demonstração com `n` agrupamentos (REDES_DEMO_GRUPOS no binário).
+    pub fn com_grupos(n: usize) -> Self {
+        Demonstracao { info: None, grupos: Some(n.max(1)) }
+    }
 }
 
 /// Gerador congruencial simples (determinístico, sem dependências).
@@ -34,12 +43,13 @@ const PALAVRAS: &[&str] = &[
     "estudos de caso", "colaboração", "etnomatemática", "jogos", "simulação", "incerteza",
 ];
 
-fn gerar(par: &Parametros) -> Resultado {
+fn gerar(par: &Parametros, fixo: Option<usize>) -> Resultado {
     let seed = 7919u64
         .wrapping_mul(par.estrutura as u64 + 3)
         .wrapping_add(par.periodo.map(|p| p as u64 + 1).unwrap_or(0) * 104_729);
     let mut r = Lcg(seed);
-    let n_grupos = 6 + (r.prox() % 3) as usize; // até 8 grupos x 5 termos = 40, sem repetir palavra
+    let n_grupos = fixo.unwrap_or(6 + (r.prox() % 3) as usize);
+    let mut prox_doc = 1i64; // até 8 grupos x 5 termos = 40, sem repetir palavra
     let mut grupos = Vec::new();
     let mut nos = Vec::new();
     let mut arestas = Vec::new();
@@ -53,10 +63,13 @@ fn gerar(par: &Parametros) -> Resultado {
         let tam = 3 + (r.prox() % 3) as usize;
         let inicio = nos.len();
         for k in 0..tam {
-            let p = PALAVRAS[baralho[cursor % baralho.len()]];
+            let mut p = PALAVRAS[baralho[cursor % baralho.len()]].to_string();
+            if cursor >= baralho.len() {
+                p = format!("{p} {}", cursor / baralho.len() + 1);
+            }
             cursor += 1;
             let peso = (1.0 + r.unit() * 12.0).round() + if k == 0 { 10.0 } else { 0.0 };
-            nos.push(No { id: nos.len(), rotulo: p.to_string(), grupo: g, peso });
+            nos.push(No { id: nos.len(), rotulo: p, grupo: g, peso });
         }
         let fim = nos.len();
         // Arestas dentro do grupo: estrela + algumas extras.
@@ -83,7 +96,9 @@ fn gerar(par: &Parametros) -> Resultado {
             documentos: docs,
             citacoes: Some(docs * (3 + (r.prox() % 9) as u32)),
             quadrante: Quadrante::Motor,
+            doc_ids: (prox_doc..prox_doc + docs as i64).collect(),
         });
+        prox_doc += docs as i64;
     }
     // Arestas entre grupos (ligações de centralidade).
     for g in 0..n_grupos {
@@ -145,7 +160,17 @@ impl Backend for Demonstracao {
         if self.info.is_none() {
             return Err("Nenhum projeto aberto.".into());
         }
-        Ok(gerar(parametros))
+        Ok(gerar(parametros, self.grupos))
+    }
+
+    fn titulos(&self, ids: &[i64]) -> std::collections::HashMap<i64, String> {
+        ids.iter()
+            .map(|&i| {
+                let a = PALAVRAS[(i as usize * 7) % PALAVRAS.len()];
+                let b = PALAVRAS[(i as usize * 13 + 5) % PALAVRAS.len()];
+                (i, format!("Estudo {i} sobre {a} e {b}"))
+            })
+            .collect()
     }
 
     fn origem(&self) -> &'static str {

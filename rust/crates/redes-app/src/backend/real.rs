@@ -46,6 +46,7 @@ pub fn converter(r: &core::Resultado) -> Resultado {
             documentos: g.documentos.get("nucleo").or_else(|| g.documentos.values().next()).map(|v| v.len() as u32).unwrap_or(0),
             citacoes: None,
             quadrante: Quadrante::de_texto(&g.quadrante).unwrap_or(Quadrante::Emergente),
+            doc_ids: g.documentos.get("nucleo").or_else(|| g.documentos.values().next()).cloned().unwrap_or_default(),
         })
         .collect();
     // Só entram no grafo os nós que pertencem a algum grupo.
@@ -101,6 +102,10 @@ impl Backend for Nucleo {
 
     fn permite_todos_periodos(&self) -> bool {
         false
+    }
+
+    fn titulos(&self, ids: &[i64]) -> HashMap<i64, String> {
+        self.projeto.as_ref().and_then(|p| p.titulos(ids).ok()).unwrap_or_default()
     }
 
     fn origem(&self) -> &'static str {

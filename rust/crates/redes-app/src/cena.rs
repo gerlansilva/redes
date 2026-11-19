@@ -11,6 +11,41 @@ pub enum Ancora {
     Direita,
 }
 
+/// O que um círculo representa (para clique e destaque na tela).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Alvo {
+    Grupo(usize),
+    No(usize),
+}
+
+/// Onde o rótulo fica em relação ao círculo dono dele.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Lugar {
+    Dentro,
+    Acima,
+    Direita,
+}
+
+/// Rótulo gerenciado por nível de detalhe: só aparece na tela quando o elemento
+/// de origem fica grande o bastante e o espaço está livre (veja `grafico`).
+/// Não entra na exportação, que usa os `Prim::Texto` da cena estática.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Rotulo {
+    pub pos: (f32, f32),
+    pub texto: String,
+    pub tam: f32,
+    pub cor: Cor,
+    pub negrito: bool,
+    pub lugar: Lugar,
+    /// Quanto maior, mais cedo ganha espaço.
+    pub prioridade: f32,
+    /// Raio, em unidades da cena, do elemento dono do rótulo.
+    pub raio: f32,
+    /// Raio mínimo em pixels de tela para o rótulo aparecer.
+    pub min_px: f32,
+    pub alvo: Option<Alvo>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Prim {
     Circulo {
@@ -19,6 +54,7 @@ pub enum Prim {
         preench: Option<Cor>,
         borda: Option<(Cor, f32)>,
         dica: Option<String>,
+        alvo: Option<Alvo>,
     },
     Linha {
         a: (f32, f32),
@@ -50,6 +86,17 @@ pub struct Cena {
     pub largura: f32,
     pub altura: f32,
     pub prims: Vec<Prim>,
+    /// Rótulos por nível de detalhe (só na tela interativa).
+    pub rotulos: Vec<Rotulo>,
+}
+
+/// Círculo encontrado sob um ponto.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Acerto<'a> {
+    pub dica: &'a str,
+    pub alvo: Option<Alvo>,
+    pub centro: (f32, f32),
+    pub raio: f32,
 }
 
 fn esc(s: &str) -> String {
@@ -68,22 +115,32 @@ pub const FAMILIA_SVG: &str = "Helvetica Neue, Helvetica, Arial, Inter, sans-ser
 
 impl Cena {
     pub fn nova(largura: f32, altura: f32) -> Self {
-        Cena { largura, altura, prims: Vec::new() }
+        Cena { largura, altura, prims: Vec::new(), rotulos: Vec::new() }
     }
 
     pub fn push(&mut self, p: Prim) {
         self.prims.push(p);
     }
 
-    /// Texto da dica do círculo sob o ponto, se houver (o de cima vence).
-    pub fn dica_em(&self, p: (f32, f32)) -> Option<&str> {
+    /// Círculo sob o ponto (o de cima vence), com `tol` de folga em unidades da cena.
+    pub fn acertar(&self, p: (f32, f32), tol: f32) -> Option<Acerto<'_>> {
         self.prims.iter().rev().find_map(|prim| match prim {
-            Prim::Circulo { c, r, dica: Some(d), .. } => {
+            Prim::Circulo { c, r, dica: Some(d), alvo, .. } => {
                 let (dx, dy) = (p.0 - c.0, p.1 - c.1);
-                if dx * dx + dy * dy <= r * r { Some(d.as_str()) } else { None }
+                let rr = r + tol;
+                if dx * dx + dy * dy <= rr * rr {
+                    Some(Acerto { dica: d.as_str(), alvo: *alvo, centro: *c, raio: *r })
+                } else {
+                    None
+                }
             }
             _ => None,
         })
+    }
+
+    /// Texto da dica do círculo sob o ponto, se houver.
+    pub fn dica_em(&self, p: (f32, f32)) -> Option<&str> {
+        self.acertar(p, 0.0).map(|a| a.dica)
     }
 
     pub fn para_svg(&self) -> String {
@@ -157,7 +214,7 @@ mod testes {
 
     fn exemplo() -> Cena {
         let mut c = Cena::nova(100.0, 80.0);
-        c.push(Prim::Circulo { c: (10.0, 10.0), r: 5.0, preench: Some([1, 2, 3, 255]), borda: None, dica: Some("a & b".into()) });
+        c.push(Prim::Circulo { c: (10.0, 10.0), r: 5.0, preench: Some([1, 2, 3, 255]), borda: None, dica: Some("a & b".into()), alvo: None });
         c.push(Prim::Texto { pos: (5.0, 5.0), texto: "<x> & \"y\"".into(), tam: 10.0, cor: [0, 0, 0, 255], ancora: Ancora::Centro, negrito: true, vertical: false });
         c
     }

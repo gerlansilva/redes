@@ -11,6 +11,7 @@
 //! "Todos os períodos" quando [`Backend::permite_todos_periodos`] é verdadeiro.
 
 use crate::modelo::{InfoProjeto, Parametros, Resultado};
+use std::collections::HashMap;
 use std::path::Path;
 
 pub mod mock;
@@ -27,6 +28,10 @@ pub trait Backend {
     /// O núcleo real analisa um período por vez; o mock aceita "todos".
     fn permite_todos_periodos(&self) -> bool {
         true
+    }
+    /// Títulos dos documentos (para o painel de detalhes); vazio se não houver.
+    fn titulos(&self, _ids: &[i64]) -> HashMap<i64, String> {
+        HashMap::new()
     }
     /// Rótulo curto para a interface ("dados de demonstração", "núcleo Rust").
     fn origem(&self) -> &'static str;

@@ -141,6 +141,8 @@ pub struct Grupo {
     /// `None` quando o núcleo não informa citações por tema.
     pub citacoes: Option<u32>,
     pub quadrante: Quadrante,
+    /// Identificadores dos documentos do agrupamento (títulos via `Backend::titulos`).
+    pub doc_ids: Vec<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
