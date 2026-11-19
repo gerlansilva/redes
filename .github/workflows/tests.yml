@@ -24,7 +24,7 @@ jobs:
       - name: Instalar o pacote
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
+          python -m pip install -e . pytest
       - name: Testes (unittest)
         # Os testes que dependem de projetos reais (/home/claude/t/...) ou do Playwright
         # pulam sozinhos quando o recurso não existe.
