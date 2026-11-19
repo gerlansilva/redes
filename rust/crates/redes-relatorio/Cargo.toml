@@ -1,0 +1,20 @@
+[package]
+name = "redes-relatorio"
+version = "0.1.0"
+edition = "2021"
+description = "Redes: gerador do relatório HTML em português (arquivo único e pasta de páginas)"
+license = "MIT"
+
+[lib]
+name = "redes_relatorio"
+path = "src/lib.rs"
+
+[[bin]]
+name = "redes-relatorio-cli"
+path = "src/bin/redes-relatorio-cli.rs"
+
+[dependencies]
+redes-core = { path = "../redes-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
