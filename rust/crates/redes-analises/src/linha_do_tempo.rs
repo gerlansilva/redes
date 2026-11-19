@@ -432,7 +432,7 @@ fn svg_simples(mensagem: &str, titulo: &str, p: &str) -> String {
          <rect class=\"lt-fundo\" width=\"{l}\" height=\"110\"/><text class=\"lt-tit\" x=\"16\" y=\"30\">{tt}</text>\
          <text class=\"lt-aviso\" x=\"16\" y=\"64\">{mm}</text></svg>",
         l = LARGURA,
-        f = FONTE_INTER,
+        f = FONTE_HELVETICA,
         p = p,
         t = esc_limpo(&tit),
         m = esc(&mensagem),
@@ -597,7 +597,7 @@ pub fn svg(dados: &LinhaDoTempo, titulo: &str, rotulos: &BTreeMap<usize, String>
          aria-labelledby=\"{p}-t {p}-d\">",
         l = LARGURA,
         h = h_tot,
-        f = FONTE_INTER,
+        f = FONTE_HELVETICA,
         p = p
     ));
     o.push(format!("<title id=\"{p}-t\">{}</title><desc id=\"{p}-d\">{}</desc>", esc_limpo(&titulo_fig), esc_limpo(&descricao), p = p));

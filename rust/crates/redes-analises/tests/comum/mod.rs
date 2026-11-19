@@ -48,3 +48,26 @@ pub fn contagem_json(v: &Value) -> BTreeMap<String, i64> {
 pub fn perto(a: f64, b: f64, tol: f64) -> bool {
     (a - b).abs() <= tol * (1.0 + b.abs())
 }
+
+/// Troca os identificadores derivados de hash (`dg1a2b3c4d`, `lt...`) por um valor fixo: o
+/// Rust usa outro hash que o Python (só estes ids mudam).
+pub fn sem_hash(svg: &str, prefixos: &[&str]) -> String {
+    let mut s = svg.to_string();
+    for p in prefixos {
+        let re = regex::Regex::new(&format!(r"{p}[0-9a-f]{{8}}")).unwrap();
+        s = re.replace_all(&s, format!("{p}XXXXXXXX")).into_owned();
+    }
+    s
+}
+
+/// Igualdade de textos; em caso de diferença, mostra o primeiro ponto divergente.
+pub fn igual_texto(a: &str, b: &str, ctx: &str) {
+    if a == b {
+        return;
+    }
+    let ca: Vec<char> = a.chars().collect();
+    let cb: Vec<char> = b.chars().collect();
+    let i = ca.iter().zip(cb.iter()).position(|(x, y)| x != y).unwrap_or(ca.len().min(cb.len()));
+    let trecho = |c: &Vec<char>| c[i.saturating_sub(100)..(i + 100).min(c.len())].iter().collect::<String>();
+    panic!("{ctx}: textos diferentes na posição {i} (rust {} chars, python {})\n rust:   ...{}\n python: ...{}", ca.len(), cb.len(), trecho(&ca), trecho(&cb));
+}

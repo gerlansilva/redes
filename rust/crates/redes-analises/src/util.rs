@@ -6,6 +6,7 @@ use unicode_normalization::UnicodeNormalization;
 pub const TINTA: &str = "#14204A";
 pub const TINTA_FRACA: &str = "#64748B";
 pub const FONTE_INTER: &str = "Inter, Arial, sans-serif";
+pub const FONTE_HELVETICA: &str = "Inter, Helvetica, Arial, sans-serif";
 
 pub const PALETA_GRUPOS: [&str; 15] = [
     "#2F2BFF", "#00A344", "#6A3BFF", "#B45309", "#0B1F66", "#0E7490", "#8B5CF6", "#4D7C0F", "#9D174D", "#0369A1",

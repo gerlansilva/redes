@@ -50,6 +50,85 @@ def similitude(caminho: str, saida: dict, **kw):
         con.close()
 
 
+BASE = dict(matriz="CoOccurrence", min_freq=1, min_cooc=1, rede_min=2, rede_max=15, corte=0.0,
+            mapeadores=["nucleo"], k_core=2, palavras=["autor", "fonte"], similaridade="EquivalenceIndex")
+CASOS_CORPUS = {
+    "palavras": {**BASE, "unidade": "Words", "algoritmo": "CentersSimples", "min_freq": 2},
+    "palavras_louvain": {**BASE, "unidade": "Words", "algoritmo": "Louvain", "min_freq": 2},
+    "autores": {**BASE, "unidade": "Authors", "algoritmo": "CentersSimples"},
+    "referencias": {**BASE, "unidade": "References", "algoritmo": "CentersSimples", "min_freq": 2},
+}
+
+
+def limpa(x):
+    """Troca não finitos por None e converte tuplas/conjuntos para JSON."""
+    import math
+    if hasattr(x, "tolist"):
+        return limpa(x.tolist())
+    if isinstance(x, float):
+        return x if math.isfinite(x) else None
+    if isinstance(x, dict):
+        return {str(k): limpa(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [limpa(v) for v in x]
+    if isinstance(x, (set, frozenset)):
+        return sorted(limpa(v) for v in x)
+    return x
+
+
+def avancadas(caminho: str, saida: dict):
+    sys.path.insert(0, os.path.join(AQUI, "..", "..", "redes-core", "tests"))
+    import gera_referencia as g1
+    from redes import dendro_helper, dendrograma, linha_do_tempo, rajadas
+    from redes.kb import ProjetoRedes
+    from redes.pipeline import executa_periodo
+    from redes.viz import densidade as vd
+    from redes.viz import dendrograma as vdg
+    from redes.viz import linha_do_tempo as vlt
+    con = sqlite3.connect(caminho)
+    saida["rajadas"] = {
+        tipo: limpa(rajadas.calcula(con, tipo, limite=20, minimo_documentos=3)) for tipo in ("palavras", "referencias")}
+    con.close()
+    with ProjetoRedes(caminho) as kb:
+        per = kb.periodos()[0]
+        for rotulo, params in CASOS_CORPUS.items():
+            config = g1.configuracao(params)
+            res = executa_periodo(kb, per.id, per.nome, config)
+            for lig in dendrograma.LIGACOES:
+                d, omit = dendro_helper.dendrograma_do_periodo(res, 60, lig)
+                if d is None:
+                    saida.setdefault("dendrograma", {})[f"{rotulo}/{lig}"] = {"vazio": True}
+                    continue
+                ng = d["n_grupos_sugerido"]
+                part = d.corte(n_grupos=ng)
+                saida.setdefault("dendrograma", {})[f"{rotulo}/{lig}"] = {
+                    "params": params, "ligacao": lig, "nos": d["nos"], "ordem": d["ordem"],
+                    "alturas": d["alturas"], "coph": d["coph"], "sugerido": ng, "fusoes": limpa(d["fusoes"]),
+                    "particao": limpa(part), "comparacao": limpa(d.comparacao(part)) if d.get("grupos_rede") else None,
+                    "frases": dendrograma.interpreta(d, ng), "omitidos": omit,
+                    "svg_texto": vdg.svg(d, ng, "Dendrograma"),
+                }
+            if params["unidade"] in ("Words", "Authors", "References"):
+                dados = linha_do_tempo.constroi(kb, config, 40)
+                saida.setdefault("linha", {})[rotulo] = {
+                    "params": params, "dados": limpa(dados),
+                    "svg_texto": vlt.svg(dados, "Linha do tempo", {}),
+                }
+                corpus = linha_do_tempo_corpus(kb, config)
+                dd = vd.calcula(corpus)
+                saida.setdefault("densidade", {})[rotulo] = {
+                    "params": params, "n_nos": len(dd["nos"]), "aviso": dd.get("aviso"),
+                    "nos": limpa(dd["nos"]), "pesos": limpa(dd["pesos"]),
+                    "svg": contagem_svg(vd.svg(corpus, "Mapa", unidade=config.unidade, dados=dd)),
+                }
+
+
+def linha_do_tempo_corpus(kb, config):
+    from redes import linha_do_tempo
+    from redes.pipeline import executa_periodo
+    return executa_periodo(linha_do_tempo._TodosOsDocumentos(kb), 0, "Corpus", config)
+
+
 def main(caminhos):
     for caminho in caminhos:
         nome = os.path.basename(caminho).replace(".redes", "")
@@ -58,8 +137,7 @@ def main(caminhos):
                    padrao={}, binomial={"indice_nome": "binomial", "n_formas": 40},
                    cosseno_frase={"indice_nome": "cosseno", "segmento": "frase", "extras": 0},
                    en={"idioma": "en", "n_formas": 30})
-        for modulo in sorted(f[:-3] for f in os.listdir(AQUI) if f.startswith("ref_") and f.endswith(".py")):
-            pass
+        avancadas(caminho, saida)
         os.makedirs(os.path.join(AQUI, "ref"), exist_ok=True)
         with gzip.open(os.path.join(AQUI, "ref", nome + ".json.gz"), "wt", encoding="utf-8") as f:
             json.dump(saida, f, ensure_ascii=False, sort_keys=True, default=str)
