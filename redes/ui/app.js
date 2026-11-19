@@ -602,8 +602,7 @@ function aplicarProjeto(projeto) {
   $("projetoArquivo").textContent = "· " + nomeArquivo(projeto.caminho);
   const periodos = projeto.periodos.length;
   $("projetoMeta").textContent = `${projeto.documentos} documentos · ` +
-    `${periodos} ${periodos === 1 ? "período" : "períodos"} · ` +
-    `${projeto.unidades.length} unidades`;
+    `${periodos} ${periodos === 1 ? "período" : "períodos"}`;
   $("estado").classList.remove("erro");
   $("estadoTexto").textContent = "Base importada";
 
@@ -887,7 +886,7 @@ function analiseSelecionada() {
 }
 
 function descricaoPersonalizada() {
-  return "Personalizada — configuração manual: ajuste os parâmetros e execute a prévia.";
+  return "Personalizada: configuração manual: ajuste os parâmetros e execute a prévia.";
 }
 
 function mostrarVisaoGeral() {
@@ -1047,6 +1046,7 @@ function marcarDesatualizada() {
   estado.desatualizada = true;
   const selo = $("seloPrevia");
   selo.textContent = "Prévia desatualizada";
+  selo.hidden = false;
   selo.classList.add("alerta");
 }
 
@@ -1335,7 +1335,7 @@ function renderizarResultado(resultado) {
   if (abaAtual() === "duplomapa") carregarDuploMapa();
   limparSimilitude(false);
   if (abaAtual() === "similitude") carregarSimilitude();
-  $("seloPrevia").textContent = "Prévia sob demanda";
+  $("seloPrevia").hidden = true;
   $("seloPrevia").classList.remove("alerta");
   fecharDrawer();
   renderizarResumo(resultado);
@@ -1372,7 +1372,6 @@ function renderizarResultado(resultado) {
     $("vazioMapa").hidden = true;
     $("zoomMapa").hidden = false;
     $("svgMapa").hidden = false;
-    $("notaMapa").hidden = false;
     $("metaMapa").textContent =
       `${resultado.periodo.nome} · ${paises.paises} países · ${paises.cooperacoes} cooperações`;
     $("estatMapa").replaceChildren(
@@ -1387,7 +1386,6 @@ function renderizarResultado(resultado) {
     $("canvasMapa").hidden = true;
     $("zoomMapa").hidden = true;
     $("svgMapa").hidden = true;
-    $("notaMapa").hidden = true;
     $("vazioMapa").hidden = false;
     $("metaMapa").textContent =
       estado.resultado?.parametros.unidade === "Countries"
@@ -1416,14 +1414,12 @@ function renderizarResultado(resultado) {
     $("vazioEstrategico").hidden = true;
     $("zoomEstrategico").hidden = false;
     $("svgEstrategico").hidden = false;
-    $("notaDiagrama").hidden = false;
     carregarDiagrama(resultado.token);
   } else {
     $("figEstrategico").hidden = true;
     $("canvasEstrategico").hidden = true;
     $("zoomEstrategico").hidden = true;
     $("svgEstrategico").hidden = true;
-    $("notaDiagrama").hidden = true;
     $("legendaDiagrama").hidden = true;
     $("vazioEstrategico").hidden = false;
     $("vazioEstrategico").textContent = "Sem agrupamentos nesta configuração";
@@ -1704,8 +1700,7 @@ function renderizarResumo(resultado) {
     : (unidade === "Words" ? "Nenhum tema motor nesta configuração." : "Nenhum grupo motor nesta configuração.");
 
   const leitura = elemento("div", "resumo-leitura");
-  leitura.append(elemento("div", "rotulo-secao", "Leitura rápida"),
-    elemento("p", "", frase), elemento("p", "", fraseMotor));
+  leitura.append(elemento("p", "", frase), elemento("p", "", fraseMotor));
 
   const blocos = [leitura];
 
@@ -1910,8 +1905,7 @@ function renderizarTabela(resultado) {
   }
 
   $("rodapeTabela").textContent =
-    `${plural(grupos.length, "agrupamento", "agrupamentos")} · ${resultado.resumo.documentos} documentos ` +
-    `no período · quadrante pela faixa normalizada de Callon`;
+    `${plural(grupos.length, "agrupamento", "agrupamentos")} · ${resultado.resumo.documentos} documentos no período`;
 }
 
 // Põe a primeira letra em maiúscula, sem mexer em nomes já formatados (autores com
@@ -2400,7 +2394,7 @@ function escolheArquivo() {
   const nome = document.createElement("b");
   nome.textContent = arquivo.name;
   textoArquivo.append(nome, document.createElement("br"),
-    document.createTextNode(`${tamanhoLegivel(arquivo.size)} · clique para trocar`));
+    document.createTextNode(`${tamanhoLegivel(arquivo.size)}`));
   $("areaSoltar").classList.add("com-arquivo");
 
   const atual = $("nomeProjeto").value.trim();
