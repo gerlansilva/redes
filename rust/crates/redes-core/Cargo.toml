@@ -1,0 +1,26 @@
+[package]
+name = "redes-core"
+version = "0.1.0"
+edition = "2021"
+description = "Redes: núcleo de análise bibliométrica (rede, agrupamento, Callon, índices h/g/hg/q2) em Rust"
+license = "MIT"
+
+[lib]
+name = "redes_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "redes-cli"
+path = "src/bin/redes-cli.rs"
+
+[dependencies]
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+indexmap = "2"
+unicode-normalization = "0.1"
+
+[dev-dependencies]
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
