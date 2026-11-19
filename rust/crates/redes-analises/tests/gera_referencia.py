@@ -129,6 +129,18 @@ def linha_do_tempo_corpus(kb, config):
     return executa_periodo(linha_do_tempo._TodosOsDocumentos(kb), 0, "Corpus", config)
 
 
+def duplo_mapa(caminho: str, saida: dict):
+    from redes import duplo_mapa as dm
+    from redes.viz import duplo_mapa as vdm
+    con = sqlite3.connect(caminho)
+    saida["duplo_mapa"] = {}
+    for rotulo, (e, d) in {"padrao": (10, 16), "pequeno": (4, 6), "grande": (25, 40)}.items():
+        dados = dm.calcula_do_banco(con, e, d)
+        saida["duplo_mapa"][rotulo] = {"max": [e, d], "dados": limpa(dados), "svg_texto": vdm.svg(dados, "Duplo mapa"),
+                                      "aplicavel": dm.aplicavel(con)}
+    con.close()
+
+
 def main(caminhos):
     for caminho in caminhos:
         nome = os.path.basename(caminho).replace(".redes", "")
@@ -138,6 +150,7 @@ def main(caminhos):
                    cosseno_frase={"indice_nome": "cosseno", "segmento": "frase", "extras": 0},
                    en={"idioma": "en", "n_formas": 30})
         avancadas(caminho, saida)
+        duplo_mapa(caminho, saida)
         os.makedirs(os.path.join(AQUI, "ref"), exist_ok=True)
         with gzip.open(os.path.join(AQUI, "ref", nome + ".json.gz"), "wt", encoding="utf-8") as f:
             json.dump(saida, f, ensure_ascii=False, sort_keys=True, default=str)

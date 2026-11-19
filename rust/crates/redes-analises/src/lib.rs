@@ -13,3 +13,5 @@ pub mod linha_do_tempo;
 pub mod densidade;
 pub mod similitude;
 pub mod similitude_viz;
+pub mod areas;
+pub mod duplo_mapa;
