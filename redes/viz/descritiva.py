@@ -159,7 +159,8 @@ def nuvem_svg(termos: list[tuple[str, int]], titulo: str = "", largura: int = 10
     for it in itens:
         partes.append(
             f'<text data-termo="{_esc(it["termo"])}" style="cursor:pointer" x="{it["x"]}" y="{it["y"]}" text-anchor="middle" font-size="{it["tamanho"]}" '
-            f'font-weight="700" fill="{it["cor"]}"><title>{_esc(it["termo"])}: {it["valor"]} documentos</title>'
+            f'font-weight="700" fill="{it["cor"]}"><title>{_esc(it["termo"])}: {it["valor"]} '
+            f'{"documento" if it["valor"] == 1 else "documentos"}</title>'
             f'{_esc(it["termo"])}</text>')
     partes.append("</svg>")
     return "".join(partes)
@@ -208,7 +209,10 @@ def producao_svg(producao: list[dict]) -> str:
         altura = p["documentos"] / topo_d * h
         partes.append(f'<rect x="{me + i * passo + passo * 0.16:.1f}" y="{mt + h - altura:.1f}" '
                       f'width="{passo * 0.68:.1f}" height="{altura:.1f}" rx="3" fill="{AZUL}" fill-opacity=".85">'
-                      f'<title>{p["ano"]}: {p["documentos"]} documentos, {p["citacoes"]} citações</title></rect>')
+                      f'<title>{p["ano"]}: {p["documentos"]} '
+                      f'{"documento" if p["documentos"] == 1 else "documentos"}, '
+                      f'{p["citacoes"]} {"citação" if p["citacoes"] == 1 else "citações"}'
+                      f'</title></rect>')
     caminho = " ".join(f'{"M" if i == 0 else "L"}{xc(i):.1f},{yc(p["citacoes"]):.1f}' for i, p in enumerate(producao))
     partes.append(f'<path d="{caminho}" fill="none" stroke="{AMARELO}" stroke-width="2.5" stroke-linejoin="round"/>')
     cada = max(1, math.ceil(len(producao) / 14))

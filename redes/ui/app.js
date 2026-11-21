@@ -395,9 +395,20 @@ function ligarEventos() {
     redeUI.rotulos = evento.target.value;
     agendarDesenho();
   });
+  $("arestasRede").addEventListener("change", (evento) => {
+    redeUI.arestas = evento.target.value !== "nao";
+    agendarDesenho();
+  });
+  $("halosRede").addEventListener("change", (evento) => {
+    redeUI.halos = evento.target.value !== "nao";
+    agendarDesenho();
+  });
   $("focoRede").addEventListener("change", (evento) => {
     redeUI.foco = Number(evento.target.value) || 0;
-    agendarDesenho();
+    redeUI.focoManual = true;
+    atualizarAvisoRede();
+    ajustarRede();
+    atualizarEstadoRede();
   });
   $("ajustarRede").addEventListener("click", ajustarRede);
   $("zoomHalo").addEventListener("click", (evento) => {
@@ -1342,8 +1353,16 @@ function renderizarResultado(resultado) {
   const resumo = resultado.resumo;
   const unidade = UNIDADES[resultado.parametros.unidade];
 
+  const recorteItens = resumo.itens && resumo.itens_reduzidos !== resumo.itens
+    ? `${nf.format(resumo.itens_reduzidos)} de ${nf.format(resumo.itens)} itens`
+    : `${nf.format(resumo.itens)} itens`;
   $("metaHalo").textContent =
-    `${unidade} · ${plural(resumo.grupos, "agrupamento", "agrupamentos")} · ${resumo.nos} nós`;
+    `${unidade} · ${recorteItens} · freq. mín. ${resultado.parametros.minimo_frequencia}`;
+  $("metaHalo").title =
+    `${unidade} · ${resultado.periodo.nome} · frequência mínima ` +
+    `${resultado.parametros.minimo_frequencia} · co-ocorrência mínima ` +
+    `${resultado.parametros.minimo_coocorrencia} · ${resumo.nos} nós · ` +
+    `${plural(resumo.grupos, "agrupamento", "agrupamentos")}`;
   $("metaEstrategico").textContent =
     `Callon · ${resultado.periodo.nome}`;
   $("metaGrupos").textContent =
@@ -2885,8 +2904,11 @@ const redeUI = {
   tx: 0,
   ty: 0,
   ajuste: 1,
-  rotulos: "nenhum",
+  rotulos: "principais",
+  arestas: true,
+  halos: true,
   foco: 0,
+  focoManual: false,
   visiveis: null,
   arrastando: false,
   moveu: false,
@@ -2898,6 +2920,12 @@ const redeUI = {
   zoomManual: false,
   selos: [],
   porGrupo: null,
+  // Grupos isolados continuam desenhados (nós, halo, rótulos e arestas
+  // internas); somem apenas as linhas que os ligam aos outros grupos.
+  gruposIsolados: new Set(),
+  grupoFoco: null,
+  legendaItens: [],
+  legendaContagem: null,
   posicao: new Map(),
   avisouTodos: false,
   carregada: false,
@@ -2910,33 +2938,50 @@ function limparRedeInterativa() {
   redeUI.visiveis = null;
   redeUI.selos = [];
   redeUI.porGrupo = null;
+  redeUI.gruposIsolados = new Set();
+  redeUI.grupoFoco = null;
+  redeUI.legendaItens = [];
   redeUI.avisouTodos = false;
+  $("statusRede").hidden = true;
   if (redeUI.raf) cancelAnimationFrame(redeUI.raf);
   redeUI.raf = 0;
   $("canvasHalo").hidden = true;
   $("acoesRede").hidden = true;
+  $("acoesRedeTopo").hidden = true;
   $("zoomHalo").hidden = true;
   $("legendaRede").hidden = true;
   $("avisoVolume").hidden = true;
   $("dicaNo").hidden = true;
-  $("rotulosRede").value = "nenhum";
+  $("rotulosRede").value = "principais";
   $("focoRede").value = "0";
-  redeUI.rotulos = "nenhum";
+  redeUI.focoManual = false;
+  $("arestasRede").value = "sim";
+  $("halosRede").value = "sim";
+  redeUI.rotulos = "principais";
+  redeUI.arestas = true;
+  redeUI.halos = true;
   redeUI.foco = 0;
 }
 
 async function carregarRedeInterativa(resultado) {
   limparRedeInterativa();
-  redeUI.carregada = true;
-  if (!estado.token || !resultado.resumo.grupos) return;
+  // Sem token (a prévia ainda não terminou) a aba deve tentar de novo quando
+  // abrir, em vez de marcar como carregada e deixar o canvas vazio.
+  if (!estado.token || !resultado.resumo.grupos) {
+    redeUI.carregada = Boolean(resultado.resumo.grupos);
+    return;
+  }
   const pedido = ++redeUI.pedido;
   $("carregandoHalo").hidden = false;
   try {
     const dados = await api(`/api/rede?token=${encodeURIComponent(estado.token)}`);
     if (pedido !== redeUI.pedido) return;
     prepararRede(dados);
+    redeUI.carregada = true;
   } catch (_) {
-    // A figura SVG continua disponível como alternativa.
+    // A figura SVG continua disponível como alternativa; a próxima abertura
+    // da aba tenta carregar de novo.
+    redeUI.carregada = false;
   } finally {
     if (pedido === redeUI.pedido) $("carregandoHalo").hidden = true;
   }
@@ -2957,51 +3002,252 @@ function prepararRede(dados) {
 
   const legenda = $("legendaRede");
   legenda.replaceChildren();
+  redeUI.legendaItens = [];
+  // Duas leituras no mesmo lugar: o ponto isola o grupo (mantém nós, halo e
+  // arestas internas; tira só as linhas que o ligam aos outros grupos) e o
+  // nome destaca o grupo sem tirar o resto do mapa. Os detalhes ficam no
+  // botão da seta, para o clique principal não trocar de contexto.
+  const cabecalho = document.createElement("div");
+  cabecalho.className = "legenda-cabecalho";
+  const titulo = document.createElement("span");
+  titulo.textContent = "Agrupamentos";
+  titulo.title = "O ponto isola o grupo; o nome destaca o grupo no mapa";
+  const contagem = document.createElement("span");
+  contagem.className = "legenda-contagem";
+  const botaoFoco = document.createElement("button");
+  botaoFoco.type = "button";
+  botaoFoco.className = "link-legenda";
+  botaoFoco.textContent = "Todo o mapa";
+  botaoFoco.title = "Voltar a destacar todos os agrupamentos";
+  botaoFoco.addEventListener("click", () => focarGrupo(null));
+  const todos = document.createElement("button");
+  todos.type = "button";
+  todos.className = "link-legenda";
+  todos.textContent = "religar todos";
+  todos.title = "Mostrar de novo as conexões entre todos os agrupamentos";
+  todos.addEventListener("click", () => filtrarGrupos(null));
+  const nenhum = document.createElement("button");
+  nenhum.type = "button";
+  nenhum.className = "link-legenda";
+  nenhum.textContent = "isolar todos";
+  nenhum.title = "Tirar as conexões entre os agrupamentos, sem esconder nenhum";
+  nenhum.addEventListener("click", () => filtrarGrupos("nenhum"));
+  cabecalho.append(titulo, contagem, botaoFoco, todos, nenhum);
+  legenda.append(cabecalho);
+
   for (const grupo of grupos) {
     const item = document.createElement("div");
     item.className = "item-legenda";
-    item.title = `Abrir ${grupo.rotulo}`;
-    const ponto = document.createElement("span");
+    item.dataset.grupo = String(grupo.indice - 1);
+    const ponto = document.createElement("button");
+    ponto.type = "button";
     ponto.className = "ponto";
     ponto.style.color = grupo.cor;
-    const nome = document.createElement("span");
+    ponto.setAttribute("aria-pressed", "true");
+    ponto.setAttribute("aria-label", `Agrupamento ${grupo.indice}: ${grupo.rotulo_curto}`);
+    const nome = document.createElement("button");
+    nome.type = "button";
     nome.className = "nome";
     nome.textContent = `${grupo.indice}. ${grupo.rotulo_curto}`;
+    nome.title = `${grupo.indice}. ${grupo.rotulo_original || grupo.rotulo_curto} — clique para destacar`;
+    nome.addEventListener("click", () => focarGrupo(grupo.indice - 1));
     const qtd = document.createElement("span");
     qtd.className = "qtd";
     qtd.textContent = String(grupo.nos);
-    item.append(ponto, nome, qtd);
-    item.addEventListener("click", () => abrirGrupo(grupo.indice));
+    const detalhe = document.createElement("button");
+    detalhe.type = "button";
+    detalhe.className = "detalhe";
+    detalhe.textContent = "›";
+    detalhe.title = `Abrir os detalhes do agrupamento ${grupo.indice}`;
+    detalhe.setAttribute("aria-label", `Abrir os detalhes do agrupamento ${grupo.indice}`);
+    detalhe.addEventListener("click", () => abrirGrupo(grupo.indice));
+    ponto.addEventListener("click", () => alternarGrupoRede(grupo.indice - 1));
+    item.append(ponto, nome, qtd, detalhe);
     legenda.append(item);
+    redeUI.legendaItens.push({
+      item, ponto, nome, detalhe, rotulo: grupo.rotulo_curto,
+    });
   }
+  redeUI.legendaContagem = contagem;
+  redeUI.legendaBotoes = { foco: botaoFoco, todos, nenhum };
+  legenda.classList.toggle("muitos", grupos.length > 16);
+  atualizarLegendaRede();
 
-  const aviso = $("avisoVolume");
   const meta = dados.meta;
-  if (meta.grupos > 30 || meta.nos > 600) {
-    aviso.textContent = `Volume alto: ${nf.format(meta.grupos)} agrupamentos e ` +
-      `${nf.format(meta.nos)} nós. Use "Nós" para ver só os principais, ` +
-      `aproxime com a roda do mouse ou aumente a frequência mínima.`;
-    aviso.hidden = false;
-  } else {
-    aviso.hidden = true;
-  }
 
   if (!redeUI.eventos) {
     ligarEventosRede();
     redeUI.eventos = true;
   }
 
+  // Rede muito maior que a tela: mostra os principais de saída, sem esconder
+  // que há mais. Quem escolheu "todos" no seletor continua com todos.
+  if (!redeUI.focoManual && redeUI.foco === 0 && meta.nos > 300) {
+    redeUI.foco = 200;
+  }
+  atualizarAvisoRede();
+
   $("figHalo").hidden = true;
   $("vazioHalo").hidden = true;
   $("canvasHalo").hidden = false;
   $("acoesRede").hidden = false;
+  $("acoesRedeTopo").hidden = false;
   $("zoomHalo").hidden = false;
   $("legendaRede").hidden = grupos.length === 0;
   $("rotulosRede").value = redeUI.rotulos;
   $("focoRede").value = String(redeUI.foco);
+  for (const opcao of $("focoRede").options) {
+    if (opcao.value === "0") opcao.textContent = `todos (${nf.format(meta.nos)})`;
+    else if (opcao.value === "50") opcao.textContent = `50 mais ligados`;
+    else opcao.textContent = `200 mais ligados`;
+  }
+  $("arestasRede").value = redeUI.arestas ? "sim" : "nao";
+  $("halosRede").value = redeUI.halos ? "sim" : "nao";
 
   dimensionarCanvas();
   ajustarRede();
+  atualizarEstadoRede();
+}
+
+function alternarGrupoRede(indice) {
+  if (redeUI.gruposIsolados.has(indice)) redeUI.gruposIsolados.delete(indice);
+  else redeUI.gruposIsolados.add(indice);
+  atualizarLegendaRede();
+  atualizarEstadoRede();
+  agendarDesenho();
+}
+
+function filtrarGrupos(modo) {
+  const total = redeUI.dados ? redeUI.dados.grupos.length : 0;
+  redeUI.gruposIsolados = modo === "nenhum"
+    ? new Set(Array.from({ length: total }, (_, i) => i))
+    : new Set();
+  atualizarLegendaRede();
+  atualizarEstadoRede();
+  agendarDesenho();
+}
+
+function focarGrupo(indice) {
+  redeUI.grupoFoco = (indice === null || redeUI.grupoFoco === indice) ? null : indice;
+  atualizarLegendaRede();
+  atualizarEstadoRede();
+  agendarDesenho();
+}
+
+function atualizarLegendaRede() {
+  const total = redeUI.legendaItens.length;
+  const isolados = redeUI.gruposIsolados.size;
+  if (redeUI.legendaContagem) {
+    redeUI.legendaContagem.textContent = isolados
+      ? `${total} grupos · ${isolados} ${isolados === 1 ? "isolado" : "isolados"}`
+      : `${total} grupos`;
+  }
+  redeUI.legendaItens.forEach(({ item, ponto, nome, detalhe, rotulo }, i) => {
+    const ligado = !redeUI.gruposIsolados.has(i);
+    const emFoco = redeUI.grupoFoco === i;
+    item.classList.toggle("isolado", !ligado);
+    item.classList.toggle("foco", emFoco);
+    ponto.setAttribute("aria-pressed", String(ligado));
+    ponto.title = ligado
+      ? `Isolar ${rotulo}: tira as linhas entre ele e os outros grupos`
+      : `Religar ${rotulo} aos outros grupos`;
+    nome.setAttribute("aria-pressed", String(emFoco));
+    nome.title = `${i + 1}. ${rotulo} — clique para destacar no mapa`;
+    detalhe.title = `Abrir os detalhes do agrupamento ${i + 1}`;
+  });
+  const botoes = redeUI.legendaBotoes;
+  if (botoes) {
+    botoes.foco.disabled = redeUI.grupoFoco === null;
+    botoes.todos.disabled = isolados === 0;
+    botoes.nenhum.disabled = total > 0 && isolados >= total;
+  }
+}
+
+function atualizarEstadoRede() {
+  const dados = redeUI.dados;
+  const alvo = $("statusRede");
+  if (!dados) {
+    alvo.hidden = true;
+    return;
+  }
+  const total = dados.grupos.length;
+  const isolados = redeUI.gruposIsolados.size;
+  const visiveis = calcularVisiveis();
+  const nosVisiveis = visiveis ? visiveis.size : dados.meta.nos;
+  const partes = [
+    `${total} grupos`,
+    `${nf.format(nosVisiveis)} de ${nf.format(dados.meta.nos)} nós`,
+  ];
+  if (redeUI.foco === 0) {
+    partes.push(`${nf.format(dados.meta.arestas)} arestas`);
+  }
+  if (dados.meta.soltos && redeUI.foco === 0) {
+    partes.push(`${dados.meta.soltos} fora dos grupos`);
+  }
+  if (isolados) {
+    partes.push(isolados >= total
+      ? "conexões entre grupos ocultas"
+      : `${isolados} de ${total} grupos isolados`);
+  }
+  if (redeUI.grupoFoco !== null) {
+    const grupo = dados.grupos[redeUI.grupoFoco];
+    const conexoes = conexoesDoGrupo(redeUI.grupoFoco);
+    const isolado = redeUI.gruposIsolados.has(redeUI.grupoFoco);
+    partes.push(`Grupo ${grupo.indice} em destaque (${grupo.nos} nós` +
+      (conexoes ? `, ${nf.format(conexoes)} conexões${isolado ? " ocultas" : ""}` : "") + ")");
+  }
+  alvo.textContent = partes.join(" · ");
+  alvo.hidden = false;
+}
+
+function conexoesDoGrupo(indice) {
+  const dados = redeUI.dados;
+  if (!dados) return 0;
+  if (dados.cruzadas && dados.cruzadas.length) {
+    let total = 0;
+    for (const ligacao of dados.cruzadas) {
+      const a = redeUI.posicao.get(ligacao.a);
+      const b = redeUI.posicao.get(ligacao.b);
+      if ((a && a.grupo === indice) || (b && b.grupo === indice)) total += 1;
+    }
+    return total;
+  }
+  return (dados.entre || [])
+    .filter((ligacao) => ligacao.gi === indice || ligacao.gj === indice)
+    .reduce((soma, ligacao) => soma + ligacao.peso, 0);
+}
+
+function atualizarAvisoRede() {
+  const aviso = $("avisoVolume");
+  const dados = redeUI.dados;
+  if (!dados) return;
+  const meta = dados.meta;
+  aviso.replaceChildren();
+  if (redeUI.foco > 0 && meta.nos > redeUI.foco) {
+    aviso.append(document.createTextNode(
+      `Mostrando os ${nf.format(redeUI.foco)} nós mais conectados de ` +
+      `${nf.format(meta.nos)}. `));
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "link-aviso";
+    link.textContent = "Ver todos";
+    link.addEventListener("click", () => {
+      redeUI.foco = 0;
+      redeUI.focoManual = true;
+      $("focoRede").value = "0";
+      atualizarAvisoRede();
+      ajustarRede();
+    });
+    aviso.append(link);
+    aviso.hidden = false;
+  } else if (meta.grupos > 30 || meta.nos > 600) {
+    aviso.textContent =
+      `${nf.format(meta.grupos)} agrupamentos e ${nf.format(meta.nos)} nós. ` +
+      `Aproxime com a roda do mouse ou aumente a frequência mínima.`;
+    aviso.hidden = false;
+  } else {
+    aviso.hidden = true;
+  }
 }
 
 function dimensionarCanvas() {
@@ -3021,14 +3267,52 @@ function dimensionarCanvas() {
   redeUI.altura = altura;
 }
 
+function calcularVisiveis() {
+  const dados = redeUI.dados;
+  if (!dados) return null;
+  let visiveis = null;
+  if (redeUI.foco > 0 && dados.nos.length > redeUI.foco) {
+    const ordenados = dados.nos.slice().sort(
+      (a, b) => b.grau - a.grau || b.frequencia - a.frequencia || a.id - b.id);
+    visiveis = new Set(ordenados.slice(0, redeUI.foco).map((no) => no.id));
+  }
+  return visiveis;
+}
+
 function areaRede() {
   const dados = redeUI.dados;
-  return {
-    x0: 18,
-    y0: 70,
-    x1: Math.max(200, dados.area.largura - 18),
-    y1: Math.max(200, dados.altura - 22),
+  // A área do servidor (980×780) não é a do canvas: usá-la deixava o desenho
+  // pequeno no meio, com ~35% de vazio de cada lado. Enquadra o que é
+  // realmente desenhado — halos com nó visível e nós visíveis.
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  const incluir = (x, y, raio) => {
+    x0 = Math.min(x0, x - raio);
+    y0 = Math.min(y0, y - raio);
+    x1 = Math.max(x1, x + raio);
+    y1 = Math.max(y1, y + raio);
   };
+  const visiveis = redeUI.visiveis;
+  const comNo = new Set();
+  for (const no of dados.nos) {
+    if (visiveis && !visiveis.has(no.id)) continue;
+    if (no.grupo >= 0) comNo.add(no.grupo);
+    incluir(no.x, no.y, no.raio);
+  }
+  if (redeUI.halos) {
+    dados.grupos.forEach((grupo, i) => {
+      if (!comNo.has(i)) return;
+      incluir(grupo.x, grupo.y, grupo.raio);
+    });
+  }
+  if (!Number.isFinite(x0)) {
+    return { x0: 18, y0: 70,
+             x1: Math.max(200, dados.area.largura - 18),
+             y1: Math.max(200, dados.altura - 22) };
+  }
+  return { x0: x0 - 6, y0: y0 - 6, x1: x1 + 6, y1: y1 + 6 };
 }
 
 function escalaAjuste() {
@@ -3040,6 +3324,10 @@ function escalaAjuste() {
 function ajustarRede() {
   const dados = redeUI.dados;
   if (!dados) return;
+  // O conjunto visível precisa estar atualizado antes de medir a área; era
+  // isso que fazia o primeiro "Reenquadrar" depois de mudar os nós usar o
+  // recorte anterior.
+  redeUI.visiveis = calcularVisiveis();
   const largura = redeUI.largura;
   const altura = redeUI.altura;
   const area = areaRede();
@@ -3050,6 +3338,7 @@ function ajustarRede() {
   redeUI.tx = (largura - (area.x1 - area.x0) * escala) / 2 - area.x0 * escala;
   redeUI.ty = (altura - (area.y1 - area.y0) * escala) / 2 - area.y0 * escala;
   agendarDesenho();
+  atualizarEstadoRede();
 }
 
 function limitarPan() {
@@ -3103,13 +3392,20 @@ function desenharRede() {
   const tx = redeUI.tx;
   const ty = redeUI.ty;
 
-  let visiveis = null;
-  if (redeUI.foco > 0 && dados.nos.length > redeUI.foco) {
-    const ordenados = dados.nos.slice().sort(
-      (a, b) => b.grau - a.grau || b.frequencia - a.frequencia || a.id - b.id);
-    visiveis = new Set(ordenados.slice(0, redeUI.foco).map((no) => no.id));
-  }
+  const visiveis = calcularVisiveis();
   redeUI.visiveis = visiveis;
+  const foco = redeUI.grupoFoco;
+  const alfaGrupo = (i) => (foco === null || i === foco ? 1 : 0.16);
+
+  // Halo só aparece se ao menos um nó dele está visível; senão o corte por
+  // grau deixava círculos vazios ocupando a figura.
+  const gruposVisiveis = new Set();
+  for (const no of dados.nos) {
+    if (no.grupo >= 0 && (!visiveis || visiveis.has(no.id))) {
+      gruposVisiveis.add(no.grupo);
+    }
+  }
+  redeUI.gruposVisiveis = gruposVisiveis;
 
   ctx.clearRect(0, 0, largura, altura);
   ctx.fillStyle = "#ffffff";
@@ -3120,25 +3416,36 @@ function desenharRede() {
   ctx.scale(escala, escala);
   ctx.lineCap = "round";
 
-  ctx.globalAlpha = 0.09;
-  for (const grupo of dados.grupos) {
-    ctx.fillStyle = grupo.cor;
-    ctx.beginPath();
-    ctx.arc(grupo.x, grupo.y, grupo.raio, 0, Math.PI * 2);
-    ctx.fill();
+  if (redeUI.halos) {
+    dados.grupos.forEach((grupo, i) => {
+      if (!gruposVisiveis.has(i)) return;
+      ctx.globalAlpha = foco === null ? 0.1 : (i === foco ? 0.15 : 0.035);
+      ctx.fillStyle = grupo.cor;
+      ctx.beginPath();
+      ctx.arc(grupo.x, grupo.y, grupo.raio, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
   }
-  ctx.globalAlpha = 1;
 
   ctx.strokeStyle = "#CBD5E1";
-  ctx.globalAlpha = 0.62;
+  ctx.globalAlpha = foco === null ? 0.62 : 0.14;
   const cruzadas = dados.cruzadas || [];
-  if (cruzadas.length && cruzadas.length <= 600) {
+  if (!redeUI.arestas) {
+    // sem arestas: os nós continuam clicáveis e os rótulos, legíveis
+  } else if (cruzadas.length && cruzadas.length <= 600) {
     for (const ligacao of cruzadas) {
       if (visiveis &&
           !(visiveis.has(ligacao.a) && visiveis.has(ligacao.b))) continue;
       const a = redeUI.posicao.get(ligacao.a);
       const b = redeUI.posicao.get(ligacao.b);
       if (!a || !b) continue;
+      // Grupo isolado mantém nós, halo e arestas internas; some só a linha
+      // que o liga a outro grupo.
+      if (redeUI.gruposIsolados.size &&
+          (redeUI.gruposIsolados.has(a.grupo) || redeUI.gruposIsolados.has(b.grupo))) {
+        continue;
+      }
       ctx.lineWidth =
         (1.0 + 0.9 * Math.min(ligacao.peso, 1)) / escala;
       ctx.beginPath();
@@ -3149,49 +3456,64 @@ function desenharRede() {
   } else {
     for (const ligacao of dados.entre) {
       if (ligacao.peso < 2) continue;
+      if (redeUI.gruposIsolados.has(ligacao.gi) ||
+          redeUI.gruposIsolados.has(ligacao.gj)) continue;
       const a = dados.grupos[ligacao.gi];
       const b = dados.grupos[ligacao.gj];
+      ctx.globalAlpha = foco === null ? 0.62
+        : (ligacao.gi === foco || ligacao.gj === foco ? 0.55 : 0.08);
       ctx.lineWidth = (1.2 + 0.35 * Math.min(ligacao.peso, 10)) / escala;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
     }
+    ctx.globalAlpha = 1;
   }
 
-  ctx.globalAlpha = 0.55;
-  ctx.lineWidth = 0.8 / escala;
-  for (const ligacao of dados.soltas) {
-    if (visiveis && !(visiveis.has(ligacao.a) && visiveis.has(ligacao.b))) continue;
-    const a = redeUI.posicao.get(ligacao.a);
-    const b = redeUI.posicao.get(ligacao.b);
-    if (!a || !b) continue;
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
+  if (redeUI.arestas) {
+    ctx.globalAlpha = foco === null ? 0.55 : 0.18;
+    ctx.lineWidth = 0.8 / escala;
+    for (const ligacao of dados.soltas) {
+      if (visiveis && !(visiveis.has(ligacao.a) && visiveis.has(ligacao.b))) continue;
+      const a = redeUI.posicao.get(ligacao.a);
+      const b = redeUI.posicao.get(ligacao.b);
+      if (!a || !b) continue;
+      // Linha entre um grupo isolado e um nó fora dos grupos também é uma
+      // conexão externa: some junto com as demais.
+      if ((a.grupo >= 0 && redeUI.gruposIsolados.has(a.grupo)) ||
+          (b.grupo >= 0 && redeUI.gruposIsolados.has(b.grupo))) continue;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
   }
-  ctx.globalAlpha = 1;
 
   for (let i = 0; i < dados.grupos.length; i++) {
     const grupo = dados.grupos[i];
     const bloco = redeUI.porGrupo[i];
     ctx.strokeStyle = grupo.cor;
-    ctx.globalAlpha = Math.max(0.18,
-      Math.min(0.55, 8 / Math.sqrt(Math.max(1, bloco.arestas.length))));
-    ctx.lineWidth = 1.15 / escala;
-    ctx.beginPath();
-    for (const ligacao of bloco.arestas) {
-      if (visiveis && !(visiveis.has(ligacao.a) && visiveis.has(ligacao.b))) continue;
-      const a = redeUI.posicao.get(ligacao.a);
-      const b = redeUI.posicao.get(ligacao.b);
-      if (!a || !b) continue;
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-    }
-    ctx.stroke();
 
-    ctx.globalAlpha = 1;
+    if (redeUI.arestas && bloco.arestas.length) {
+      ctx.globalAlpha = Math.max(0.18,
+        Math.min(0.55, 8 / Math.sqrt(Math.max(1, bloco.arestas.length)))) *
+        (foco === null || i === foco ? 1 : 0.15);
+      ctx.lineWidth = 1.15 / escala;
+      ctx.beginPath();
+      for (const ligacao of bloco.arestas) {
+        if (visiveis && !(visiveis.has(ligacao.a) && visiveis.has(ligacao.b))) continue;
+        const a = redeUI.posicao.get(ligacao.a);
+        const b = redeUI.posicao.get(ligacao.b);
+        if (!a || !b) continue;
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      }
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = alfaGrupo(i);
     ctx.fillStyle = grupo.cor;
     ctx.beginPath();
     for (const no of bloco.nos) {
@@ -3204,7 +3526,7 @@ function desenharRede() {
 
   ctx.fillStyle = "#ffffff";
   ctx.strokeStyle = "#64748B";
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = foco === null ? 1 : 0.3;
   ctx.lineWidth = 1.1 / escala;
   ctx.beginPath();
   for (const no of dados.soltos.map((id) => redeUI.posicao.get(id)).filter(Boolean)) {
@@ -3225,16 +3547,15 @@ function desenharRede() {
   if (redeUI.dica) desenharDestaque(redeUI.dica);
 }
 
-// Anel escuro e numerado nos pontos de virada (mesma marca do SVG em viz/halo.py).
+// Anel escuro nos pontos de virada (mesma marca do SVG em viz/halo.py). A posição
+// no ranking fica no painel e na dica do nó: número solto no canvas competia com
+// o selo do grupo e com os rótulos.
 function desenharPivosRede(ctx, escala, visiveis) {
   const p = estado.resultado && estado.resultado.pivos;
   if (!p || !p.pivos || !p.pivos.length || !(escala > 0)) return;
   ctx.save();
   ctx.setLineDash([]);
   ctx.globalAlpha = 1;
-  ctx.font = `700 ${11 / escala}px Inter, Arial, sans-serif`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
   for (const item of p.pivos) {
     const no = redeUI.posicao.get(item.no);
     if (!no || (visiveis && !visiveis.has(item.no))) continue;
@@ -3247,14 +3568,14 @@ function desenharPivosRede(ctx, escala, visiveis) {
     ctx.strokeStyle = "#14204A";
     ctx.lineWidth = 2.2 / escala;
     ctx.stroke();
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 3 / escala;
-    ctx.strokeText(String(item.posicao), no.x + raio + 2 / escala, no.y - raio);
-    ctx.fillStyle = "#14204A";
-    ctx.fillText(String(item.posicao), no.x + raio + 2 / escala, no.y - raio);
   }
   ctx.restore();
+}
+
+function pivoDoNo(id) {
+  const p = estado.resultado && estado.resultado.pivos;
+  if (!p || !p.pivos) return null;
+  return p.pivos.find((item) => item.no === id) || null;
 }
 
 function desenharSelos() {
@@ -3268,18 +3589,21 @@ function desenharSelos() {
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "700 11px Inter, Arial, sans-serif";
+  ctx.font = "700 12px Inter, Arial, sans-serif";
 
   for (const grupo of ordenados) {
+    const indice = grupo.indice - 1;
     const x = grupo.selo_x * escala + redeUI.tx;
     const y = grupo.selo_y * escala + redeUI.ty;
-    if (x < 14 || x > redeUI.largura - 14 || y < 14 || y > redeUI.altura - 14) continue;
-    if (ocupados.some((ponto) => Math.hypot(ponto[0] - x, ponto[1] - y) < 26)) continue;
+    if (x < 16 || x > redeUI.largura - 16 || y < 16 || y > redeUI.altura - 16) continue;
+    if (ocupados.some((ponto) => Math.hypot(ponto[0] - x, ponto[1] - y) < 30)) continue;
     ocupados.push([x, y]);
     redeUI.selos.push({ x, y, indice: grupo.indice });
 
+    ctx.globalAlpha = redeUI.grupoFoco === null || redeUI.grupoFoco === indice
+      ? 1 : 0.28;
     ctx.beginPath();
-    ctx.arc(x, y, 10, 0, Math.PI * 2);
+    ctx.arc(x, y, 12, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(255,255,255,.96)";
     ctx.fill();
     ctx.lineWidth = 2;
@@ -3288,6 +3612,7 @@ function desenharSelos() {
     ctx.fillStyle = grupo.cor;
     ctx.fillText(String(grupo.indice), x, y + 0.5);
   }
+  ctx.globalAlpha = 1;
 }
 
 function desenharRotulos(visiveis) {
@@ -3295,9 +3620,12 @@ function desenharRotulos(visiveis) {
   const dados = redeUI.dados;
   const ctx = redeUI.ctx;
 
+  const foco = redeUI.grupoFoco;
+  const base = dados.nos.filter((no) => !visiveis || visiveis.has(no.id))
+    .filter((no) => foco === null || no.grupo === foco);
   let alvos;
   if (redeUI.rotulos === "todos") {
-    const elegiveis = dados.nos.filter((no) => !visiveis || visiveis.has(no.id));
+    const elegiveis = base;
     alvos = elegiveis.slice().sort(
       (a, b) => b.grau - a.grau || b.frequencia - a.frequencia).slice(0, 400);
     if (elegiveis.length > 400 && !redeUI.avisouTodos) {
@@ -3305,18 +3633,40 @@ function desenharRotulos(visiveis) {
       mostrarToast("Rótulos limitados aos 400 nós de maior grau.");
     }
   } else {
-    alvos = dados.nos.slice()
-      .sort((a, b) => b.grau - a.grau || b.frequencia - a.frequencia)
-      .filter((no) => !visiveis || visiveis.has(no.id))
-      .slice(0, 16);
+    // Um rótulo por halo antes de repetir halo: antes os 16 maiores graus
+    // globais caiam em poucos grupos e deixavam halos sem nome.
+    const ordem = (a, b) => b.grau - a.grau || b.frequencia - a.frequencia;
+    const elegiveis = base;
+    const porGrupo = new Map();
+    for (const no of elegiveis) {
+      if (no.grupo < 0) continue;
+      const atual = porGrupo.get(no.grupo);
+      if (!atual || ordem(no, atual) < 0) porGrupo.set(no.grupo, no);
+    }
+    const campeoes = [...porGrupo.values()].sort(ordem);
+    // Com um grupo em destaque, um nome basta: encher as 16 vagas com nós do
+    // mesmo halo cobria o desenho de rótulos sobrepostos.
+    alvos = foco !== null ? campeoes.slice(0, 1) : campeoes.slice(0, 16);
+    if (foco === null && alvos.length < 16) {
+      const escolhidos = new Set(alvos.map((no) => no.id));
+      for (const no of elegiveis.slice().sort(ordem)) {
+        if (alvos.length >= 16) break;
+        if (escolhidos.has(no.id)) continue;
+        alvos.push(no);
+        escolhidos.add(no.id);
+      }
+    }
   }
 
-  ctx.font = "600 10.5px Inter, Arial, sans-serif";
+  ctx.font = "600 12px Inter, Arial, sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
 
   const caixas = [];
+  // Posições candidatas: direita, acima, esquerda e abaixo do nó. O texto
+  // começa fora do círculo, para não cobrir o próprio marcador, e não pode
+  // invadir outro nó nem outro rótulo.
   for (const no of alvos) {
     const ancoraX = no.x * redeUI.escala + redeUI.tx;
     const y = no.y * redeUI.escala + redeUI.ty;
@@ -3324,12 +3674,25 @@ function desenharRotulos(visiveis) {
         y < -10 || y > redeUI.altura + 10) continue;
     const texto = textoNo(no);
     const largura = ctx.measureText(texto).width;
-    let x = ancoraX + 5;
-    if (x + largura > redeUI.largura - 4) x = ancoraX - largura - 5;
-    const linha = Math.min(redeUI.altura - 10, Math.max(12, y));
-    const caixa = [x - 2, linha - 7, x + largura + 2, linha + 7];
-    if (caixas.some((outra) => !(caixa[2] < outra[0] || caixa[0] > outra[2] ||
-                                 caixa[3] < outra[1] || caixa[1] > outra[3]))) continue;
+    const raio = Math.max(3, no.raio * redeUI.escala);
+    const candidatos = [
+      [ancoraX + raio + 3, y],
+      [ancoraX - largura / 2, y - raio - 9],
+      [ancoraX - largura - raio - 3, y],
+      [ancoraX - largura / 2, y + raio + 9],
+    ];
+    let escolhido = null;
+    for (const [cx, cy] of candidatos) {
+      const x = Math.min(redeUI.largura - largura - 4, Math.max(4, cx));
+      const linha = Math.min(redeUI.altura - 10, Math.max(12, cy));
+      const caixa = [x - 2, linha - 7, x + largura + 2, linha + 7];
+      if (caixas.some((outra) => !(caixa[2] < outra[0] || caixa[0] > outra[2] ||
+                                   caixa[3] < outra[1] || caixa[1] > outra[3]))) continue;
+      escolhido = [x, linha, caixa];
+      break;
+    }
+    if (!escolhido) continue;
+    const [x, linha, caixa] = escolhido;
     caixas.push(caixa);
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(255,255,255,.92)";
@@ -3400,6 +3763,13 @@ function mostrarDica(no, x, y) {
   detalhe.textContent = `${grupo ? grupo.rotulo_curto : "Sem agrupamento"} · ` +
     `freq ${no.frequencia} · grau ${nf.format(no.grau)}`;
   caixa.append(titulo, document.createElement("br"), detalhe);
+  const pivo = pivoDoNo(no.id);
+  if (pivo) {
+    const linha = document.createElement("span");
+    linha.textContent = `Ponto de virada ${pivo.posicao} · ` +
+      `liga ${pivo.grupos_vizinhos} agrupamentos`;
+    caixa.append(document.createElement("br"), linha);
+  }
   caixa.hidden = false;
   const limite = Math.max(12, $("caixaHalo").clientWidth - caixa.offsetWidth - 16);
   caixa.style.left = `${Math.min(limite, Math.max(8, x))}px`;

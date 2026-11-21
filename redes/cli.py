@@ -161,7 +161,14 @@ def comando_analisa(args) -> int:
             if escritor_grupos:
                 escritor_grupos.writerows(_linhas_grupos(resultado))
 
-            if args.halo:
+            # Período sem documentos não tem agrupamento para desenhar; o TSV
+            # continua registrando o período vazio, mas as figuras são puladas.
+            vazio = resultado.dataset_original.quantidade_itens() == 0
+            if vazio and (args.halo or args.estrategico):
+                print(f"sem documentos em {periodo.nome}: figuras não geradas",
+                      file=sys.stderr)
+
+            if args.halo and not vazio:
                 titulo = f"Rede de {{unidade}} — {periodo.nome}"
                 svg = halo_svg(resultado, titulo)
                 destino = Path(args.halo.format(periodo=periodo.posicao))
@@ -169,7 +176,7 @@ def comando_analisa(args) -> int:
                 destino.write_text(svg, encoding="utf-8")
                 print(f"halo: {destino}", file=sys.stderr)
 
-            if args.estrategico:
+            if args.estrategico and not vazio:
                 titulo = f"Diagrama estratégico — {periodo.nome}"
                 svg = diagrama_svg(resultado, titulo)
                 destino = Path(args.estrategico.format(periodo=periodo.posicao))

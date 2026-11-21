@@ -399,12 +399,17 @@
         </section>
 
         <section class="cartao" id="blocoRede" data-bloco="blocoRede">
-          <header>
+          <header class="rede-cabecalho">
             <div class="cartao-titulo">
               <h2>Rede em halos</h2>
               <span class="meta" id="metaHalo">—</span>
             </div>
+            <div class="rede-acoes" id="acoesRedeTopo" hidden>
+              <button class="botao-mini" id="ajustarRede" title="Enquadrar apenas o que está visível">Reenquadrar</button>
+              <button class="botao-mini" id="svgRede" title="Abrir a figura SVG completa, com todos os agrupamentos; não reflete grupos isolados nem o corte de nós">Figura completa (SVG)</button>
+            </div>
           </header>
+          <div class="rede-status" id="statusRede" role="status" aria-live="polite" hidden></div>
           <div class="barra-rede" id="acoesRede" hidden>
               <label class="campo-mini" title="Mostrar rótulos dos nós">
                 <span>Rótulos</span>
@@ -414,20 +419,38 @@
                   <option value="todos">todos</option>
                 </select>
               </label>
-              <label class="campo-mini" title="Nós exibidos, por grau">
-                <span>Nós</span>
+              <label class="campo-mini" title="Quantos nós exibir, por grau">
+                <span>Nós exibidos</span>
                 <select id="focoRede">
                   <option value="0">todos</option>
-                  <option value="50">top 50</option>
-                  <option value="200">top 200</option>
+                  <option value="50">50 mais ligados</option>
+                  <option value="200">200 mais ligados</option>
                 </select>
               </label>
-              <button class="botao-mini" id="ajustarRede" title="Ajustar a rede à área">Ajustar</button>
-              <button class="botao-mini" id="svgRede" title="Abrir a figura SVG">SVG</button>
+              <details class="rede-ajustes" id="ajustesRede">
+                <summary class="botao-mini">Ajustes</summary>
+                <div class="rede-ajustes-painel">
+                  <label class="campo-mini" title="Mostrar as arestas entre os nós">
+                    <span>Arestas</span>
+                    <select id="arestasRede">
+                      <option value="sim">mostrar</option>
+                      <option value="nao">ocultar</option>
+                    </select>
+                  </label>
+                  <label class="campo-mini" title="Mostrar os halos dos agrupamentos">
+                    <span>Halos</span>
+                    <select id="halosRede">
+                      <option value="sim">mostrar</option>
+                      <option value="nao">ocultar</option>
+                    </select>
+                  </label>
+                </div>
+              </details>
           </div>
           <div class="aviso-volume" id="avisoVolume" hidden></div>
           <div class="corpo-fig" id="caixaHalo">
-            <canvas id="canvasHalo" aria-label="Rede interativa em halos" hidden></canvas>
+            <canvas id="canvasHalo" aria-label="Rede interativa em halos"
+                    title="Arraste para mover · role para ampliar · clique num nó para ver o halo · anel escuro marca ponto de virada" hidden></canvas>
             <img id="figHalo" alt="Rede em halos" hidden>
             <div class="vazio" id="vazioHalo">Nenhuma rede para mostrar</div>
             <div class="carregando-figura" id="carregandoHalo" hidden>
@@ -437,7 +460,6 @@
             <div class="zoom" id="zoomHalo" hidden>
               <button type="button" data-zoom="mais" title="Ampliar">+</button>
               <button type="button" data-zoom="menos" title="Reduzir">−</button>
-              <button type="button" data-zoom="reset" title="Ajustar">⤢</button>
             </div>
           </div>
           <div class="legenda-rede" id="legendaRede" hidden></div>
@@ -1156,7 +1178,8 @@
         <div><b>4. Explore</b><span>Clique em um tema do Resumo para ver itens e documentos. As outras abas trazem rede, diagrama e comparação de períodos.</span></div>
         <div><b>5. Exporte</b><span>Baixe a grade, os índices e as redes, ou gere o relatório HTML.</span></div>
       </div>
-      <p class="dica" style="margin-top:16px">Atalho: <kbd>Esc</kbd> fecha janelas abertas.</p>
+      <p class="dica" style="margin-top:16px">Na rede, o ponto colorido da legenda isola o agrupamento: os nós, o halo e as arestas internas ficam, e somem só as linhas que o ligam aos outros grupos. O nome destaca o agrupamento no mapa; a seta abre os detalhes.</p>
+      <p class="dica">Atalho: <kbd>Esc</kbd> fecha janelas abertas.</p>
     </div>
   </div>
 </div>

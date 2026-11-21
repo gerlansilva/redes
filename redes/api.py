@@ -1497,27 +1497,113 @@ def _apaga_relatorio(pasta: Path) -> None:
         pass
 
 
-def _escolhe_frequencia(kb, periodos, base: dict, parametros: dict, fixa=None):
-    """Maior frequência mínima (3, 2, 1) que ainda dá agrupamentos em todos os períodos.
+# Frequência mínima inicial por tipo de análise. Palavras-chave e citações
+# precisam de 2 para não virarem uma lista de temas de um documento só; as
+# unidades sociais (autores, países, instituições) têm poucos itens e já se
+# organizam com 1.
+FREQUENCIA_POR_UNIDADE = {
+    "Words": 2,
+    "Authors": 1,
+    "Countries": 1,
+    "Institutions": 1,
+    "References": 2,
+    "AuthorsReference": 2,
+    "ReferenceSources": 2,
+}
+# Limites de qualidade para aceitar uma frequência: acima disso o mapa fica
+# poluído (muitos grupos, a maioria com um documento só); abaixo, fraco.
+MAX_GRUPOS_POR_PERIODO = 8
+MAX_FRACAO_GRUPOS_FRACOS = 0.5
+MIN_NOS_AGRUPADOS = 15
+# Acima disso a figura deixa de ser legível na tela e o layout demora segundos.
+# A frequência sobe até o mapa caber, como faz a opção "Nós: top N".
+MAX_NOS_POR_PERIODO = 300
 
-    Se nenhuma serve a todos, vale a que forma mais agrupamentos. Com `fixa`
-    (pedido pelo usuário) só ela é tentada.
+
+def _avalia_frequencia(resultados, acoplamento: bool = False) -> dict:
+    """Resume a qualidade de uma frequência: grupos, nós e grupos de um documento.
+
+    No acoplamento bibliográfico o grupo reúne documentos, e um grupo de um
+    documento é esperado quando ele não compartilha referências, então a
+    contagem de grupos fracos não se aplica. ``denso`` marca período com mais
+    de ``MAX_NOS_POR_PERIODO`` nós: a figura cabe na tela, mas não se lê.
     """
-    candidatas = (int(fixa),) if fixa else (3, 2, 1)
-    melhor = None
+    grupos = [len(r.grupos) for r in resultados]
+    com_itens = [r.dataset_original.quantidade_itens() > 0 for r in resultados]
+    nos_por_periodo = [sum(len(g.nos) for g in r.grupos) for r in resultados]
+    nos = sum(nos_por_periodo)
+    fracos = 0 if acoplamento else sum(
+        1 for r in resultados for g in r.grupos if len(g.documentos_nucleo) <= 1)
+    total = sum(grupos)
+    return {
+        "grupos": grupos,
+        "vazio": any(n == 0 for n, tem in zip(grupos, com_itens) if tem),
+        "nos": nos,
+        "nos_por_periodo": nos_por_periodo,
+        "denso": any(n > MAX_NOS_POR_PERIODO for n in nos_por_periodo),
+        "fracos": fracos,
+        "fracao_fraca": (fracos / total) if total else 0.0,
+        "excesso": max(grupos, default=0) > MAX_GRUPOS_POR_PERIODO,
+    }
+
+
+def _escolhe_frequencia(kb, periodos, base: dict, parametros: dict, fixa=None):
+    """Frequência mínima adequada ao tipo de análise.
+
+    Cada unidade começa na sua frequência padrão (``FREQUENCIA_POR_UNIDADE``) e
+    é ajustada quando o resultado fica fraco (período com itens e nenhum grupo,
+    poucos nós) ou poluído (mais de ``MAX_GRUPOS_POR_PERIODO`` grupos, metade
+    deles com um documento só, ou mais de ``MAX_NOS_POR_PERIODO`` nós num
+    período). Entre as candidatas saudáveis fica a mais próxima do padrão; sem
+    nenhuma saudável, a mais próxima. Com `fixa` (pedido pelo usuário) só ela é
+    tentada.
+    """
+    unidade = parametros.get("unidade") or base.get("unidade") or "Words"
+    matriz = parametros.get("matriz") or base.get("matriz") or "CoOccurrence"
+    acoplamento = matriz == "BasicCoupling"
+    if fixa:
+        candidatas = (int(fixa),)
+        padrao = int(fixa)
+    else:
+        padrao = FREQUENCIA_POR_UNIDADE.get(unidade, 2)
+        ordem = [padrao]
+        for passo in range(1, 3):
+            if padrao - passo >= 1:
+                ordem.append(padrao - passo)
+            ordem.append(padrao + passo)
+        candidatas = tuple(dict.fromkeys(ordem))
+
+    avaliadas = []
     for frequencia in candidatas:
         config = _config({**base, **parametros, "minimo_frequencia": frequencia})
         resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
-        grupos = [len(r.grupos) for r in resultados]
-        if sum(grupos) == 0:
+        metricas = _avalia_frequencia(resultados, acoplamento)
+        if sum(metricas["grupos"]) == 0:
             continue
-        com_itens = [n for n, r in zip(grupos, resultados)
-                     if r.dataset_original.quantidade_itens() > 0]
-        if com_itens and all(n >= 1 for n in com_itens) and sum(grupos) >= 3:
-            return config, frequencia, resultados
-        if melhor is None or sum(grupos) > melhor[0]:
-            melhor = (sum(grupos), config, frequencia, resultados)
-    return (melhor[1], melhor[2], melhor[3]) if melhor else None
+        metricas.update({"frequencia": frequencia, "config": config,
+                         "resultados": resultados, "distancia": abs(frequencia - padrao)})
+        avaliadas.append(metricas)
+    if not avaliadas:
+        return None
+
+    # Densidade vem primeiro: entre frequências que caibam na tela, a escolha
+    # segue os critérios de grupo; se nenhuma couber, fica a menos densa.
+    cabe = [m for m in avaliadas if not m["denso"]]
+    if cabe:
+        avaliadas = cabe
+    else:
+        avaliadas = sorted(avaliadas, key=lambda m: (max(m["nos_por_periodo"]),
+                                                     abs(m["frequencia"] - padrao)))[:1]
+
+    completas = [m for m in avaliadas if not m["vazio"]] or avaliadas
+    saudaveis = [m for m in completas
+                 if not m["excesso"]
+                 and not m["denso"]
+                 and m["fracao_fraca"] <= MAX_FRACAO_GRUPOS_FRACOS
+                 and m["nos"] >= MIN_NOS_AGRUPADOS]
+    escolhida = min(saudaveis or completas,
+                    key=lambda m: (m["distancia"], -m["nos"]))
+    return escolhida["config"], escolhida["frequencia"], escolhida["resultados"]
 
 
 def gera_relatorio_completo(dados: dict) -> dict:
@@ -1583,8 +1669,12 @@ def gera_relatorio_completo(dados: dict) -> dict:
             if poucos_informativa:
                 nota += f" Atenção: {modulo_avisos.POUCO_INFORMATIVO}."
             origem = ("a mesma da tela" if fixa else
-                      "escolhida automaticamente: a maior entre 3, 2 e 1 que mantém "
-                      "agrupamentos em todos os períodos")
+                      ("escolhida automaticamente: padrão deste tipo de análise, para "
+                       "não gerar temas de um documento só nem esvaziar a rede"
+                       if frequencia == FREQUENCIA_POR_UNIDADE.get(
+                           parametros.get("unidade"), 2) else
+                       "escolhida automaticamente: ajustada em relação ao padrão deste "
+                       "tipo de análise porque o mapa ficava fraco ou poluído neste corpus"))
             secoes.append({"rotulo": rotulo,
                            "descricao": descricao + f" Frequência mínima {frequencia} ({origem})." + nota,
                            "pasta": pasta, "config": config, "resultados": resumo["resultados"]})

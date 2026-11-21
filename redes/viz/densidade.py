@@ -273,7 +273,8 @@ def svg(res, titulo: str = "", topo: int = TOPO_NOS, suavizacao: int = SUAVIZACA
                  f'font-size="{fs:.1f}" fill="{TINTA}" stroke="#fff" stroke-width="3" '
                  'paint-order="stroke" stroke-linejoin="round" stroke-opacity=".75">'
                  f'<title>{_esc(textos_cheios[i])} — {int(d["pesos"][i])} '
-                 f'documentos</title>{_esc(textos[i])}</text>')
+                 f'{"documento" if int(d["pesos"][i]) == 1 else "documentos"}</title>'
+                 f'{_esc(textos[i])}</text>')
     # Legenda na faixa de baixo, toda dentro do SVG.
     ly = qy + alt_q + 20
     paradas = "".join(f'<stop offset="{a:g}" stop-color="rgb({c[0]},{c[1]},{c[2]})"/>'

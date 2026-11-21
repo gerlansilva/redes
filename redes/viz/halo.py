@@ -62,6 +62,9 @@ UNIDADE_TITULO = {"Words": "palavras-chave", "Authors": "autores",
 # Abaixo disto a legenda cabe em uma coluna; acima, ela é distribuída.
 LARGURA_COLUNA_LEGENDA = 236
 COLUNAS_MAX_LEGENDA = 4
+# Acima disso a legenda toma metade da figura. Os maiores vão para a lista e o
+# restante fica resumido; a tabela do relatório continua com todos.
+TETO_LEGENDA = 60
 
 
 def _rotulo_curto(texto: str, unidade: str, limite: int = 30) -> str:
@@ -316,7 +319,7 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
     cores = [cor_do_grupo(i) for i in range(k)]
 
     legenda = geometria_legenda(
-        k + (1 if soltos else 0), altura, topo=118, base=48)
+        min(k, TETO_LEGENDA) + (1 if soltos else 0), altura, topo=118, base=48)
     largura_legenda = (26 + max(1, legenda["colunas"]) * LARGURA_COLUNA_LEGENDA
                        if k or soltos else 0)
     largura_legenda = max(legenda_largura, largura_legenda)
@@ -334,8 +337,15 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
     for (i, j), peso in meta.items():
         grafo_grupos.add_edge(i, j, weight=peso)
 
-    circulo = np.array([[0.5 + 0.34 * math.cos(2 * math.pi * i / max(1, k)),
-                         0.5 + 0.34 * math.sin(2 * math.pi * i / max(1, k))]
+    # O anel dos agrupamentos acompanha o tamanho dos halos, não a área da
+    # figura. Com dois ou três grupos, o raio fixo de 0,34 da largura abria um
+    # vazio no meio que não correspondia a nenhuma distância na rede.
+    diametros = np.array([30.0 * math.sqrt(max(1, len(membros))) + 30.0 * 0.7
+                          for membros in lista]) if k else np.zeros(0)
+    util = max(1.0, min(pw, ph - 130))
+    raio_anel = min(0.34, float(diametros.sum() + 40 * k) / (2 * math.pi * util) * 1.25)
+    circulo = np.array([[0.5 + raio_anel * math.cos(2 * math.pi * i / max(1, k)),
+                         0.5 + raio_anel * math.sin(2 * math.pi * i / max(1, k))]
                         for i in range(k)])
 
     if 1 < k <= 400 and grafo_grupos.number_of_edges() >= k:
@@ -343,7 +353,19 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
                                 iterations=300)
         mola = np.array([mola[i] for i in range(k)])
         mola = (mola - mola.min(0)) / (np.ptp(mola, 0) + 1e-9)
+        # A mola é normalizada em 0–1; estica na mesma medida do anel compacto.
+        mola = 0.5 + (mola - 0.5) * 2 * raio_anel
         base = 0.65 * circulo + 0.35 * mola
+    elif k > 3 and grafo_grupos.number_of_edges() == 0:
+        # Rede fragmentada: nenhum agrupamento se liga a outro. O anel deixava
+        # um vazio no centro e empilhava os grupos pequenos na borda; o
+        # girassol distribui por área, com os maiores perto do centro.
+        angulo = math.pi * (3 - math.sqrt(5))
+        base = np.zeros((k, 2))
+        for posto, i in enumerate(sorted(range(k), key=lambda i: -diametros[i])):
+            raio = math.sqrt((posto + 0.5) / k)
+            base[i] = [0.5 + 0.44 * raio * math.cos(posto * angulo),
+                       0.5 + 0.44 * raio * math.sin(posto * angulo)]
     else:
         base = circulo
 
@@ -365,6 +387,14 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
     # Até 300 agrupamentos o resultado é o de sempre.
     iter_mola = 300 if k <= 300 else 120
 
+    # Raio de cada nó, por frequência: é o que define a distância mínima
+    # aceitável dentro do halo. Calculado aqui porque o desenho interno
+    # precisa dele antes de escolher o diâmetro.
+    tamanhos = _tamanhos_por_posto(
+        {no: resultado.frequencia_nos.get(no, 1) for no in rede.nos})
+    raio_no = {no: tamanhos.get(resultado.frequencia_nos.get(no, 1), 7) / 2
+               for no in rede.nos}
+
     def desenho_interno(i: int) -> tuple:
         if i not in internos:
             membros = lista[i]
@@ -381,18 +411,35 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
                 q = {no: np.array(v) for no, v in bruto.items()}
             pontos = np.array([q[no] for no in q])
             centro = pontos.mean(0)
-            escala = max(1e-6, np.abs(pontos - centro).max())
-            internos[i] = (sub, n, q, centro, escala)
+            # Normaliza pela distância, não pela maior coordenada: um nó na
+            # diagonal ficava a √2 do raio e vazava do halo.
+            escala = max(1e-6, float(np.linalg.norm(pontos - centro, axis=1).max()))
+            normal = {no: (np.array(v) - centro) / escala for no, v in q.items()}
+            # Menor meio-diâmetro que ainda deixa dois nós sem encostar. Sem
+            # isso, a mola normalizada espremia os nós do núcleo até sobrepor.
+            # Em grupos muito cheios, exigir 5 px de folga em todos os pares
+            # infla o halo até não caber na figura; 1,5 px ainda separa.
+            folga = 5.0 if n <= 40 else (3.0 if n <= 90 else 1.5)
+            maior = max((raio_no[no] for no in normal), default=7.0)
+            meio = maior + 6
+            nomes = list(normal)
+            for a in range(len(nomes)):
+                for b in range(a + 1, len(nomes)):
+                    d = float(np.linalg.norm(normal[nomes[a]] - normal[nomes[b]]))
+                    if d > 1e-6:
+                        preciso = (raio_no[nomes[a]] + raio_no[nomes[b]] + folga) / d
+                        meio = max(meio, preciso)
+            internos[i] = (sub, n, q, centro, escala, meio, maior)
         return internos[i]
 
     if k:
         for _ in range(tentativas):
             info = {}
             for i in range(len(lista)):
-                sub, n, q, centro, escala = desenho_interno(i)
-                diametro = unit * math.sqrt(n) + unit * 0.7
+                sub, n, q, centro, escala, meio, maior = desenho_interno(i)
+                diametro = max(unit * math.sqrt(n) + unit * 0.7, 2 * meio)
                 info[i] = (sub, {no: (np.array(v) - centro) / escala * diametro / 2
-                                 for no, v in q.items()}, diametro / 2 + 10)
+                                 for no, v in q.items()}, diametro / 2 + maior + 6)
 
             pos = np.array([np.array([40 + base[i, 0] * (pw - 80),
                                       90 + base[i, 1] * (ph - 130)]) for i in range(k)])
@@ -421,7 +468,8 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
                                  for no, deslocamento in q.items()}, r * 0.94)
             pos = pos * 0.94 + np.array([pw / 2, (90 + ph - 40) / 2]) * 0.06
 
-        # Enquadramento: layouts esparsos deixavam metade da área vazia.
+        # Enquadramento: layouts esparsos deixavam metade da área vazia. Só
+        # encolhe aqui; o desenho é ampliado depois, com halos e órbitas juntos.
         xs = np.concatenate([pos[:, 0] - [info[i][2] for i in range(k)],
                              pos[:, 0] + [info[i][2] for i in range(k)]])
         ys = np.concatenate([pos[:, 1] - [info[i][2] for i in range(k)],
@@ -429,8 +477,8 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
         largura_usada = xs.max() - xs.min()
         altura_usada = ys.max() - ys.min()
         fator = min((pw - 100) / max(1e-6, largura_usada),
-                    (ph - 170) / max(1e-6, altura_usada), 2.2)
-        if fator > 1.0:
+                    (ph - 170) / max(1e-6, altura_usada), 1.0)
+        if fator < 1.0:
             cx = (xs.min() + xs.max()) / 2
             cy = (ys.min() + ys.max()) / 2
             pos[:, 0] = pw / 2 + (pos[:, 0] - cx) * fator
@@ -452,12 +500,42 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
         return baixo + deslocado
 
     if soltos:
-        for j, no in enumerate(soltos):
-            angulo = 2 * math.pi * j / max(1, len(soltos)) + 0.4
-            nodepos[no] = np.array([pw / 2 + math.cos(angulo) * pw * 0.42,
-                                    ph / 2 + math.sin(angulo) * ph * 0.40])
+        # Cada nó sem agrupamento fica na órbita do agrupamento com que mais se
+        # liga, em vez de uma circunferência do tamanho da tela: com poucos nós,
+        # o anel antigo abria vãos e arestas compridas que não existem na rede.
+        vizinhos: dict[int, set[int]] = collections.defaultdict(set)
+        for a, b, _ in rede.arestas():
+            vizinhos[a].add(b)
+            vizinhos[b].add(a)
+        membros_por_grupo = [set(membros) for membros in lista]
+        destino: dict[int, int] = {}
+        for no in soltos:
+            if k:
+                contagem = [len(vizinhos.get(no, set()) & membros)
+                            for membros in membros_por_grupo]
+                destino[no] = int(np.argmax(contagem)) if max(contagem) else 0
+            else:
+                destino[no] = -1
+        por_grupo = collections.Counter(destino.values())
+        vistos = collections.Counter()
+        for no in soltos:
+            i = destino[no]
+            total = max(1, por_grupo[i])
+            j = vistos[i]
+            vistos[i] += 1
+            if i >= 0:
+                centro = pos[i]
+                orbita = float(info[i][2]) + 26 + 12 * math.sqrt(total)
+            else:
+                centro = np.array([pw / 2, ph / 2])
+                orbita = 0.18 * min(pw, ph)
+            angulo = 2 * math.pi * j / total + 0.4
+            nodepos[no] = centro + np.array([math.cos(angulo) * orbita,
+                                             math.sin(angulo) * orbita])
         fixos = list(indice)
-        if len(nodepos) <= 400:
+        # A mola só compensa quando há muitos nós soltos e a órbita por grupo
+        # fica apertada; com poucos, ela desmancha a órbita e espalha o desenho.
+        if len(soltos) >= 24 and len(nodepos) <= 400:
             try:
                 nodepos = nx.spring_layout(rede.para_networkx(), pos=nodepos,
                                            fixed=fixos, iterations=200, seed=6)
@@ -466,6 +544,85 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
 
         _relaxa_soltos(nodepos, soltos, pos,
                        np.array([info[i][2] for i in range(k)]), _dentro)
+
+    # Enquadramento final: amplia o conjunto (centros, halos, órbitas e nós)
+    # até ocupar a área útil. Antes só os centros eram esticados, o que abria
+    # vãos entre grupos e deixava a rede pequena no meio da figura.
+    if nodepos:
+        pontos = np.array(list(nodepos.values()))
+        x0, x1 = float(pontos[:, 0].min()), float(pontos[:, 0].max())
+        y0, y1 = float(pontos[:, 1].min()), float(pontos[:, 1].max())
+        if k:
+            raios = np.array([info[i][2] for i in range(k)])
+            x0, x1 = min(x0, float((pos[:, 0] - raios).min())), max(x1, float((pos[:, 0] + raios).max()))
+            y0, y1 = min(y0, float((pos[:, 1] - raios).min())), max(y1, float((pos[:, 1] + raios).max()))
+        escala = min((pw - 100) / max(1e-6, x1 - x0),
+                     (ph - 170) / max(1e-6, y1 - y0),
+                     2.6 if k <= 2 else 1.9)
+        centro = np.array([(x0 + x1) / 2, (y0 + y1) / 2])
+        alvo = np.array([pw / 2, (104 + ph - 44) / 2])
+        for no in list(nodepos):
+            nodepos[no] = (nodepos[no] - centro) * escala + alvo
+        if k:
+            for i in range(k):
+                info[i] = (info[i][0], info[i][1], info[i][2] * escala)
+            pos = (pos - centro) * escala + alvo
+
+    # Último ajuste: halos que não couberam podem deixar nós de agrupamentos
+    # vizinhos encostados. Separa só os nós, sem mover halos nem centros.
+    if len(nodepos) > 1:
+        nomes = list(nodepos)
+        for _ in range(30):
+            mudou = False
+            for a in range(len(nomes)):
+                for b in range(a + 1, len(nomes)):
+                    na, nb = nomes[a], nomes[b]
+                    dv = nodepos[na] - nodepos[nb]
+                    dist = float(np.linalg.norm(dv))
+                    preciso = raio_no[na] + raio_no[nb] + 2
+                    if dist < preciso:
+                        direcao = dv / dist if dist > 1e-6 else np.array([1.0, 0.0])
+                        falta = (preciso - dist) / 2
+                        nodepos[na] = nodepos[na] + direcao * falta
+                        nodepos[nb] = nodepos[nb] - direcao * falta
+                        mudou = True
+            if not mudou:
+                break
+        # O halo cresce até conter os nós que o ajuste empurrou para fora.
+        if k:
+            for i in range(len(lista)):
+                _, q, raio = info[i]
+                alcance = max((float(np.linalg.norm(nodepos[no] - pos[i])) + raio_no[no]
+                               for no in q), default=0.0)
+                if alcance + 4 > raio:
+                    info[i] = (info[i][0], q, alcance + 4)
+
+    # O crescimento acima pode ter invadido o halo vizinho depois da última
+    # verificação. Aqui a separação é refeita movendo o halo inteiro (centro e
+    # nós juntos), com guarda: deslocamento grande ou nó encostado desfaz tudo.
+    if k > 1:
+        raios = np.array([info[i][2] for i in range(k)])
+        # Acima de 80% de ocupação não há área para separar: o custo do passe
+        # não se paga e o resultado seria rejeitado pela guarda adiante.
+        ocupacao = float(np.sum(np.pi * raios ** 2)) / max(1.0, pw * (ph - 130))
+        if ocupacao <= 0.80 and not _separados(pos, raios, 6.0):
+            pos_antes = pos.copy()
+            nos_antes = {no: nodepos[no].copy() for membros in lista for no in membros}
+            nova = _separar(pos, raios, pw, ph, iteracoes=400)
+            desloc = nova - pos
+            if float(np.linalg.norm(desloc, axis=1).max()) <= 40.0:
+                pos = nova
+                for i, membros in enumerate(lista):
+                    for no in membros:
+                        nodepos[no] = nodepos[no] + desloc[i]
+                encostados = any(
+                    float(np.linalg.norm(nodepos[a] - nodepos[b]))
+                    < raio_no[a] + raio_no[b] + 1.5
+                    for a in nodepos for b in nodepos if a < b)
+                if encostados:
+                    pos = pos_antes
+                    for no, ponto in nos_antes.items():
+                        nodepos[no] = ponto
 
     selos = []
     for i in range(k):
@@ -477,9 +634,6 @@ def layout_halo(resultado, largura: int = 1280, altura: int = 780,
             "x": float(min(max(ponto[0], 30), pw - 30)),
             "y": float(min(max(ponto[1], 96), ph - 42)),
         })
-
-    tamanhos = _tamanhos_por_posto(
-        {no: resultado.frequencia_nos.get(no, 1) for no in rede.nos})
 
     nos = []
     for no in rede.nos:
@@ -684,11 +838,11 @@ def halo_svg(resultado, titulo: str, subtitulo: str = "", largura: int = 1280,
             f'font-family="{FONTE}">ponto de virada (liga agrupamentos diferentes; o número '
             f'é o Nº da tabela)</text>')
 
-    entradas = [("grupo", i) for i in range(k)]
+    entradas = [("grupo", i) for i in range(min(k, TETO_LEGENDA))]
     if soltos:
         entradas.append(("soltos", 0))
     visiveis = entradas[:legenda["visiveis"]]
-    restantes = legenda["restantes"]
+    restantes = legenda["restantes"] + max(0, k - TETO_LEGENDA)
     if restantes and visiveis:
         visiveis[-1] = ("restantes", restantes)
 
