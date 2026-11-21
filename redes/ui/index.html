@@ -51,7 +51,7 @@
       </div>
       <div class="grupo">
         <p class="grupo-titulo">Estrutura social</p>
-        <button type="button" class="nav-analise" data-analise="autores" title="Colaboração entre autores" aria-label="Colaboração entre autores"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M16 15c3 0 5 1.5 5 4"/></svg><span class="nav-texto">Coautoria</span></button>
+        <button type="button" class="nav-analise" data-analise="autores" title="Coautoria entre autores" aria-label="Coautoria entre autores"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M16 15c3 0 5 1.5 5 4"/></svg><span class="nav-texto">Coautoria</span></button>
         <button type="button" class="nav-analise so-se-focal" data-analise="paises" title="Colaboração entre países" aria-label="Colaboração entre países"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><span class="nav-texto">Países</span><span class="nav-pouco" title="pouco informativo para este corpus" aria-label="pouco informativo para este corpus">aviso</span></button>
         <button type="button" class="nav-analise so-se-focal" data-analise="instituicoes" title="Colaboração entre instituições" aria-label="Colaboração entre instituições"><svg class="nav-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg><span class="nav-texto">Instituições</span><span class="nav-pouco" title="pouco informativo para este corpus" aria-label="pouco informativo para este corpus">aviso</span></button>
       </div>
@@ -405,7 +405,9 @@
               <span class="meta" id="metaHalo">—</span>
             </div>
             <div class="rede-acoes" id="acoesRedeTopo" hidden>
-              <button class="botao-mini" id="ajustarRede" title="Enquadrar apenas o que está visível">Reenquadrar</button>
+              <button class="botao-mini" id="ajustarRede" title="Enquadrar apenas o que está visível">Enquadrar</button>
+              <button class="botao-mini" id="irPivos" title="Ir para a tabela de pontos de virada" hidden>Pontos de virada</button>
+              <button class="botao-mini" id="pngRede" title="Baixar uma imagem PNG do que está na tela, com os grupos isolados e o corte de nós">Imagem da tela (PNG)</button>
               <button class="botao-mini" id="svgRede" title="Abrir a figura SVG completa, com todos os agrupamentos; não reflete grupos isolados nem o corte de nós">Figura completa (SVG)</button>
             </div>
           </header>
@@ -449,8 +451,8 @@
           </div>
           <div class="aviso-volume" id="avisoVolume" hidden></div>
           <div class="corpo-fig" id="caixaHalo">
-            <canvas id="canvasHalo" aria-label="Rede interativa em halos"
-                    title="Arraste para mover · role para ampliar · clique num nó para ver o halo · anel escuro marca ponto de virada" hidden></canvas>
+            <canvas id="canvasHalo" aria-label="Rede interativa em halos" tabindex="0"
+                    title="Arraste para mover · role para ampliar · clique num nó para ver o halo · anel escuro marca ponto de virada · com o foco no mapa, setas andam entre nós, Espaço isola o grupo, Enter destaca, Esc limpa" hidden></canvas>
             <img id="figHalo" alt="Rede em halos" hidden>
             <div class="vazio" id="vazioHalo">Nenhuma rede para mostrar</div>
             <div class="carregando-figura" id="carregandoHalo" hidden>
@@ -1195,6 +1197,7 @@
       <button class="fechar" id="fecharDrawer" aria-label="Fechar">×</button>
     </header>
     <div class="drawer-metricas" id="drawerMetricas"></div>
+    <p class="drawer-nota" id="drawerNota" hidden></p>
     <div class="drawer-corpo" id="drawerCorpo">
       <section class="drawer-secao">
         <div class="rotulo-secao">Itens <span id="drawerItensQtd"></span></div>

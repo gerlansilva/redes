@@ -1448,6 +1448,16 @@ kbd {
   color: var(--tinta-suave);
 }
 .drawer-metricas .valor-metrica { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--azul-escuro); }
+.drawer-nota {
+  margin: 12px 24px 0;
+  padding: 9px 12px;
+  border-left: 3px solid #C9D2EE;
+  border-radius: 0 6px 6px 0;
+  background: #F8F9FD;
+  color: var(--tinta-fraca);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
 .drawer-corpo { flex: 1; overflow: auto; padding: 6px 24px 24px; }
 .drawer-secao { padding-top: 16px; }
 .drawer-secao .rotulo-secao { margin-bottom: 8px; }
@@ -1484,6 +1494,7 @@ kbd {
 .corpo-fig canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .corpo-fig canvas.interativa { cursor: grab; }
 .corpo-fig canvas.interativa.arrastando { cursor: grabbing; }
+.corpo-fig canvas:focus-visible { outline: 3px solid #3B5BDB; outline-offset: -3px; }
 .corpo-fig img { transform-origin: center center; will-change: transform; }
 .corpo-fig.zoom-ativo img { cursor: grab; }
 .corpo-fig.zoom-ativo.arrastando img { cursor: grabbing; }

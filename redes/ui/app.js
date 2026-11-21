@@ -389,19 +389,34 @@ function ligarEventos() {
     desenharDiagrama();
   });
   $("svgRede").addEventListener("click", () => abrirLightbox("figHalo"));
+  $("pngRede").addEventListener("click", baixarRedePng);
+  $("irPivos").addEventListener("click", () => {
+    const bloco = $("pivosBloco");
+    if (!bloco || bloco.hidden) return;
+    selecionarAba("grupos");
+    const titulo = bloco.querySelector("h3");
+    if (titulo) {
+      titulo.tabIndex = -1;
+      titulo.focus({ preventScroll: true });
+    }
+    bloco.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
   $("figAgrupamentos").addEventListener("click", () => abrirLightbox("figAgrupamentos"));
   $("svgAgrupamentos").addEventListener("click", () => abrirLightbox("figAgrupamentos"));
   $("rotulosRede").addEventListener("change", (evento) => {
     redeUI.rotulos = evento.target.value;
     agendarDesenho();
+    salvarSessao();
   });
   $("arestasRede").addEventListener("change", (evento) => {
     redeUI.arestas = evento.target.value !== "nao";
     agendarDesenho();
+    salvarSessao();
   });
   $("halosRede").addEventListener("change", (evento) => {
     redeUI.halos = evento.target.value !== "nao";
     agendarDesenho();
+    salvarSessao();
   });
   $("focoRede").addEventListener("change", (evento) => {
     redeUI.foco = Number(evento.target.value) || 0;
@@ -409,6 +424,7 @@ function ligarEventos() {
     atualizarAvisoRede();
     ajustarRede();
     atualizarEstadoRede();
+    salvarSessao();
   });
   $("ajustarRede").addEventListener("click", ajustarRede);
   $("zoomHalo").addEventListener("click", (evento) => {
@@ -493,6 +509,92 @@ function prepararApresentacao() {
 
 function ultimoProjeto() {
   try { return localStorage.getItem("redes.projeto"); } catch (_) { return null; }
+}
+
+/* Sessão por projeto: a última análise (unidade, período, frequência…) e a
+   vista da rede (rótulos, corte de nós, grupos isolados e foco). Sem isso,
+   reabrir a entrevista exigia reconfigurar tudo a cada vez. */
+const SESSAO_PREFIXO = "redes.sessao.";
+
+function lerSessao(caminho = estado.projeto && estado.projeto.caminho) {
+  if (!caminho) return null;
+  try {
+    const bruto = localStorage.getItem(SESSAO_PREFIXO + caminho);
+    return bruto ? JSON.parse(bruto) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function gravarSessao(parcial) {
+  if (!estado.projeto) return;
+  try {
+    const atual = lerSessao() || {};
+    localStorage.setItem(SESSAO_PREFIXO + estado.projeto.caminho,
+      JSON.stringify({ ...atual, ...parcial, quando: Date.now() }));
+  } catch (_) { /* sem armazenamento */ }
+}
+
+function assinaturaDe(p = {}) {
+  return [
+    p.unidade || $("unidade").value,
+    p.matriz || $("matriz").value,
+    p.periodo ?? Number($("periodo").value),
+    p.minimo_frequencia ?? estado.freq,
+    p.minimo_coocorrencia ?? estado.cooc,
+  ].join("|");
+}
+
+function salvarSessao() {
+  if (!estado.projeto || !estado.resultado) return;
+  const p = { ...parametros(), ...(estado.resultado.parametros || {}) };
+  const dados = { parametros: parametros(), assinatura: assinaturaDe(p) };
+  // Sem a rede carregada não há vista para salvar; omitir a chave preserva a
+  // vista da mesma análise em vez de apagá-la.
+  if (redeUI.dados) {
+    dados.vista = {
+      rotulos: redeUI.rotulos,
+      foco: redeUI.foco,
+      arestas: redeUI.arestas,
+      halos: redeUI.halos,
+      isolados: [...redeUI.gruposIsolados],
+      grupoFoco: redeUI.grupoFoco,
+    };
+  }
+  gravarSessao(dados);
+}
+
+function restaurarSessao(projeto) {
+  const sessao = lerSessao(projeto.caminho);
+  if (!sessao || !sessao.parametros) return false;
+  const p = sessao.parametros;
+  for (const campo of ["unidade", "matriz", "similaridade", "algoritmo",
+                       "mapeadores", "palavras", "corte", "rede"]) {
+    if (p[campo] != null && $(campo)) $(campo).value = String(p[campo]);
+  }
+  if (p.componente_minimo != null && $("componenteMin")) {
+    $("componenteMin").value = String(p.componente_minimo);
+    $("componenteMin").dataset.unidade = $("unidade").value;
+  }
+  const periodo = p.periodo != null ? String(p.periodo) : "";
+  if (periodo && $("periodo").querySelector(`option[value="${CSS.escape(periodo)}"]`)) {
+    $("periodo").value = periodo;
+  }
+  estado.freq = Number(p.minimo_frequencia) || 1;
+  estado.cooc = Number(p.minimo_coocorrencia) || 1;
+  estado.autoFreq = false;
+  estado.predefinicao = "personalizada";
+  marcarPredefinicao("personalizada");
+  if ($("coocMin")) $("coocMin").value = String(estado.cooc);
+  atualizarFrequenciaTela();
+  $("analise").value = "personalizada";
+  if ($("analiseFixa")) $("analiseFixa").hidden = true;
+  const campos = document.querySelector(".campos");
+  if (campos) campos.classList.remove("restringida");
+  mostrarCampoComponente();
+  ajustarMapeadores();
+  sincronizarAnalises();
+  return true;
 }
 
 function atualizarContinuar(projetos) {
@@ -644,6 +746,9 @@ function aplicarProjeto(projeto) {
 
   limparResultado();
   estado.detalheAberto = false;
+  // Retoma a última análise do projeto; o `abrir()` chama a prévia em seguida,
+  // então a tela volta com os mesmos parâmetros e a mesma vista da rede.
+  restaurarSessao(projeto);
   aplicarAbas($("analise").value);
 }
 
@@ -1279,6 +1384,7 @@ async function previsualizar() {
     if (!estado.pendente) {
       estado.resultado = resultado;
       renderizarResultado(resultado);
+      salvarSessao();
     }
   } catch (erro) {
     // Sem resultado novo, o antigo não vale: o menu Exportar não pode servir a análise anterior.
@@ -2117,6 +2223,7 @@ async function abrirGrupo(selo) {
   $("drawerTitulo").textContent = "Carregando agrupamento…";
   $("drawerQuadrante").replaceChildren();
   $("drawerMetricas").replaceChildren();
+  $("drawerNota").hidden = true;
   $("drawerItensQtd").textContent = "";
   $("drawerDocsQtd").textContent = "";
   $("drawerItens").replaceChildren(textoVazio("lendo os itens…"));
@@ -2155,6 +2262,17 @@ function renderizarDrawer(dados) {
   }
   subDrawer.push(elemento("span", "rot-atual-drawer", extras.join(" · ")));
   $("drawerQuadrante").replaceChildren(...subDrawer);
+
+  const unidade = estado.resultado?.parametros?.unidade;
+  const nota = $("drawerNota");
+  if (nota) {
+    const citacao = ["References", "AuthorsReference"].includes(unidade) && !grupo.rotulo_novo;
+    nota.hidden = !citacao;
+    nota.textContent = citacao
+      ? "Sem rótulo temático: o nome do grupo vem do item central. " +
+        "Para dar um nome ao tema, edite esse item na aba Base."
+      : "";
+  }
 
   $("drawerMetricas").replaceChildren(
     metrica("Itens", grupo.itens),
@@ -3011,7 +3129,11 @@ function prepararRede(dados) {
   cabecalho.className = "legenda-cabecalho";
   const titulo = document.createElement("span");
   titulo.textContent = "Agrupamentos";
-  titulo.title = "O ponto isola o grupo; o nome destaca o grupo no mapa";
+  const unidade = dados.meta.unidade;
+  titulo.title = "O ponto isola o grupo; o nome destaca o grupo no mapa" +
+    (["References", "AuthorsReference"].includes(unidade)
+      ? ". Aqui o nome do grupo é o item central (a obra ou o autor citado), não um tema."
+      : "");
   const contagem = document.createElement("span");
   contagem.className = "legenda-contagem";
   const botaoFoco = document.createElement("button");
@@ -3071,6 +3193,7 @@ function prepararRede(dados) {
   redeUI.legendaContagem = contagem;
   redeUI.legendaBotoes = { foco: botaoFoco, todos, nenhum };
   legenda.classList.toggle("muitos", grupos.length > 16);
+  aplicarVistaSalva(grupos.length);
   atualizarLegendaRede();
 
   const meta = dados.meta;
@@ -3109,12 +3232,33 @@ function prepararRede(dados) {
   atualizarEstadoRede();
 }
 
+function aplicarVistaSalva(total) {
+  const sessao = lerSessao();
+  const vista = sessao && sessao.vista;
+  if (!vista) return false;
+  const p = { ...parametros(), ...((estado.resultado && estado.resultado.parametros) || {}) };
+  if (sessao.assinatura !== assinaturaDe(p)) return false;
+  if (["nenhum", "principais", "todos"].includes(vista.rotulos)) {
+    redeUI.rotulos = vista.rotulos;
+  }
+  if (Number.isFinite(vista.foco)) redeUI.foco = Number(vista.foco);
+  if (typeof vista.arestas === "boolean") redeUI.arestas = vista.arestas;
+  if (typeof vista.halos === "boolean") redeUI.halos = vista.halos;
+  const isolados = Array.isArray(vista.isolados) ? vista.isolados : [];
+  redeUI.gruposIsolados = new Set(isolados.filter(
+    (i) => Number.isInteger(i) && i >= 0 && i < total));
+  redeUI.grupoFoco = Number.isInteger(vista.grupoFoco) &&
+    vista.grupoFoco >= 0 && vista.grupoFoco < total ? vista.grupoFoco : null;
+  return true;
+}
+
 function alternarGrupoRede(indice) {
   if (redeUI.gruposIsolados.has(indice)) redeUI.gruposIsolados.delete(indice);
   else redeUI.gruposIsolados.add(indice);
   atualizarLegendaRede();
   atualizarEstadoRede();
   agendarDesenho();
+  salvarSessao();
 }
 
 function filtrarGrupos(modo) {
@@ -3125,6 +3269,7 @@ function filtrarGrupos(modo) {
   atualizarLegendaRede();
   atualizarEstadoRede();
   agendarDesenho();
+  salvarSessao();
 }
 
 function focarGrupo(indice) {
@@ -3132,6 +3277,7 @@ function focarGrupo(indice) {
   atualizarLegendaRede();
   atualizarEstadoRede();
   agendarDesenho();
+  salvarSessao();
 }
 
 function atualizarLegendaRede() {
@@ -3237,6 +3383,7 @@ function atualizarAvisoRede() {
       $("focoRede").value = "0";
       atualizarAvisoRede();
       ajustarRede();
+      salvarSessao();
     });
     aviso.append(link);
     aviso.hidden = false;
@@ -3339,6 +3486,73 @@ function ajustarRede() {
   redeUI.ty = (altura - (area.y1 - area.y0) * escala) / 2 - area.y0 * escala;
   agendarDesenho();
   atualizarEstadoRede();
+}
+
+// PNG do que está na tela. A figura do servidor é a rede completa; esta
+// exportação leva o recorte, os grupos isolados, o foco e a legenda de estado.
+function baixarRedePng() {
+  const canvas = $("canvasHalo");
+  const dados = redeUI.dados;
+  if (!dados || canvas.hidden || !canvas.width) {
+    mostrarToast("A rede ainda não está na tela.", true);
+    return;
+  }
+  const dpr = canvas.width / Math.max(1, canvas.clientWidth || canvas.width);
+  const margem = Math.round(16 * dpr);
+  const faixa = Math.round(58 * dpr);
+  const saida = document.createElement("canvas");
+  saida.width = canvas.width + margem * 2;
+  saida.height = canvas.height + faixa + margem * 2;
+  const ctx = saida.getContext("2d");
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, saida.width, saida.height);
+  ctx.drawImage(canvas, margem, margem);
+
+  const unidade = ROTULO_UNIDADE[dados.meta.unidade] || dados.meta.unidade;
+  const periodo = ($("periodo").selectedOptions[0] || {}).textContent || "";
+  const freq = estado.resultado?.parametros?.minimo_frequencia ?? estado.freq;
+  const visiveis = calcularVisiveis();
+  const nos = visiveis ? visiveis.size : dados.meta.nos;
+  const isolados = redeUI.gruposIsolados.size;
+  const foco = redeUI.grupoFoco !== null ? dados.grupos[redeUI.grupoFoco] : null;
+  const titulo = `${estado.projeto?.nome || "Rede"} · ${unidade}` +
+    (periodo ? ` · ${periodo}` : "");
+  const detalhe = [
+    `${nf.format(dados.meta.grupos)} grupos`,
+    `${nf.format(nos)} de ${nf.format(dados.meta.nos)} nós`,
+    `freq. mín. ${freq}`,
+  ];
+  if (isolados) detalhe.push(`${isolados} de ${dados.meta.grupos} grupos isolados`);
+  if (foco) detalhe.push(`grupo ${foco.indice} em destaque`);
+  detalhe.push(new Date().toLocaleDateString("pt-BR"));
+
+  const base = margem + canvas.height + 22 * dpr;
+  ctx.fillStyle = "#14204A";
+  ctx.font = `700 ${13 * dpr}px Inter, Arial, sans-serif`;
+  ctx.fillText(titulo, margem, base, saida.width - margem * 2);
+  ctx.fillStyle = "#4A556F";
+  ctx.font = `${11 * dpr}px Inter, Arial, sans-serif`;
+  ctx.fillText(detalhe.join(" · "), margem, base + 19 * dpr, saida.width - margem * 2);
+
+  const limpo = (texto) => String(texto || "").normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "").toLowerCase();
+  const nome = `${limpo(estado.projeto?.nome) || "rede"}-rede-` +
+    `${limpo(unidade)}${periodo ? "-" + limpo(periodo) : ""}.png`;
+  saida.toBlob((blob) => {
+    if (!blob) {
+      mostrarToast("Não foi possível gerar a imagem.", true);
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nome;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }, "image/png");
 }
 
 function limitarPan() {
@@ -3776,11 +3990,134 @@ function mostrarDica(no, x, y) {
   caixa.style.top = `${Math.min($("caixaHalo").clientHeight - 10, Math.max(46, y))}px`;
 }
 
+function mostrarNoSelecionado(no) {
+  redeUI.dica = no;
+  const x = no.x * redeUI.escala + redeUI.tx;
+  const y = no.y * redeUI.escala + redeUI.ty;
+  mostrarDica(no, x + 14, y - 10);
+  agendarDesenho();
+}
+
+function selecionarNoInicial() {
+  const dados = redeUI.dados;
+  if (!dados) return null;
+  const visiveis = calcularVisiveis();
+  let melhor = null;
+  for (const no of dados.nos) {
+    if (visiveis && !visiveis.has(no.id)) continue;
+    if (!melhor || no.grau > melhor.grau || (no.grau === melhor.grau &&
+        no.frequencia > melhor.frequencia)) {
+      melhor = no;
+    }
+  }
+  if (melhor) mostrarNoSelecionado(melhor);
+  return melhor;
+}
+
+// Setas andam para o nó mais alinhado na direção da tecla, não para o mais
+// próximo: em halo denso, o vizinho mais perto quase sempre está atrás.
+function navegarRede(tecla) {
+  const dados = redeUI.dados;
+  if (!dados) return;
+  const visiveis = calcularVisiveis();
+  const candidatos = dados.nos.filter((no) => !visiveis || visiveis.has(no.id));
+  if (!candidatos.length) return;
+  const atual = redeUI.dica && candidatos.includes(redeUI.dica) ? redeUI.dica : null;
+  if (!atual) {
+    selecionarNoInicial();
+    return;
+  }
+  const direcoes = {
+    ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+  };
+  const [dx, dy] = direcoes[tecla] || [0, 0];
+  const sx = atual.x * redeUI.escala + redeUI.tx;
+  const sy = atual.y * redeUI.escala + redeUI.ty;
+  let melhor = null;
+  let nota = Infinity;
+  for (const no of candidatos) {
+    if (no === atual) continue;
+    const x = no.x * redeUI.escala + redeUI.tx;
+    const y = no.y * redeUI.escala + redeUI.ty;
+    const vx = x - sx;
+    const vy = y - sy;
+    const proj = vx * dx + vy * dy;
+    if (proj <= 2) continue;
+    const perp = Math.abs(vx * dy - vy * dx);
+    const custo = proj + perp * 2.2;
+    if (custo < nota) {
+      nota = custo;
+      melhor = no;
+    }
+  }
+  if (melhor) mostrarNoSelecionado(melhor);
+}
+
+function ligarTecladoRede(canvas) {
+  canvas.addEventListener("focus", () => {
+    if (redeUI.dados && !redeUI.dica) selecionarNoInicial();
+  });
+  canvas.addEventListener("keydown", (evento) => {
+    if (!redeUI.dados) return;
+    const tecla = evento.key;
+    if (tecla.startsWith("Arrow")) {
+      evento.preventDefault();
+      navegarRede(tecla);
+      return;
+    }
+    const no = redeUI.dica;
+    if ((tecla === " " || tecla === "Spacebar") && no) {
+      evento.preventDefault();
+      if (no.grupo >= 0) alternarGrupoRede(no.grupo);
+      return;
+    }
+    if (tecla === "Enter" && no) {
+      evento.preventDefault();
+      if (no.grupo >= 0) focarGrupo(no.grupo);
+      return;
+    }
+    if (tecla === "Escape") {
+      if (!no && redeUI.grupoFoco === null) return;
+      evento.preventDefault();
+      redeUI.dica = null;
+      mostrarDica(null);
+      redeUI.grupoFoco = null;
+      atualizarLegendaRede();
+      atualizarEstadoRede();
+      agendarDesenho();
+      salvarSessao();
+    }
+  });
+
+  // Atalhos de condução: 1–9 isolam o grupo, 0 religa todos. Ficam fora de
+  // campos de texto para não roubar a digitação.
+  document.addEventListener("keydown", (evento) => {
+    if (evento.defaultPrevented || evento.metaKey || evento.ctrlKey || evento.altKey) return;
+    const alvo = evento.target;
+    if (alvo && alvo.closest &&
+        alvo.closest("input, textarea, select, [contenteditable='true']")) return;
+    if (!redeUI.dados || $("canvasHalo").hidden) return;
+    const abaRede = document.querySelector('.aba[data-aba="rede"]');
+    if (!abaRede || !abaRede.classList.contains("ativa")) return;
+    if (/^[1-9]$/.test(evento.key)) {
+      const indice = Number(evento.key) - 1;
+      if (indice < redeUI.dados.grupos.length) {
+        evento.preventDefault();
+        alternarGrupoRede(indice);
+      }
+    } else if (evento.key === "0") {
+      evento.preventDefault();
+      filtrarGrupos(null);
+    }
+  });
+}
+
 function ligarEventosRede() {
   const canvas = $("canvasHalo");
   const caixa = $("caixaHalo");
 
   canvas.classList.add("interativa");
+  ligarTecladoRede(canvas);
 
   canvas.addEventListener("pointerdown", (evento) => {
     if (evento.button !== 0 || !redeUI.dados) return;
@@ -4898,9 +5235,19 @@ async function baixarSimilitude(tipo) {
 
 /* ---------------------------------------------------------- pontos de virada */
 
+function atualizarBotaoPivos() {
+  const botao = $("irPivos");
+  if (!botao) return;
+  const p = estado.resultado && estado.resultado.pivos;
+  const n = p && !p.adiado && p.pivos ? p.pivos.length : 0;
+  botao.hidden = !n;
+  botao.textContent = n === 1 ? "1 ponto de virada" : `${n} pontos de virada`;
+}
+
 function limparPivos() {
   $("pivosBloco").hidden = true;
   $("pivosCorpo").replaceChildren();
+  atualizarBotaoPivos();
 }
 
 function renderizarPivos(resultado) {
@@ -4984,6 +5331,7 @@ function renderizarPivos(resultado) {
     desc.textContent += (termos.length ? " " : "") +
       "Sigma = (intermediação + 1) elevado à força da rajada; entre os pontos de virada, o ranking por sigma acompanha sobretudo a intermediação, não a força da rajada. A rajada de palavras-chave é calculada só sobre as palavras-chave dos autores.";
   }
+  atualizarBotaoPivos();
 }
 
 function ligarPivos() {

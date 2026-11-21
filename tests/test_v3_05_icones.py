@@ -25,7 +25,11 @@ def test_menu_com_rotulo_curto_e_nome_completo_no_titulo():
     assert len(itens) == 9
     for chave, titulo, rotulo, curto in itens:
         assert " " not in curto.strip() or chave == "visao", (chave, curto)
-        assert titulo == rotulo and titulo.startswith(curto)
+        assert titulo == rotulo, (chave, titulo, rotulo)
+        # O rótulo curto é prefixo do nome completo ou a categoria que o nome
+        # qualifica ("Autores" em "Cocitação de autores").
+        assert (titulo.startswith(curto)
+                or curto.casefold() in titulo.casefold()), (chave, curto, titulo)
 
 
 def test_sem_biblioteca_externa_de_icones():
