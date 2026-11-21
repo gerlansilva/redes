@@ -1068,7 +1068,19 @@ tbody tr:hover td { background: #FBFCFE; }
   font: inherit;
   font-size: 11.5px;
 }
-.legenda-rede .busca-legenda:focus-visible { outline: 2px solid var(--azul); outline-offset: 1px; }
+.legenda-rede .busca-legenda:focus-visible,
+.legenda-rede .filtro-legenda:focus-visible { outline: 2px solid var(--azul); outline-offset: 1px; }
+.legenda-rede .filtro-legenda {
+  min-height: 26px;
+  padding: 2px 6px;
+  border: 1px solid var(--linha-forte);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--tinta);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
 .legenda-rede .item-legenda[hidden] { display: none; }
 .legenda-rede .link-legenda {
   min-height: 26px;

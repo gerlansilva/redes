@@ -3207,6 +3207,7 @@ function prepararRede(dados) {
   legenda.replaceChildren();
   redeUI.legendaItens = [];
   redeUI.buscaLegenda = "";
+  redeUI.minimoLegenda = 0;
   // Duas leituras no mesmo lugar: o ponto isola o grupo (mantém nós, halo e
   // arestas internas; tira só as linhas que o ligam aos outros grupos) e o
   // nome destaca o grupo sem tirar o resto do mapa. Os detalhes ficam no
@@ -3222,16 +3223,34 @@ function prepararRede(dados) {
       : "");
   const contagem = document.createElement("span");
   contagem.className = "legenda-contagem";
-  // Acima de 16 grupos a legenda rola; sem busca, achar um nome vira caça.
+  // Acima de 16 grupos a legenda rola; sem filtro, achar um nome vira caça.
+  // O filtro mexe só na lista: o mapa inteiro continua à vista.
   let busca = null;
+  let tamanho = null;
   if (grupos.length > 16) {
     busca = document.createElement("input");
     busca.type = "search";
     busca.className = "busca-legenda";
-    busca.placeholder = "Buscar agrupamento";
-    busca.setAttribute("aria-label", "Buscar agrupamento na legenda");
+    busca.placeholder = "Filtrar grupos";
+    busca.setAttribute("aria-label", "Filtrar agrupamentos pelo nome na legenda");
     busca.addEventListener("input", () => {
       redeUI.buscaLegenda = busca.value;
+      atualizarLegendaRede();
+    });
+    tamanho = document.createElement("select");
+    tamanho.className = "filtro-legenda";
+    tamanho.setAttribute("aria-label", "Filtrar agrupamentos pelo tamanho");
+    tamanho.title = "Filtrar a legenda pelo número de nós do agrupamento";
+    for (const [valor, rotulo] of [
+      ["0", "todos os tamanhos"], ["5", "5+ nós"], ["10", "10+ nós"], ["15", "15+ nós"],
+    ]) {
+      const opcao = document.createElement("option");
+      opcao.value = valor;
+      opcao.textContent = rotulo;
+      tamanho.append(opcao);
+    }
+    tamanho.addEventListener("change", () => {
+      redeUI.minimoLegenda = Number(tamanho.value) || 0;
       atualizarLegendaRede();
     });
   }
@@ -3255,6 +3274,7 @@ function prepararRede(dados) {
   nenhum.addEventListener("click", () => filtrarGrupos("nenhum"));
   cabecalho.append(titulo);
   if (busca) cabecalho.append(busca);
+  if (tamanho) cabecalho.append(tamanho);
   cabecalho.append(contagem, botaoFoco, todos, nenhum);
   legenda.append(cabecalho);
 
@@ -3290,6 +3310,7 @@ function prepararRede(dados) {
     redeUI.legendaItens.push({
       item, ponto, nome, detalhe, rotulo: grupo.rotulo_curto,
       original: grupo.rotulo_original || grupo.rotulo_curto || "",
+      nos: Number(grupo.nos) || 0,
     });
   }
   redeUI.legendaContagem = contagem;
@@ -3398,15 +3419,18 @@ function atualizarLegendaRede() {
   const total = redeUI.legendaItens.length;
   const isolados = redeUI.gruposIsolados.size;
   const alvo = chaveBusca(redeUI.buscaLegenda || "");
+  const minimo = redeUI.minimoLegenda || 0;
   let vistos = 0;
-  for (const { item, rotulo, original } of redeUI.legendaItens) {
-    const combina = !alvo || chaveBusca(rotulo).includes(alvo) ||
-      chaveBusca(original).includes(alvo);
+  for (const { item, rotulo, original, nos } of redeUI.legendaItens) {
+    const combina = (!alvo || chaveBusca(rotulo).includes(alvo) ||
+      chaveBusca(original).includes(alvo)) && nos >= minimo;
     item.hidden = !combina;
     if (combina) vistos += 1;
   }
   if (redeUI.legendaContagem) {
-    const base = alvo ? `${vistos} de ${total} grupos` : `${total} grupos`;
+    const base = alvo || minimo
+      ? `${vistos} de ${total} grupos`
+      : `${total} grupos`;
     redeUI.legendaContagem.textContent = isolados
       ? `${base} · ${isolados} ${isolados === 1 ? "isolado" : "isolados"}`
       : base;
