@@ -3353,6 +3353,15 @@ function alternarGrupoRede(indice) {
   salvarSessao();
 }
 
+// Linhas (arestas) ligadas/desligadas sem sair do mapa; o seletor "Linhas"
+// e o atalho L usam o mesmo caminho.
+function alternarLinhasRede() {
+  redeUI.arestas = !redeUI.arestas;
+  $("arestasRede").value = redeUI.arestas ? "sim" : "nao";
+  agendarDesenho();
+  salvarSessao();
+}
+
 function filtrarGrupos(modo) {
   const total = redeUI.dados ? redeUI.dados.grupos.length : 0;
   redeUI.gruposIsolados = modo === "nenhum"
@@ -4212,6 +4221,9 @@ function ligarTecladoRede(canvas) {
     } else if (evento.key === "0") {
       evento.preventDefault();
       filtrarGrupos(null);
+    } else if (evento.key === "l" || evento.key === "L") {
+      evento.preventDefault();
+      alternarLinhasRede();
     }
   });
 }
