@@ -199,7 +199,7 @@ const estado = {
   pedidoGrupo: 0,
   desatualizada: false,
   aplicandoAnalise: false,
-  avancado: false,
+  avancado: true,
   comEvolucao: false,
   calculando: false,
   pendente: false,
@@ -215,9 +215,6 @@ document.addEventListener("DOMContentLoaded", iniciar);
 async function iniciar() {
   prepararApresentacao();
   prepararZoomEstrategico();
-  let avancado = false;
-  try { avancado = localStorage.getItem("redes.avancado") === "1"; } catch (_) { /* sem armazenamento */ }
-  aplicarModo(avancado);
   montarGruposAbas();
   ligarEventos();
   aplicaMenuRecolhido(localStorage.getItem("redes.menu.recolhido") === "1");
@@ -316,31 +313,22 @@ function ligarEventos() {
     estado.cooc = Math.max(1, Math.floor(Number($("coocMin").value)) || 1);
     $("coocMin").value = String(estado.cooc);
     marcarPredefinicao("personalizada");
-    marcarDesatualizada();
+    if (estado.projeto) agendarPrevia(500);
   });
   $("freqMenos").addEventListener("click", () => mudaFrequencia(-1));
   $("freqMais").addEventListener("click", () => mudaFrequencia(1));
-  $("modoAvancado").addEventListener("change", (evento) => {
-    mudarModo(evento.target.checked);
-  });
   $("periodo").addEventListener("change", () => {
     if (!estado.projeto) return;
-    if (estado.avancado) {
-      previsualizar();
-    } else {
-      redefinirFrequencia();
-      mostrarCarregandoResumo();
-      agendarPrevia();
-    }
+    previsualizar();
   });
   for (const id of ["unidade", "matriz", "similaridade", "algoritmo",
                     "mapeadores", "palavras", "corte", "rede", "componenteMin"]) {
     $(id).addEventListener("change", () => {
-      marcarDesatualizada();
       marcarPersonalizada();
       mostrarCampoComponente();
       ajustarMapeadores();
       if ($("analise").value === "personalizada") aplicarAbas(null, true);
+      if (estado.projeto) agendarPrevia(500);
     });
   }
   $("componenteMin").addEventListener("input", () => {
@@ -1270,29 +1258,6 @@ function marcarDesatualizada() {
   selo.classList.add("alerta");
 }
 
-/* ------------------------------------------------------- modo simples/avançado */
-
-function aplicarModo(avancado) {
-  estado.avancado = avancado;
-  document.body.classList.toggle("modo-avancado", avancado);
-  $("modoAvancado").checked = avancado;
-  const mais = $("maisOpcoes");
-  if (mais) mais.open = avancado;
-  if (typeof atualizarMenuExportar === "function" && $("listaExportar")) atualizarMenuExportar();
-}
-
-function mudarModo(avancado) {
-  aplicarModo(avancado);
-  try { localStorage.setItem("redes.avancado", avancado ? "1" : "0"); } catch (_) { /* sem armazenamento */ }
-  aplicarAbas($("analise").value, true);
-  if (!avancado && estado.projeto && estado.resultado) {
-    // Volta ao modo simples: recalcula com a frequência mínima automática.
-    redefinirFrequencia();
-    mostrarCarregandoResumo();
-    agendarPrevia();
-  }
-}
-
 /* ------------------------------------------------------- execução da prévia */
 
 function agendarPrevia(atraso = 350) {
@@ -1338,12 +1303,8 @@ function aplicarPredefinicao(chave) {
   marcarPredefinicao(chave);
   redefinirFrequencia();
   if (!estado.projeto) return;
-  if (estado.avancado) {
-    marcarDesatualizada();
-  } else {
-    mostrarCarregandoResumo();
-    agendarPrevia(200);
-  }
+  mostrarCarregandoResumo();
+  agendarPrevia(200);
 }
 
 function mostrarNotaAuto(texto, acao) {
@@ -2810,11 +2771,7 @@ function mudaFrequencia(passo) {
   marcarPredefinicao("personalizada");
   atualizarFrequenciaTela();
   mostrarNotaAuto("");
-  if (estado.avancado) {
-    marcarDesatualizada();
-  } else {
-    agendarPrevia(500);
-  }
+  agendarPrevia(500);
 }
 
 async function abrirModal() {

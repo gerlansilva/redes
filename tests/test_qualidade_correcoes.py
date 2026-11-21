@@ -575,8 +575,6 @@ class NavegadorTest(unittest.TestCase):
         pg.fill("#caminhoProjeto", str(SERJ))
         pg.click("#btnAbrirCaminho")
         pg.wait_for_timeout(3000)
-        pg.evaluate("()=>{const c=document.getElementById('modoAvancado');"
-                    "if(!c.checked){c.checked=true;c.dispatchEvent(new Event('change',{bubbles:true}))}}")
         pg.click(f"[data-analise={analise}]")
         pg.wait_for_selector("#seloQualidade", state="visible", timeout=60000)
         return pg

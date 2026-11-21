@@ -1827,8 +1827,6 @@ kbd {
 
 /* ------------------------------------------------- modo simples / avançado */
 
-body:not(.modo-avancado) .so-avancado { display: none !important; }
-
 .nav-analises .grupo-unico .grupo-titulo { display: none; }
 
 .sidebar-modo { margin-top: auto; padding: 0 4px; }
@@ -2305,8 +2303,7 @@ body:not(.modo-avancado) .selo-estado:not(.erro) { display: none; }
 .evolucao-transicao tr[data-situacao="some"] td:first-child { color: #B45309; }
 .evolucao-transicao tr[data-situacao="surge"] td:first-child { color: #047857; }
 
-/* Corpus de autor focal: itens pouco informativos só no modo avançado, com aviso. */
-body.corpus-focal:not(.modo-avancado) .so-se-focal { display: none !important; }
+/* Corpus de autor focal: itens pouco informativos ficam sempre visíveis, com aviso. */
 .nav-pouco { display: none; margin-left: auto; font-size: 10px; color: #8A6A1E; background: #FFF4D6;
   border-radius: 8px; padding: 1px 6px; white-space: nowrap; }
 body.corpus-focal .nav-pouco { display: inline-block; }

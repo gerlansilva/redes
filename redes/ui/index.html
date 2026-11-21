@@ -7,7 +7,7 @@
 <link rel="icon" href="/static/logo-mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="modo-avancado">
 <section class="tela apresentacao" id="apresentacao" aria-labelledby="apresentacaoTitulo">
   <div class="apresentacao-miolo">
     <img class="apresentacao-logo" src="/static/logo-mark.svg" alt="" width="132" height="132">
@@ -73,15 +73,6 @@
       </button>
     </nav>
 
-    <div class="sidebar-modo">
-      <label class="alternador-modo" for="modoAvancado"
-             title="Mostra todos os parâmetros e a grade completa">
-        <input type="checkbox" id="modoAvancado">
-        <span class="chave" aria-hidden="true"></span>
-        <span class="modo-texto">Modo avançado</span>
-      </label>
-    </div>
-
   </aside>
 
   <button type="button" class="recolher" id="btnRecolher" aria-label="Recolher menu" aria-expanded="true" title="Recolher menu">
@@ -138,7 +129,7 @@
 
         <p class="analise-fixa so-avancado" id="analiseFixa" hidden></p>
 
-        <details class="mais-opcoes" id="maisOpcoes">
+        <details class="mais-opcoes" id="maisOpcoes" open>
           <summary>Mais opções</summary>
           <div class="campos">
             <div class="campo fixo">
@@ -149,8 +140,10 @@
                 <option value="References">Referências</option>
                 <option value="AuthorsReference">Autores de referência</option>
                 <option value="ReferenceSources">Fontes de referência</option>
-                <option value="Countries">Países</option>
-                <option value="Institutions">Instituições (IES)</option>
+                <!-- Países e IES têm análise própria no menu; no modo avançado
+                     ficam ocultas, mas seguem disponíveis para essas análises. -->
+                <option value="Countries" hidden disabled>Países</option>
+                <option value="Institutions" hidden disabled>Instituições (IES)</option>
               </select>
                 <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
               </div>
@@ -190,7 +183,7 @@
 
         </details>
 
-        <details class="avancado so-avancado" id="avancado">
+        <details class="avancado so-avancado" id="avancado" open>
           <summary>Parâmetros avançados</summary>
           <div class="campos avancado-campos">
             <div class="campo">

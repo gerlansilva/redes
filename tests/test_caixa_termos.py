@@ -297,8 +297,6 @@ class NavegadorTest(unittest.TestCase):
     def test_figuras_sem_caixa_alta_e_sem_corte(self):
         for largura, altura in ((1440, 900), (1280, 720)):
             pg = self._abre(largura, altura)
-            pg.evaluate("()=>{const c=document.getElementById('modoAvancado');"
-                        "if(!c.checked){c.checked=true;c.dispatchEvent(new Event('change',{bubbles:true}))}}")
             pg.click("[data-analise=conceitual]")
             pg.wait_for_selector("#seloQualidade", state="visible", timeout=60000)
             for aba in ("rede", "diagrama", "grupos", "linhatempo", "densidade"):

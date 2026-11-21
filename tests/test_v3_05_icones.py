@@ -110,6 +110,25 @@ def test_troca_de_analise_limpa_o_resultado_anterior():
     assert "limparEvolucao();" in limpar
 
 
+def test_modo_avancado_nao_oferece_paises_nem_ies():
+    # As duas unidades têm análise própria no menu; na configuração manual
+    # ficam ocultas para não duplicar a escolha.
+    for valor in ("Countries", "Institutions"):
+        opcao = re.search(rf'<option value="{valor}"([^>]*)>', HTML)
+        assert opcao, valor
+        assert "hidden" in opcao.group(1) and "disabled" in opcao.group(1), valor
+
+
+def test_sem_alternador_de_modo_e_parametros_a_vista():
+    # O antigo "Modo avançado" saiu: todos os parâmetros ficam à vista.
+    assert 'id="modoAvancado"' not in HTML
+    assert 'class="sidebar-modo"' not in HTML
+    assert "body:not(.modo-avancado) .so-avancado" not in CSS
+    assert '<details class="mais-opcoes" id="maisOpcoes" open>' in HTML
+    assert '<details class="avancado so-avancado" id="avancado" open>' in HTML
+    assert "avancado: true" in JS
+
+
 def test_abas_visiveis_e_agrupadas_por_bloco():
     # Nenhuma aba some no modo simples e a personalizada não perde visões.
     assert "ABAS_SIMPLES" not in JS and "ABAS_SO_AVANCADO" not in JS
