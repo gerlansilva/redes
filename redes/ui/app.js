@@ -860,7 +860,6 @@ function selecionarAba(chave) {
     outra.setAttribute("aria-selected", ativa ? "true" : "false");
   }
   mostrarAba(chave);
-  mostrarFaixaAvisos(estado.resultado ? estado.resultado.avisos : null);
   if (chave === "evolucao") carregarEvolucao();
   if (chave === "longitudinal") compararPeriodos();
   if (chave === "dendrograma") carregarDendrograma();
@@ -1457,41 +1456,8 @@ async function previsualizar() {
   }
 }
 
-// Faixa discreta com os avisos de limite mínimo: informam, nunca bloqueiam.
-function mostrarFaixaAvisos(avisos) {
-  const faixa = $("faixaAvisos");
-  if (!faixa) return;
-  faixa.replaceChildren();
-  // Avisos que só repetem o que a tela já mostra (termo genérico e corpus de
-  // autor focal) não entram na faixa; ficam no relatório e nos dados da API.
-  const silenciosos = new Set(["termo_generico", "autor_focal"]);
-  const uteis = (lista) => (lista || []).filter((a) => !silenciosos.has(a.codigo));
-  // Na evolução temática a faixa traz os avisos de cada período; nas demais abas, os do período aberto.
-  if (abaAtual() === "evolucao" && evolucaoUI.avisos) {
-    for (const periodo of evolucaoUI.avisos) {
-      const relevantes = uteis(periodo.avisos);
-      if (!relevantes.length) continue;
-      const linha = elemento("p", "faixa-aviso", `${periodo.periodo}: ` +
-        relevantes.map((a) => a.mensagem).join(" · "));
-      linha.dataset.periodo = periodo.periodo;
-      faixa.append(linha);
-    }
-    faixa.hidden = faixa.childElementCount === 0;
-    return;
-  }
-  const lista = uteis(avisos).filter((a) => a.nivel === "limite"
-    || a.codigo === "grupos_fracos");
-  faixa.hidden = lista.length === 0;
-  for (const aviso of lista) {
-    const linha = elemento("p", "faixa-aviso", aviso.mensagem);
-    linha.dataset.codigo = aviso.codigo;
-    faixa.append(linha);
-  }
-}
-
 function renderizarResultado(resultado) {
   estado.token = resultado.token || null;
-  mostrarFaixaAvisos(resultado.avisos);
   if (abaAtual() === "evolucao") carregarEvolucao();
   estado.desatualizada = false;
   dendro.token = null;
@@ -4340,12 +4306,11 @@ function linhaVazia(texto, colunas) {
 
 /* ------------------------------------------------------ evolução temática */
 
-const evolucaoUI = { chave: null, pedido: 0, avisos: null, textos: null, unidade: null };
+const evolucaoUI = { chave: null, pedido: 0, textos: null, unidade: null };
 
 function limparEvolucao() {
   evolucaoUI.chave = null;
   evolucaoUI.pedido += 1;
-  evolucaoUI.avisos = null;
   $("figEvolucaoTema").hidden = true;
   $("legendaEvolucao").hidden = true;
   $("downloadEvolucaoTema").hidden = true;
@@ -4399,8 +4364,6 @@ function renderizarEvolucao(mapa) {
   $("metaEvolucao").textContent =
     `${mapa.periodos.length} períodos · ${plural(mapa.nos, sing, plur)} · ${plural(mapa.elos, "elo", "elos")}`;
 
-  evolucaoUI.avisos = mapa.periodos_avisos || [];
-  mostrarFaixaAvisos(estado.resultado ? estado.resultado.avisos : null);
 
   const tabela = $("tabelaEvolucao");
   tabela.replaceChildren();

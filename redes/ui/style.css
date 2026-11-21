@@ -2158,14 +2158,7 @@ body.tela-aberta { overflow: hidden; }
 .grupo .rot-atual { display: block; margin-top: 1px; font-size: 11px; font-weight: 400; color: var(--tinta-fraca); }
 .drawer-sub .rot-atual-drawer { color: var(--tinta-fraca); }
 
-/* Faixa discreta de avisos de limite mínimo (não bloqueiam a análise). */
-.faixa-avisos { margin: 0 0 10px; padding: 6px 12px; border-left: 3px solid #E0B352;
-  background: #FFFAEB; border-radius: 6px; font-size: 12.5px; color: #6B4E0A; }
-.faixa-avisos .faixa-aviso { margin: 2px 0; line-height: 1.4; }
-
 /* Evolução temática: figura principal. */
-.evolucao-avisos { padding: 6px 16px 0; }
-.evolucao-avisos .faixa-aviso { margin: 2px 0; font-size: 12px; color: #6B4E0A; }
 .evolucao-figura { padding: 10px 16px 0; overflow-x: auto; }
 .evolucao-figura img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 .evolucao-legenda, .evolucao-nota { margin: 8px 16px; font-size: 12px; color: #64748B; line-height: 1.45; }
@@ -2229,7 +2222,6 @@ body.modo-conducao .recolher,
 body.modo-conducao .topo,
 body.modo-conducao .parametros,
 body.modo-conducao .barra-resultados,
-body.modo-conducao .faixa-avisos,
 body.modo-conducao .acoes-finais,
 body.modo-conducao #estatHalo { display: none !important; }
 body.modo-conducao .principal { max-width: none; padding: 0; }

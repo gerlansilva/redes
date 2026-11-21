@@ -138,12 +138,13 @@ def test_sem_alternador_de_modo_e_parametros_a_vista():
     assert "avancado: true" in JS
 
 
-def test_sem_avisos_repetidos_na_faixa_e_no_menu():
-    # "termo genérico" e "corpus focal" só repetem o que a tela já mostra.
-    trecho = re.search(r"function mostrarFaixaAvisos\(.*?\n}\n", JS, flags=re.S).group(0)
-    assert 'new Set(["termo_generico", "autor_focal"])' in trecho
+def test_sem_faixa_de_avisos_na_analise():
+    # Os avisos continuam na API e no relatório; a tela não repete a faixa amarela.
+    assert "faixaAvisos" not in HTML
+    assert "faixaAvisos" not in JS
+    assert "mostrarFaixaAvisos" not in JS
+    assert ".faixa-avisos" not in CSS and "faixa-aviso" not in CSS
     assert "nav-pouco" not in HTML
-    assert "nav-pouco" not in CSS
 
 
 def test_abas_visiveis_e_agrupadas_por_bloco():
