@@ -130,27 +130,48 @@ class ProjetoRedes:
 
     # ------------------------------------------------------------ construção
 
-    def dataset(self, unidade: str, periodo_id: int,
+    def _documentos_do_corpus(self) -> list[sqlite3.Row]:
+        """Todos os documentos do projeto, inclusive os que não têm data."""
+        documentos: list[sqlite3.Row] = []
+        for publish_date_id in [linha[0] for linha in self.conexao.execute(
+                "SELECT idPublishDate FROM PublishDate ORDER BY idPublishDate")]:
+            documentos.extend(self._documentos(publish_date_id))
+        documentos.extend(self.conexao.execute(
+            "SELECT * FROM Document WHERE PublishDate_idPublishDate IS NULL "
+            "ORDER BY idDocument").fetchall())
+        return documentos
+
+    def dataset(self, unidade: str, periodo_id: int | None = None,
                 palavras: tuple[str, ...] = ("autor", "fonte")) -> Dataset:
         """Constrói o conjunto documento × item de uma unidade e de um período.
 
-        `palavras` escolhe as origens usadas quando a unidade é ``Words``, como
-        os três seletores de `AnalysisConfiguration`: palavras do autor, da
-        fonte e adicionadas. Quando nenhuma é marcada, entram todas.
+        `periodo_id=None` usa o corpus completo (todos os períodos). `palavras`
+        escolhe as origens usadas quando a unidade é ``Words``, como os três
+        seletores de `AnalysisConfiguration`: palavras do autor, da fonte e
+        adicionadas. Quando nenhuma é marcada, entram todas.
         """
         if unidade not in UNIDADES:
             raise ValueError(f"unidade desconhecida: {unidade}")
 
         construtor = getattr(self, f"_unidade_{unidade}")
         ds = Dataset()
-        for publish_date_id in self._publish_dates(periodo_id):
-            for documento in self._documentos(publish_date_id):
-                doc_id = documento["idDocument"]
-                ds.adiciona_documento(doc_id, documento["citationsCount"] or 0)
-                if unidade == "Words":
-                    self._unidade_Words(ds, doc_id, palavras)
-                else:
-                    construtor(ds, doc_id)
+        vistos: set[int] = set()
+        if periodo_id is None:
+            documentos = self._documentos_do_corpus()
+        else:
+            documentos = [documento
+                          for publish_date_id in self._publish_dates(periodo_id)
+                          for documento in self._documentos(publish_date_id)]
+        for documento in documentos:
+            doc_id = documento["idDocument"]
+            if doc_id in vistos:
+                continue
+            vistos.add(doc_id)
+            ds.adiciona_documento(doc_id, documento["citationsCount"] or 0)
+            if unidade == "Words":
+                self._unidade_Words(ds, doc_id, palavras)
+            else:
+                construtor(ds, doc_id)
         return ds
 
     def _unidade_Words(self, ds: Dataset, doc_id: int,

@@ -554,7 +554,8 @@ function assinaturaDe(p = {}) {
   return [
     p.unidade || $("unidade").value,
     p.matriz || $("matriz").value,
-    p.periodo ?? Number($("periodo").value),
+    p.periodo ?? ($("periodo").value === "todos"
+      ? "todos" : Number($("periodo").value)),
     p.minimo_frequencia ?? estado.freq,
     p.minimo_coocorrencia ?? estado.cooc,
   ].join("|");
@@ -737,12 +738,21 @@ function aplicarProjeto(projeto) {
 
   const select = $("periodo");
   select.replaceChildren();
+  // Com mais de um período, a análise geral vem primeiro: o corpus inteiro,
+  // sem a leitura dividida por período. Cada período continua no seletor.
+  if (projeto.periodos.length > 1) {
+    const opcao = document.createElement("option");
+    opcao.value = "todos";
+    opcao.textContent = "Todos os períodos";
+    select.append(opcao);
+  }
   for (const periodo of projeto.periodos) {
     const opcao = document.createElement("option");
     opcao.value = String(periodo.id);
     opcao.textContent = periodo.nome;
     select.append(opcao);
   }
+  select.value = projeto.periodos.length > 1 ? "todos" : String(projeto.periodos[0]?.id ?? "");
   select.disabled = false;
 
   $("btnPreview").disabled = false;
@@ -842,7 +852,7 @@ function parametros() {
     componente_minimo: Math.max(1, Math.floor(Number($("componenteMin").value)) || padraoComponente()),
     mapeadores,
     palavras,
-    periodo: Number($("periodo").value),
+    periodo: $("periodo").value === "todos" ? "todos" : Number($("periodo").value),
     ignorar: estado.ignorar || [],
   };
 }

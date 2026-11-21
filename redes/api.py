@@ -34,7 +34,7 @@ from . import rotulos as modulo_rotulos
 from .grade import UNIDADES as UNIDADES_GRADE, grade as combinacoes_grade
 from .network import Cancelado as _Cancelado
 from .ies import COMPONENTE_MINIMO_PADRAO, tabela_variantes
-from .kb import ProjetoRedes
+from .kb import Periodo, ProjetoRedes
 from .mappers import MAPEADORES
 from .pipeline import (Configuracao, MENSAGEM_MAPEADOR_ACOPLAMENTO,
                        executa_periodo)
@@ -389,7 +389,7 @@ def dendrograma_do_pedido(pedido: dict) -> dict:
         caminho = _valida_projeto(str(pedido.get("projeto") or pedido.get("caminho") or ""))
         config = _config(pedido)
         with ProjetoRedes(caminho) as kb:
-            periodo = _periodo(kb, pedido.get("periodo"))
+            periodo = _periodo_da_analise(kb, pedido.get("periodo"))
             resultado = executa_periodo(kb, periodo.id, periodo.nome, config)
     res, omitidos = dendro_helper.dendrograma_do_periodo(resultado, limite, ligacao)
     if res is None:
@@ -770,6 +770,18 @@ def _periodo(kb: ProjetoRedes, identificador):
                   f"Períodos do projeto: {nomes}.")
 
 
+def _periodo_da_analise(kb: ProjetoRedes, identificador):
+    """Período pedido; ``todos`` devolve o corpus completo (id ``None``).
+
+    Diferente de ``_periodo``, que usa o primeiro período como padrão, aqui
+    ``todos`` é explícito: a análise soma os documentos de todos os períodos.
+    """
+    if (isinstance(identificador, str)
+            and identificador.strip().casefold() in ("todos", "geral", "corpus")):
+        return Periodo(None, "Todos os períodos", 0)
+    return _periodo(kb, identificador)
+
+
 def descreve_projeto(caminho: Path) -> dict:
     with ProjetoRedes(caminho) as kb:
         periodos = kb.periodos()
@@ -813,7 +825,7 @@ def analisa(dados: dict) -> dict:
     config = _config(dados)
 
     with ProjetoRedes(caminho) as kb:
-        periodo = _periodo(kb, dados.get("periodo"))
+        periodo = _periodo_da_analise(kb, dados.get("periodo"))
         resultado = executa_periodo(kb, periodo.id, periodo.nome, config)
         paises = (colaboracao_do_periodo(kb, periodo.id, config.minimo_frequencia)
                   if config.unidade == "Countries"
@@ -1275,19 +1287,29 @@ def exportar(token: str, tipo: str) -> tuple[bytes, str, str]:
 
 
 def lista_documentos(token: str, busca: str = "") -> dict:
-    """Documentos do período da análise, com busca por título, autor ou fonte."""
+    """Documentos do período da análise, com busca por título, autor ou fonte.
+
+    Numa análise de todos os períodos, lista o corpus inteiro.
+    """
     analise = _analise(token)
 
     termo = (busca or "").strip().lower()
     with ProjetoRedes(analise["projeto"]) as kb:
-        linhas = kb.conexao.execute(
-            "SELECT d.idDocument, d.title, d.year, d.authors, d.citationsCount, "
-            "j.source FROM Document d "
-            "JOIN PublishDate p ON p.idPublishDate = d.PublishDate_idPublishDate "
-            "JOIN PublishDate_Period pp ON pp.PublishDate_idPublishDate = p.idPublishDate "
-            "LEFT JOIN Journal j ON j.idJournal = d.Journal_idJournal "
-            "WHERE pp.Period_idPeriod = ? ORDER BY d.idDocument",
-            (analise["periodo_id"],)).fetchall()
+        if analise["periodo_id"] is None:
+            linhas = kb.conexao.execute(
+                "SELECT d.idDocument, d.title, d.year, d.authors, d.citationsCount, "
+                "j.source FROM Document d "
+                "LEFT JOIN Journal j ON j.idJournal = d.Journal_idJournal "
+                "ORDER BY d.idDocument").fetchall()
+        else:
+            linhas = kb.conexao.execute(
+                "SELECT d.idDocument, d.title, d.year, d.authors, d.citationsCount, "
+                "j.source FROM Document d "
+                "JOIN PublishDate p ON p.idPublishDate = d.PublishDate_idPublishDate "
+                "JOIN PublishDate_Period pp ON pp.PublishDate_idPublishDate = p.idPublishDate "
+                "LEFT JOIN Journal j ON j.idJournal = d.Journal_idJournal "
+                "WHERE pp.Period_idPeriod = ? ORDER BY d.idDocument",
+                (analise["periodo_id"],)).fetchall()
 
     documentos = []
     for linha in linhas:

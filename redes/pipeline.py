@@ -177,10 +177,12 @@ class ResultadoPeriodo:
         return self.rotulos.get(no) or str(no)
 
 
-def executa_periodo(projeto: ProjetoRedes, periodo_id: int, periodo_nome: str,
-                    config: Configuracao, cancelado=None) -> ResultadoPeriodo:
+def executa_periodo(projeto: ProjetoRedes, periodo_id: int | None,
+                    periodo_nome: str, config: Configuracao,
+                    cancelado=None) -> ResultadoPeriodo:
     """Executa a análise de um período inteiro.
 
+    `periodo_id=None` roda sobre o corpus completo, somando todos os períodos.
     `cancelado` é um callback sem argumentos; quando devolve verdadeiro a
     análise para na próxima verificação (entre as etapas e dentro do
     agrupamento) levantando `clustering.Cancelado`.

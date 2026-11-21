@@ -73,6 +73,22 @@ class EsquemaTest(unittest.TestCase):
         self.assertEqual(2, conjunto.quantidade_itens())
         self.assertEqual(2, conjunto.quantidade_documentos())
 
+    def test_dataset_do_corpus_completo_soma_os_periodos(self):
+        caminho = Path(tempfile.mkdtemp()) / "dados.redes"
+        constroi([
+            DocumentoFonte(titulo="Um", autores=["Silva, A."], ano="2020",
+                           palavras_autor=["tema um"]),
+            DocumentoFonte(titulo="Dois", autores=["Costa, B."], ano="2021",
+                           palavras_autor=["tema dois"]),
+        ], caminho, [("2020–2020", 2020, 2020), ("2021–2021", 2021, 2021)])
+        with ProjetoRedes(caminho) as projeto:
+            periodos = projeto.periodos()
+            primeiro = projeto.dataset("Words", periodos[0].id)
+            todos = projeto.dataset("Words", None)
+        self.assertEqual(1, primeiro.quantidade_documentos())
+        self.assertEqual(2, todos.quantidade_documentos())
+        self.assertEqual(2, todos.quantidade_itens())
+
     def test_projeto_antigo_sem_tabelas_de_pais(self):
         caminho = Path(tempfile.mkdtemp()) / "dados.redes"
         _projeto(caminho)

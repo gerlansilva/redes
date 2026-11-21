@@ -55,28 +55,7 @@ class _TodosOsDocumentos:
 
     def dataset(self, unidade: str, periodo_id=None,
                 palavras: tuple[str, ...] = ("autor", "fonte")) -> Dataset:
-        kb = self._kb
-        construtor = getattr(kb, f"_unidade_{unidade}")
-        ds = Dataset()
-        vistos: set[int] = set()
-        datas = [linha[0] for linha in kb.conexao.execute(
-            "SELECT idPublishDate FROM PublishDate ORDER BY idPublishDate")]
-        grupos = [kb._documentos(d) for d in datas]
-        grupos.append(kb.conexao.execute(
-            "SELECT * FROM Document WHERE PublishDate_idPublishDate IS NULL "
-            "ORDER BY idDocument").fetchall())
-        for documentos in grupos:
-            for documento in documentos:
-                doc_id = documento["idDocument"]
-                if doc_id in vistos:
-                    continue
-                vistos.add(doc_id)
-                ds.adiciona_documento(doc_id, documento["citationsCount"] or 0)
-                if unidade == "Words":
-                    kb._unidade_Words(ds, doc_id, palavras)
-                else:
-                    construtor(ds, doc_id)
-        return ds
+        return self._kb.dataset(unidade, None, palavras)
 
 
 def _anos_das_referencias(conexao, teto: int | None) -> dict[int, int]:

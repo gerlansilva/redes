@@ -135,6 +135,12 @@ class RobustezApiTest(unittest.TestCase):
                 api._periodo(kb, "1850")
             self.assertIn("Períodos do projeto", str(ctx.exception))
 
+    def test_todos_os_periodos_usa_o_corpus_completo(self):
+        with api.ProjetoRedes(self.projeto) as kb:
+            periodo = api._periodo_da_analise(kb, "todos")
+        self.assertIsNone(periodo.id)
+        self.assertEqual("Todos os períodos", periodo.nome)
+
     def test_agrupamento_inexistente_informa_faixa(self):
         analise = self.analisa()
         codigo, dados = self.pede(f"/api/grupo?token={analise['token']}&selo=9999")
