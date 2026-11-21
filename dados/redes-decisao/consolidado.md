@@ -503,3 +503,31 @@ Medido no `batanero`, todos os períodos, palavras-chave, coocorrência mínima 
   não subia no macOS atual. A correção entrou na 0.4.0.
 - **CI**: o trabalho de release precisa de `actions/checkout` para o `gh`
   descobrir o repositório; sem isso, `gh release create` falha.
+
+## Capturas de tela atualizadas (21/11/2026)
+
+- **22 imagens viraram 14**: saíram as capturas de recursos removidos (faixa
+  amarela de avisos, modo avançado, aba Resumo, detalhe por período recolhido) e
+  entraram Países (mapa) e Instituições (rede), que agora têm aba própria.
+- **Padrão de captura**: 1296 x 827 (janela do navegador do app), sempre a partir
+  dos dois projetos públicos (`celii`, 53 documentos, e `batanero`, 147
+  documentos e 3 períodos).
+- **Textos alinhados**: `README.md`, `docs/guia-de-uso.md`, `docs/analises.md` e
+  `docs/perguntas-frequentes.md` deixaram de citar modo avançado, faixa amarela,
+  *Ignorar e reanalisar* e *Detalhe por período*; o guia passa a descrever os
+  grupos Temas, Citações e Colaboração e a barra de resultados.
+
+## A marca é o arquivo oficial, sem redesenho (21/11/2026)
+
+- **Fonte única**: `redes/assets/logo.png`, o arquivo entregue pela coordenação,
+  usado como está (1254 x 1254, mesmo SHA-256 `4c296f46…` em todas as cópias).
+  Não há versão redesenhada: `logo.svg`, `logo-mark.svg` e `logo-icone.svg`
+  foram removidos.
+- **Onde aparece**: favicon, abertura, menu lateral, capa e cabeçalho do
+  relatório, tela de abertura do app desktop, ícones `.icns`/`.ico` (gerados a
+  partir do PNG) e README. O nome do produto continua como texto.
+- **Servidor**: `/static/` passou a servir binários (PNG e ICO) além de
+  HTML/CSS/JS/SVG; antes tentava ler tudo como UTF-8 e devolvia erro.
+- **Relatório único**: a marca entra embutida em `data:image/png;base64`, para o
+  HTML continuar sem arquivos externos.
+- **Tamanhos**: README 180 px; capa do relatório 150 px; cabeçalho 40 px.
