@@ -920,7 +920,7 @@ tbody tr:hover td { background: #FBFCFE; }
 /* ------------------------------------------------------------------ barra da rede */
 
 .rede-cabecalho { align-items: flex-start; }
-.rede-acoes { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.rede-acoes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .rede-status {
   padding: 6px 16px 8px;
   border-bottom: 1px solid #F1F3F9;
@@ -1001,6 +1001,7 @@ tbody tr:hover td { background: #FBFCFE; }
 .botao-mini {
   height: 32px;
   padding: 0 11px;
+  white-space: nowrap;
   border: 1px solid var(--linha-forte);
   border-radius: 8px;
   background: var(--branco);
@@ -1042,6 +1043,7 @@ tbody tr:hover td { background: #FBFCFE; }
 .legenda-rede .legenda-cabecalho {
   grid-column: 1 / -1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 0 2px 4px;
@@ -1055,6 +1057,19 @@ tbody tr:hover td { background: #FBFCFE; }
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
+.legenda-rede .busca-legenda {
+  width: 156px;
+  min-height: 26px;
+  padding: 2px 8px;
+  border: 1px solid var(--linha-forte);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--tinta);
+  font: inherit;
+  font-size: 11.5px;
+}
+.legenda-rede .busca-legenda:focus-visible { outline: 2px solid var(--azul); outline-offset: 1px; }
+.legenda-rede .item-legenda[hidden] { display: none; }
 .legenda-rede .link-legenda {
   min-height: 26px;
   padding: 2px 4px;
@@ -1410,6 +1425,25 @@ kbd {
   background: var(--branco);
   box-shadow: -24px 0 70px rgba(12, 16, 24, .28);
   animation: entra-drawer .18s ease-out;
+}
+/* Em tela larga o detalhe fica ao lado do mapa: só o cartão da rede reserva
+   a coluna do painel, então abas e parâmetros não encolhem. */
+@media (min-width: 1280px) {
+  body.detalhe-docado #blocoRede { padding-right: 380px; }
+  body.detalhe-docado #drawer .drawer-metricas { grid-template-columns: repeat(2, 1fr); }
+  body.detalhe-docado #drawer {
+    top: 68px;
+    background: transparent;
+    backdrop-filter: none;
+    pointer-events: none;
+  }
+  body.detalhe-docado #drawer .drawer-painel {
+    width: 380px;
+    pointer-events: auto;
+    border-left: 1px solid var(--linha-forte);
+    box-shadow: -16px 0 40px rgba(11, 16, 40, .08);
+    animation: none;
+  }
 }
 @keyframes entra-drawer { from { transform: translateX(24px); opacity: .6; } }
 .drawer-topo {
@@ -2273,3 +2307,43 @@ body.corpus-focal .nav-pouco { display: inline-block; }
   padding: 6px 10px; border-radius: 7px; cursor: pointer; }
 .bib-exp-menu button:hover { background: var(--lavanda); color: var(--azul); }
 .bib-exp[hidden] { display: none; }
+
+/* ---------------------------------------------------------- modo condução */
+
+/* Tela de apresentação: sai o cromo do aplicativo, fica o mapa e a legenda
+   em corpo maior. O painel de detalhes, se aberto, continua docado. */
+body.modo-conducao { background: #EDEFF6; }
+body.modo-conducao .app { grid-template-columns: minmax(0, 1fr); }
+body.modo-conducao .sidebar,
+body.modo-conducao .recolher,
+body.modo-conducao .topo,
+body.modo-conducao .parametros,
+body.modo-conducao .barra-resultados,
+body.modo-conducao .faixa-avisos,
+body.modo-conducao .acoes-finais,
+body.modo-conducao #estatHalo { display: none !important; }
+body.modo-conducao .principal { max-width: none; padding: 0; }
+body.modo-conducao .resultados { margin: 0; }
+body.modo-conducao #resultados > .cartao { display: none !important; }
+body.modo-conducao #resultados > #blocoRede {
+  display: flex !important;
+  flex-direction: column;
+  height: 100vh;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+body.modo-conducao #blocoRede .rede-cabecalho { padding: 12px 18px 10px; }
+body.modo-conducao #blocoRede .corpo-fig { flex: 1 1 auto; height: auto; min-height: 0; }
+body.modo-conducao #blocoRede .legenda-rede {
+  flex: 0 1 auto;
+  max-height: 30vh;
+  overflow: auto;
+  font-size: 14px;
+}
+body.modo-conducao #blocoRede .legenda-rede .item-legenda {
+  min-height: 42px;
+  font-size: 14px;
+}
+body.modo-conducao #blocoRede .legenda-rede .nome { font-size: 14px; }

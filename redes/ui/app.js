@@ -427,6 +427,12 @@ function ligarEventos() {
     salvarSessao();
   });
   $("ajustarRede").addEventListener("click", ajustarRede);
+  $("modoConducao").addEventListener("click", () => {
+    if (!modoConducaoAtivo()) entrarModoConducao();
+    else aplicarModoConducao(false);
+  });
+  window.matchMedia("(min-width: 1280px)")
+    .addEventListener("change", ditarModoDrawer);
   $("zoomHalo").addEventListener("click", (evento) => {
     const botao = evento.target.closest("[data-zoom]");
     if (!botao) return;
@@ -457,15 +463,19 @@ function ligarEventos() {
   ligarQualidade();
 
   document.addEventListener("keydown", (evento) => {
-    if (evento.key === "Escape") {
-      fecharMenuExportar(false);
-      fecharLightbox();
-      fecharDrawer();
-      fecharModal();
-      fecharAjuda();
-      fecharSobre();
-      fecharBase();
-    }
+    if (evento.key !== "Escape" || evento.defaultPrevented) return;
+    // Esc fecha o que estiver por cima; só sai do modo condução quando não há
+    // nada aberto, para não derrubar a apresentação sem querer.
+    const aberto = ["drawer", "lightbox", "modal", "modalAjuda", "modalSobre", "modalBase"]
+      .some((id) => { const el = $(id); return el && !el.hidden; });
+    fecharMenuExportar(false);
+    fecharLightbox();
+    fecharDrawer();
+    fecharModal();
+    fecharAjuda();
+    fecharSobre();
+    fecharBase();
+    if (!aberto && modoConducaoAtivo()) aplicarModoConducao(false);
   });
 }
 
@@ -834,6 +844,9 @@ function parametros() {
 function selecionarAba(chave) {
   const aba = document.querySelector(`.aba[data-aba="${chave}"]`);
   if (!aba) return;
+  // O detalhe docado pertence ao cartão da rede; ao trocar de aba ele volta
+  // a ser um diálogo comum ou fecha.
+  if (chave !== "rede") fecharDrawer();
   for (const outra of document.querySelectorAll(".aba[data-aba]")) {
     const ativa = outra === aba;
     outra.classList.toggle("ativa", ativa);
@@ -970,6 +983,7 @@ function mostrarAba(chave) {
     bloco.classList.toggle("oculta", !visivel);
     bloco.hidden = !visivel;
   }
+  if (chave === "rede") ditarModoDrawer();
   // Re-renderiza figuras que dependem do tamanho do canvas ao voltarem a ficar visíveis.
   if (chave === "rede" && typeof redeUI !== "undefined" && redeUI.dados) {
     agendarDesenho();
@@ -2218,6 +2232,7 @@ async function abrirGrupo(selo) {
 
   const pedido = ++estado.pedidoGrupo;
   $("drawer").hidden = false;
+  ditarModoDrawer();
   $("drawerSelo").className = "selo";
   $("drawerSelo").textContent = String(selo);
   $("drawerTitulo").textContent = "Carregando agrupamento…";
@@ -2369,6 +2384,66 @@ function textoVazio(conteudo) {
 function fecharDrawer() {
   estado.pedidoGrupo += 1;
   $("drawer").hidden = true;
+  ditarModoDrawer();
+}
+
+// Em tela larga o detalhe abre ao lado do mapa; em tela estreita continua
+// cobrindo, porque não há espaço para os dois.
+function ditarModoDrawer() {
+  const drawer = $("drawer");
+  const cabe = window.matchMedia("(min-width: 1280px)").matches;
+  // Só doca quando a rede está à vista: em outra aba o detalhe continua
+  // sendo o diálogo que cobre a tela.
+  const docado = cabe && !drawer.hidden && abaAtual() === "rede";
+  document.body.classList.toggle("detalhe-docado", docado);
+  const painel = drawer.querySelector(".drawer-painel");
+  if (painel) painel.setAttribute("aria-modal", docado ? "false" : "true");
+  if (redeUI.dados) {
+    // Redimensiona e redesenha no mesmo passo: a troca de largura não pode
+    // deixar o canvas com o bitmap do tamanho anterior.
+    requestAnimationFrame(() => {
+      dimensionarCanvas();
+      agendarDesenho();
+    });
+  }
+}
+
+/* ---------------------------------------------------------- modo condução */
+
+function modoConducaoAtivo() {
+  return document.body.classList.contains("modo-conducao");
+}
+
+function aplicarModoConducao(ativo) {
+  document.body.classList.toggle("modo-conducao", ativo);
+  const botao = $("modoConducao");
+  if (botao) {
+    botao.setAttribute("aria-pressed", ativo ? "true" : "false");
+    botao.textContent = ativo ? "Sair do modo (Esc)" : "Modo condução";
+  }
+  if (!ativo) {
+    const gatilho = $("modoConducao");
+    if (gatilho) gatilho.focus({ preventScroll: true });
+  }
+  requestAnimationFrame(() => {
+    if (!redeUI.dados) return;
+    dimensionarCanvas();
+    ajustarRede();
+  });
+}
+
+function entrarModoConducao() {
+  if (!estado.resultado) {
+    mostrarToast("Execute uma prévia antes de conduzir.", true);
+    return;
+  }
+  if (abaAtual() !== "rede") selecionarAba("rede");
+  // Sem dica aberta: a apresentação começa limpa; as setas é que escolhem.
+  redeUI.dica = null;
+  mostrarDica(null);
+  aplicarModoConducao(true);
+  const canvas = $("canvasHalo");
+  if (canvas && !canvas.hidden) requestAnimationFrame(() => canvas.focus({ preventScroll: true }));
 }
 
 function estatistica(rotulo, valor, cor, titulo) {
@@ -3121,6 +3196,7 @@ function prepararRede(dados) {
   const legenda = $("legendaRede");
   legenda.replaceChildren();
   redeUI.legendaItens = [];
+  redeUI.buscaLegenda = "";
   // Duas leituras no mesmo lugar: o ponto isola o grupo (mantém nós, halo e
   // arestas internas; tira só as linhas que o ligam aos outros grupos) e o
   // nome destaca o grupo sem tirar o resto do mapa. Os detalhes ficam no
@@ -3136,6 +3212,19 @@ function prepararRede(dados) {
       : "");
   const contagem = document.createElement("span");
   contagem.className = "legenda-contagem";
+  // Acima de 16 grupos a legenda rola; sem busca, achar um nome vira caça.
+  let busca = null;
+  if (grupos.length > 16) {
+    busca = document.createElement("input");
+    busca.type = "search";
+    busca.className = "busca-legenda";
+    busca.placeholder = "Buscar agrupamento";
+    busca.setAttribute("aria-label", "Buscar agrupamento na legenda");
+    busca.addEventListener("input", () => {
+      redeUI.buscaLegenda = busca.value;
+      atualizarLegendaRede();
+    });
+  }
   const botaoFoco = document.createElement("button");
   botaoFoco.type = "button";
   botaoFoco.className = "link-legenda";
@@ -3154,7 +3243,9 @@ function prepararRede(dados) {
   nenhum.textContent = "isolar todos";
   nenhum.title = "Tirar as conexões entre os agrupamentos, sem esconder nenhum";
   nenhum.addEventListener("click", () => filtrarGrupos("nenhum"));
-  cabecalho.append(titulo, contagem, botaoFoco, todos, nenhum);
+  cabecalho.append(titulo);
+  if (busca) cabecalho.append(busca);
+  cabecalho.append(contagem, botaoFoco, todos, nenhum);
   legenda.append(cabecalho);
 
   for (const grupo of grupos) {
@@ -3188,6 +3279,7 @@ function prepararRede(dados) {
     legenda.append(item);
     redeUI.legendaItens.push({
       item, ponto, nome, detalhe, rotulo: grupo.rotulo_curto,
+      original: grupo.rotulo_original || grupo.rotulo_curto || "",
     });
   }
   redeUI.legendaContagem = contagem;
@@ -3283,10 +3375,19 @@ function focarGrupo(indice) {
 function atualizarLegendaRede() {
   const total = redeUI.legendaItens.length;
   const isolados = redeUI.gruposIsolados.size;
+  const alvo = chaveBusca(redeUI.buscaLegenda || "");
+  let vistos = 0;
+  for (const { item, rotulo, original } of redeUI.legendaItens) {
+    const combina = !alvo || chaveBusca(rotulo).includes(alvo) ||
+      chaveBusca(original).includes(alvo);
+    item.hidden = !combina;
+    if (combina) vistos += 1;
+  }
   if (redeUI.legendaContagem) {
+    const base = alvo ? `${vistos} de ${total} grupos` : `${total} grupos`;
     redeUI.legendaContagem.textContent = isolados
-      ? `${total} grupos · ${isolados} ${isolados === 1 ? "isolado" : "isolados"}`
-      : `${total} grupos`;
+      ? `${base} · ${isolados} ${isolados === 1 ? "isolado" : "isolados"}`
+      : base;
   }
   redeUI.legendaItens.forEach(({ item, ponto, nome, detalhe, rotulo }, i) => {
     const ligado = !redeUI.gruposIsolados.has(i);
@@ -4055,7 +4156,7 @@ function navegarRede(tecla) {
 
 function ligarTecladoRede(canvas) {
   canvas.addEventListener("focus", () => {
-    if (redeUI.dados && !redeUI.dica) selecionarNoInicial();
+    if (redeUI.dados && !redeUI.dica && !modoConducaoAtivo()) selecionarNoInicial();
   });
   canvas.addEventListener("keydown", (evento) => {
     if (!redeUI.dados) return;
@@ -4079,6 +4180,7 @@ function ligarTecladoRede(canvas) {
     if (tecla === "Escape") {
       if (!no && redeUI.grupoFoco === null) return;
       evento.preventDefault();
+      evento.stopPropagation();
       redeUI.dica = null;
       mostrarDica(null);
       redeUI.grupoFoco = null;
@@ -4099,6 +4201,8 @@ function ligarTecladoRede(canvas) {
     if (!redeUI.dados || $("canvasHalo").hidden) return;
     const abaRede = document.querySelector('.aba[data-aba="rede"]');
     if (!abaRede || !abaRede.classList.contains("ativa")) return;
+    if (["drawer", "lightbox", "modal", "modalAjuda", "modalSobre", "modalBase"]
+      .some((id) => { const el = $(id); return el && !el.hidden; })) return;
     if (/^[1-9]$/.test(evento.key)) {
       const indice = Number(evento.key) - 1;
       if (indice < redeUI.dados.grupos.length) {
