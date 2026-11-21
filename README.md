@@ -37,6 +37,10 @@ Além disso: visão geral descritiva (produção, citações, leis de Lotka, Bra
 
 Pesquisadoras e pesquisadores que fazem revisão de literatura, estado da arte ou estudos bibliométricos e querem uma ferramenta em português, local (nenhum dado sai da sua máquina) e sem programar.
 
+## Para macOS (DMG)
+
+Baixe `Redes-<versão>-macOS-arm64.dmg` na página de [Releases](https://github.com/gerlansilva/redes/releases). O app abre a mesma interface em uma janela própria, com o servidor Python embutido — não é preciso instalar Python. Na primeira abertura, clique com o botão direito em **Redes** e escolha **Abrir**: o app é assinado localmente e não é notarizado pela Apple.
+
 ## Instalação
 
 Requer Python 3.10 ou mais novo.

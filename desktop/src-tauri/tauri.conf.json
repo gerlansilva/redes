@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Redes",
+  "version": "0.3.0",
+  "identifier": "br.gerlan.redes",
+  "build": {
+    "frontendDist": "../splash"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Redes",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 980,
+        "minHeight": 640,
+        "url": "index.html",
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns"
+    ],
+    "externalBin": ["binaries/redes-servidor"],
+    "category": "Education",
+    "shortDescription": "Mapeamento científico e redes da produção acadêmica",
+    "longDescription": "Redes reúne a interface local de análise bibliométrica em um aplicativo para macOS: importe Scopus, Web of Science, OpenAlex, Zotero, BibTeX, RIS ou CSV e veja temas, autores, referências e colaboração, período a período.",
+    "copyright": "GPL-3.0-or-later",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  }
+}
