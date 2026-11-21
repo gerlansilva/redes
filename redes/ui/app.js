@@ -1480,19 +1480,24 @@ function mostrarFaixaAvisos(avisos) {
   const faixa = $("faixaAvisos");
   if (!faixa) return;
   faixa.replaceChildren();
+  // Avisos que só repetem o que a tela já mostra (termo genérico e corpus de
+  // autor focal) não entram na faixa; ficam no relatório e nos dados da API.
+  const silenciosos = new Set(["termo_generico", "autor_focal"]);
+  const uteis = (lista) => (lista || []).filter((a) => !silenciosos.has(a.codigo));
   // Na evolução temática a faixa traz os avisos de cada período; nas demais abas, os do período aberto.
   if (abaAtual() === "evolucao" && evolucaoUI.avisos) {
     for (const periodo of evolucaoUI.avisos) {
-      if (!periodo.avisos.length) continue;
+      const relevantes = uteis(periodo.avisos);
+      if (!relevantes.length) continue;
       const linha = elemento("p", "faixa-aviso", `${periodo.periodo}: ` +
-        periodo.avisos.map((a) => a.mensagem).join(" · "));
+        relevantes.map((a) => a.mensagem).join(" · "));
       linha.dataset.periodo = periodo.periodo;
       faixa.append(linha);
     }
     faixa.hidden = faixa.childElementCount === 0;
     return;
   }
-  const lista = (avisos || []).filter((a) => a.nivel === "limite" || a.codigo === "termo_generico"
+  const lista = uteis(avisos).filter((a) => a.nivel === "limite"
     || a.codigo === "grupos_fracos");
   faixa.hidden = lista.length === 0;
   for (const aviso of lista) {

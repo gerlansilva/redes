@@ -108,8 +108,7 @@ a { color: var(--azul); }
 .app.recolhida .nav { width: 100%; }
 .app.recolhida .nav-item,
 .app.recolhida .nav-analise { justify-content: center; padding: 10px 8px; }
-.app.recolhida .grupo-titulo,
-.app.recolhida .nav-pouco { display: none; }
+.app.recolhida .grupo-titulo { display: none; }
 
 .conteudo { min-width: 0; display: flex; flex-direction: column; }
 
@@ -2303,10 +2302,7 @@ body:not(.modo-avancado) .selo-estado:not(.erro) { display: none; }
 .evolucao-transicao tr[data-situacao="some"] td:first-child { color: #B45309; }
 .evolucao-transicao tr[data-situacao="surge"] td:first-child { color: #047857; }
 
-/* Corpus de autor focal: itens pouco informativos ficam sempre visíveis, com aviso. */
-.nav-pouco { display: none; margin-left: auto; font-size: 10px; color: #8A6A1E; background: #FFF4D6;
-  border-radius: 8px; padding: 1px 6px; white-space: nowrap; }
-body.corpus-focal .nav-pouco { display: inline-block; }
+/* Corpus de autor focal: itens pouco informativos ficam sempre visíveis. */
 .bib-aviso { margin: 8px 0; padding: 6px 12px; border-left: 3px solid #E0B352; background: #FFFAEB;
   color: #6B4E0A; font-size: 12.5px; border-radius: 6px; }
 

@@ -129,6 +129,14 @@ def test_sem_alternador_de_modo_e_parametros_a_vista():
     assert "avancado: true" in JS
 
 
+def test_sem_avisos_repetidos_na_faixa_e_no_menu():
+    # "termo genérico" e "corpus focal" só repetem o que a tela já mostra.
+    trecho = re.search(r"function mostrarFaixaAvisos\(.*?\n}\n", JS, flags=re.S).group(0)
+    assert 'new Set(["termo_generico", "autor_focal"])' in trecho
+    assert "nav-pouco" not in HTML
+    assert "nav-pouco" not in CSS
+
+
 def test_abas_visiveis_e_agrupadas_por_bloco():
     # Nenhuma aba some no modo simples e a personalizada não perde visões.
     assert "ABAS_SIMPLES" not in JS and "ABAS_SO_AVANCADO" not in JS
