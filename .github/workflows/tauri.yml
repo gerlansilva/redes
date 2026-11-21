@@ -6,7 +6,7 @@ name: Redes desktop (Tauri)
 on:
   push:
     branches: [tauri]
-  tags: ["v*"]
+    tags: ["v*"]
   pull_request:
     paths: ["desktop/**", ".github/workflows/tauri.yml"]
   workflow_dispatch:
