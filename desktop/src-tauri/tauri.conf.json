@@ -38,7 +38,8 @@
     "longDescription": "Redes reúne a interface local de análise bibliométrica em um aplicativo para macOS: importe Scopus, Web of Science, OpenAlex, Zotero, BibTeX, RIS ou CSV e veja temas, autores, referências e colaboração, período a período.",
     "copyright": "GPL-3.0-or-later",
     "macOS": {
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-"
     }
   }
 }
