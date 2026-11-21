@@ -65,4 +65,4 @@ def test_sobre_cita_o_autor():
 
 
 def test_versao():
-    assert redes.__version__ == "0.1.1"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", redes.__version__)

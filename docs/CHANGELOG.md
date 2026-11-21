@@ -1,6 +1,25 @@
 # Mudanças
 
-## Não publicada
+## 0.2.0 — 21/11/2026
+
+### Interface
+- Menu lateral por tarefa (**Temas**, **Citações**, **Colaboração**) e barra de
+  resultados por bloco (**Visão geral**, **Mapas**, **Tabelas**, **Métodos**,
+  **Comparar**).
+- Cada análise mostra só as visões que lhe dizem respeito: Países (mapa e
+  densidade), Instituições (rede e densidade) e Coautoria (rede, dendrograma,
+  linha do tempo e densidade).
+- O seletor de período começa em **Todos os períodos**; os recortes por período
+  vêm depois.
+- Frequência mínima automática: quando a rede passa de 14 temas, o corte sobe
+  sozinho até 6 para manter a leitura possível; as predefinições *Padrão*,
+  *Mais estrita* e *Mais ampla* continuam disponíveis.
+- Saíram o **modo avançado**, a aba **Resumo** e o botão *Ignorar e reanalisar*:
+  todos os parâmetros ficam à vista na própria análise.
+- Saiu a faixa amarela de avisos: os limites mínimos continuam nos dados da API
+  e por extenso no *Relatório completo*, mas não repetem o que a tela já mostra.
+- Selo **Qualidade** (OK, Atenção, Ruim, Indefinido) resume a leitura do mapa.
+- A marca passou a ser usada sozinha (a rede em halos), sem o nome ao lado: vale para o cabeçalho e a capa do *Relatório completo*, para o site e para o README.
 
 ### Correções
 - Evolução temática: o *Relatório completo* e a aba *Evolução temática* mostravam contagens diferentes para o mesmo corpus (Celi, 2008-2014, 2015-2020, 2021-2026: 3 temas no relatório e 22 na aba). Causa: não era sobreposição nem contagem diferente de "temas", e sim a **frequência mínima**. A aba usava a da tela (1); o relatório ignorava a tela e escolhia sozinho a maior entre 3, 2 e 1 que ainda dava agrupamento em todos os períodos (3, com um tema por período). Agora o relatório gerado pela interface usa os parâmetros da tela (frequência e co-ocorrência mínimas, corte, tamanho da rede, similaridade e algoritmo); sem frequência informada (uso direto da API), mantém a escolha automática e a descreve no texto da seção ("escolhida automaticamente" ou "a mesma da tela").

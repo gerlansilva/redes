@@ -114,7 +114,7 @@ img.mapa-sobreposicao { display:block; margin:10px auto; }
              padding-bottom:10px; margin-bottom:24px; }
 .marca-relatorio { font-size:10px; font-weight:600; letter-spacing:.14em;
                    text-transform:uppercase; color:#64748B; margin:0; }
-.logo-relatorio { display:block; height:32px; width:auto; flex:none; }
+.logo-relatorio { display:block; height:40px; width:auto; flex:none; }
 .voltar { margin:0 0 10px; font-size:13px; }
 .sumario { position:sticky; top:0; background:#fff; padding:8px 0; border-bottom:1px solid #E6E9F2; margin:0 0 18px;
   display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; z-index:2; }

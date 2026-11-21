@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="redes/assets/logo.svg" alt="Redes" width="420">
+  <img src="redes/assets/logo.svg" alt="Redes" width="160">
 </p>
 
 # Redes
@@ -7,7 +7,7 @@
 **Mapeamento científico e análise de redes da produção acadêmica, com interface web local em português.** Importe o arquivo exportado da sua base (Scopus, Web of Science, OpenAlex, Zotero, BibTeX, RIS ou CSV) e veja temas, autores, referências e colaboração, período a período.
 
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-GPL--3.0--or--later-blue)
-![Versão](https://img.shields.io/badge/vers%C3%A3o-0.1.1-brightgreen)
+![Versão](https://img.shields.io/badge/vers%C3%A3o-0.2.0-brightgreen)
 ![Python](https://img.shields.io/badge/python-%E2%89%A53.10-informational)
 
 ## Galeria
@@ -98,7 +98,7 @@ Os testes de interface usam Playwright e Chrome; sem eles, são pulados. Estrutu
 
 Veja [CITATION.cff](CITATION.cff). Sugestão:
 
-> SILVA, Gerlan Silva da. *Redes: mapeamento científico e análise de redes da produção acadêmica* (versão 0.1.1). 2026. Disponível em: https://github.com/gerlansilva/redes.
+> SILVA, Gerlan Silva da. *Redes: mapeamento científico e análise de redes da produção acadêmica* (versão 0.2.0). 2026. Disponível em: https://github.com/gerlansilva/redes.
 
 ## Referências metodológicas
 

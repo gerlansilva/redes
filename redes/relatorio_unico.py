@@ -42,7 +42,7 @@ _CSS_EXTRA = """
 .sumario li.n4 { padding-left:40px; font-size:12.5px; }
 .sumario small { color:#64748B; }
 .capa { text-align:center; padding:28px 0 18px; border-bottom:1px solid #D7DBE6; margin-bottom:24px; }
-.capa img.logo-capa, .capa svg.logo-capa { width:220px; height:auto; margin:0 auto 10px; display:block; }
+.capa img.logo-capa, .capa svg.logo-capa { width:150px; height:150px; margin:0 auto 10px; display:block; }
 .capa h1 { border:0; font-size:30px; margin:6px 0 4px; }
 .capa .projeto { font-size:16px; color:#1F2A44; margin:0 0 14px; }
 .capa dl { display:inline-grid; grid-template-columns:auto auto; gap:4px 18px; text-align:left;

@@ -2,6 +2,7 @@
 import pytest
 
 from redes import cli
+import redes
 from redes.cli import main
 
 
@@ -51,7 +52,7 @@ def test_versao(capsys):
     with pytest.raises(SystemExit) as saida:
         main(["--version"])
     assert saida.value.code == 0
-    assert "redes 0.1.1" in capsys.readouterr().out
+    assert f"redes {redes.__version__}" in capsys.readouterr().out
 
 
 def test_debug_devolve_traceback(tmp_path, monkeypatch):
