@@ -430,9 +430,9 @@
                   <option value="200">200 mais ligados</option>
                 </select>
               </label>
-              <label class="campo-mini" title="Mostrar ou ocultar as linhas (arestas) entre os nós; atalho L">
+              <label class="campo-mini" title="Mostrar ou ocultar as linhas entre os halos e para nós fora dos grupos; atalho L">
                 <span>Linhas</span>
-                <select id="arestasRede">
+                <select id="ligacoesRede">
                   <option value="sim">mostrar</option>
                   <option value="nao">ocultar</option>
                 </select>
@@ -440,6 +440,13 @@
               <details class="rede-ajustes" id="ajustesRede">
                 <summary class="botao-mini">Ajustes</summary>
                 <div class="rede-ajustes-painel">
+                  <label class="campo-mini" title="Mostrar todas as arestas; para esconder só as linhas entre halos, use Linhas">
+                    <span>Arestas</span>
+                    <select id="arestasRede">
+                      <option value="sim">mostrar</option>
+                      <option value="nao">ocultar</option>
+                    </select>
+                  </label>
                   <label class="campo-mini" title="Mostrar os halos dos agrupamentos">
                     <span>Halos</span>
                     <select id="halosRede">
@@ -453,7 +460,7 @@
           <div class="aviso-volume" id="avisoVolume" hidden></div>
           <div class="corpo-fig" id="caixaHalo">
             <canvas id="canvasHalo" aria-label="Rede interativa em halos" tabindex="0"
-                    title="Arraste para mover · role para ampliar · clique num nó para ver o halo · anel escuro marca ponto de virada · com o foco no mapa, setas andam entre nós, Espaço isola o grupo, Enter destaca, Esc limpa · L oculta ou mostra as linhas" hidden></canvas>
+                    title="Arraste para mover · role para ampliar · clique num nó para ver o halo · anel escuro marca ponto de virada · com o foco no mapa, setas andam entre nós, Espaço isola o grupo, Enter destaca, Esc limpa · L oculta ou mostra as linhas entre os halos" hidden></canvas>
             <img id="figHalo" alt="Rede em halos" hidden>
             <div class="vazio" id="vazioHalo">Nenhuma rede para mostrar</div>
             <div class="carregando-figura" id="carregandoHalo" hidden>
@@ -1182,7 +1189,7 @@
         <div><b>5. Exporte</b><span>Baixe a grade, os índices e as redes, ou gere o relatório HTML.</span></div>
       </div>
       <p class="dica" style="margin-top:16px">Na rede, o ponto colorido da legenda isola o agrupamento: os nós, o halo e as arestas internas ficam, e somem só as linhas que o ligam aos outros grupos. O nome destaca o agrupamento no mapa; a seta abre os detalhes.</p>
-      <p class="dica">Atalhos: <kbd>Esc</kbd> fecha janelas abertas; na rede, <kbd>L</kbd> oculta ou mostra as linhas e <kbd>1–9</kbd>/<kbd>0</kbd> isolam e religam agrupamentos.</p>
+      <p class="dica">Atalhos: <kbd>Esc</kbd> fecha janelas abertas; na rede, <kbd>L</kbd> oculta ou mostra as linhas entre os halos e <kbd>1–9</kbd>/<kbd>0</kbd> isolam e religam agrupamentos.</p>
     </div>
   </div>
 </div>

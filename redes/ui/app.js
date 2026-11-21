@@ -408,6 +408,11 @@ function ligarEventos() {
     agendarDesenho();
     salvarSessao();
   });
+  $("ligacoesRede").addEventListener("change", (evento) => {
+    redeUI.ligacoes = evento.target.value !== "nao";
+    agendarDesenho();
+    salvarSessao();
+  });
   $("arestasRede").addEventListener("change", (evento) => {
     redeUI.arestas = evento.target.value !== "nao";
     agendarDesenho();
@@ -566,6 +571,7 @@ function salvarSessao() {
       rotulos: redeUI.rotulos,
       foco: redeUI.foco,
       arestas: redeUI.arestas,
+      ligacoes: redeUI.ligacoes,
       halos: redeUI.halos,
       isolados: [...redeUI.gruposIsolados],
       grupoFoco: redeUI.grupoFoco,
@@ -3099,6 +3105,8 @@ const redeUI = {
   ajuste: 1,
   rotulos: "principais",
   arestas: true,
+  // Linhas que ligam nós de agrupamentos diferentes (as "linhas entre halos").
+  ligacoes: true,
   halos: true,
   foco: 0,
   focoManual: false,
@@ -3148,9 +3156,11 @@ function limparRedeInterativa() {
   $("rotulosRede").value = "principais";
   $("focoRede").value = "0";
   redeUI.focoManual = false;
+  $("ligacoesRede").value = "sim";
   $("arestasRede").value = "sim";
   $("halosRede").value = "sim";
   redeUI.rotulos = "principais";
+  redeUI.ligacoes = true;
   redeUI.arestas = true;
   redeUI.halos = true;
   redeUI.foco = 0;
@@ -3316,6 +3326,7 @@ function prepararRede(dados) {
     else if (opcao.value === "50") opcao.textContent = `50 mais ligados`;
     else opcao.textContent = `200 mais ligados`;
   }
+  $("ligacoesRede").value = redeUI.ligacoes ? "sim" : "nao";
   $("arestasRede").value = redeUI.arestas ? "sim" : "nao";
   $("halosRede").value = redeUI.halos ? "sim" : "nao";
 
@@ -3335,6 +3346,7 @@ function aplicarVistaSalva(total) {
   }
   if (Number.isFinite(vista.foco)) redeUI.foco = Number(vista.foco);
   if (typeof vista.arestas === "boolean") redeUI.arestas = vista.arestas;
+  if (typeof vista.ligacoes === "boolean") redeUI.ligacoes = vista.ligacoes;
   if (typeof vista.halos === "boolean") redeUI.halos = vista.halos;
   const isolados = Array.isArray(vista.isolados) ? vista.isolados : [];
   redeUI.gruposIsolados = new Set(isolados.filter(
@@ -3353,11 +3365,12 @@ function alternarGrupoRede(indice) {
   salvarSessao();
 }
 
-// Linhas (arestas) ligadas/desligadas sem sair do mapa; o seletor "Linhas"
-// e o atalho L usam o mesmo caminho.
+// Linhas entre halos ligadas/desligadas sem sair do mapa: as arestas internas
+// dos agrupamentos continuam. O seletor "Linhas" e o atalho L usam o mesmo
+// caminho.
 function alternarLinhasRede() {
-  redeUI.arestas = !redeUI.arestas;
-  $("arestasRede").value = redeUI.arestas ? "sim" : "nao";
+  redeUI.ligacoes = !redeUI.ligacoes;
+  $("ligacoesRede").value = redeUI.ligacoes ? "sim" : "nao";
   agendarDesenho();
   salvarSessao();
 }
@@ -3755,8 +3768,11 @@ function desenharRede() {
   ctx.strokeStyle = "#CBD5E1";
   ctx.globalAlpha = foco === null ? 0.62 : 0.14;
   const cruzadas = dados.cruzadas || [];
-  if (!redeUI.arestas) {
-    // sem arestas: os nós continuam clicáveis e os rótulos, legíveis
+  // "Linhas" esconde só o que liga um agrupamento a outro; as arestas
+  // internas de cada halo continuam.
+  const entreHalos = redeUI.arestas && redeUI.ligacoes;
+  if (!entreHalos) {
+    // sem linhas entre halos: os nós continuam clicáveis e os rótulos, legíveis
   } else if (cruzadas.length && cruzadas.length <= 600) {
     for (const ligacao of cruzadas) {
       if (visiveis &&
@@ -3795,7 +3811,7 @@ function desenharRede() {
     ctx.globalAlpha = 1;
   }
 
-  if (redeUI.arestas) {
+  if (redeUI.arestas && redeUI.ligacoes) {
     ctx.globalAlpha = foco === null ? 0.55 : 0.18;
     ctx.lineWidth = 0.8 / escala;
     for (const ligacao of dados.soltas) {
