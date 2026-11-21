@@ -78,8 +78,8 @@ const CONFIG_ABAS = {
   // Países: a leitura que importa é o mapa e a densidade da colaboração.
   paises: { abas: ["paises", "densidade"],
             padrao: "paises", redeRotulo: "Rede de países" },
-  instituicoes: { abas: ["rede", "ies", "diagrama", "agrupamentos", "grupos", "indices",
-                         "dendrograma", "linhatempo", "densidade", "longitudinal"],
+  // Instituições: a rede de vínculos entre IES e a densidade dessa rede.
+  instituicoes: { abas: ["rede", "densidade"],
                   padrao: "rede", redeRotulo: "Rede de instituições" },
   veiculos: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "duplomapa",
                      "dendrograma", "linhatempo", "densidade", "longitudinal"],

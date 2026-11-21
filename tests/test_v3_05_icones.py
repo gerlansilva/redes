@@ -93,17 +93,21 @@ def test_cada_analise_so_oferece_abas_que_se_aplicam():
     assert [k for k, v in abas.items() if "similitude" in v] == ["conceitual"]
     # Só periódicos pede duplo mapa de áreas das revistas.
     assert [k for k, v in abas.items() if "duplomapa" in v] == ["veiculos"]
-    # Mapa de países e variantes unidas só nas unidades correspondentes.
+    # Mapa de países só na análise de países; a aba de variantes unidas não
+    # entra mais na barra (a consolidação continua no relatório).
     assert [k for k, v in abas.items() if "paises" in v] == ["paises"]
-    assert [k for k, v in abas.items() if "ies" in v] == ["instituicoes"]
+    assert not any("ies" in v for v in abas.values())
     # Documentos só onde o agrupamento é de documentos.
     assert sorted(k for k, v in abas.items() if "documentos" in v) == ["conceitual", "frentes"]
-    # Densidade vale em todas as unidades; dendrograma e linha do tempo em
-    # todas, menos países, que mostra só o mapa e a densidade.
+    # Densidade vale em todas as unidades; dendrograma e linha do tempo nas
+    # análises gerais. Países fica com mapa e densidade; instituições, com a
+    # rede e a densidade.
     assert all("densidade" in v for v in abas.values())
     for chave in ("dendrograma", "linhatempo"):
-        assert all(chave in v for k, v in abas.items() if k != "paises"), chave
+        assert all(chave in v for k, v in abas.items()
+                   if k not in ("paises", "instituicoes")), chave
     assert abas["paises"] == ["paises", "densidade"]
+    assert abas["instituicoes"] == ["rede", "densidade"]
 
 
 def test_troca_de_analise_limpa_o_resultado_anterior():

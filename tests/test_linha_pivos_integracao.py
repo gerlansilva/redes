@@ -337,7 +337,7 @@ class InterfaceTest(unittest.TestCase):
         self.assertIn('id="blocoLinhaDoTempo"', self.html)
         self.assertIn('linhatempo: "blocoLinhaDoTempo"', self.js)
         config = re.search(r"const CONFIG_ABAS = \{.*?\n\};", self.js, re.S).group(0)
-        self.assertEqual(config.count('"linhatempo"'), 7)   # em todas as unidades, menos países
+        self.assertEqual(config.count('"linhatempo"'), 6)   # nas análises gerais
         grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", self.js, re.S).group(0)
         self.assertIn('"linhatempo"', grupos)                 # sempre visível, no bloco Métodos
 
