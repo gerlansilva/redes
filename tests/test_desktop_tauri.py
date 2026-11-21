@@ -51,6 +51,17 @@ def test_icone_e_so_a_imagem_da_rede():
     assert "logo.svg" not in script
 
 
+def test_app_assinado_sem_quebrar_o_sidecar():
+    # O hardened runtime recusa carregar o Python.framework extraído pelo
+    # PyInstaller; as permissões precisam liberar a validação de bibliotecas.
+    macos = _config()["bundle"]["macOS"]
+    assert macos["hardenedRuntime"] is True
+    assert macos["entitlements"] == "entitlements.plist"
+    perms = (DESKTOP / "src-tauri" / "entitlements.plist").read_text(encoding="utf-8")
+    assert "com.apple.security.cs.disable-library-validation" in perms
+    assert "com.apple.security.cs.allow-unsigned-executable-memory" in perms
+
+
 def test_sidecar_e_o_servidor_web():
     rust = (DESKTOP / "src-tauri" / "src" / "main.rs").read_text(encoding="utf-8")
     assert 'sidecar("redes-servidor")' in rust

@@ -39,7 +39,7 @@ npm run tauri build -- --target aarch64-apple-darwin
 Saídas em `src-tauri/target/aarch64-apple-darwin/release/bundle/`:
 
 - `macos/Redes.app`
-- `dmg/Redes_0.3.0_aarch64.dmg`
+- `dmg/Redes_0.4.0_aarch64.dmg`
 
 O app é assinado *ad hoc* e não é notarizado. Na primeira abertura, clique com o
 botão direito em **Redes** e escolha **Abrir**.
@@ -58,7 +58,7 @@ npm run tauri build -- --target x86_64-pc-windows-msvc --bundles nsis
 ```
 
 Saída em `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`:
-`Redes_0.3.0_x64-setup.exe`.
+`Redes_0.4.0_x64-setup.exe`.
 
 ## Release
 
