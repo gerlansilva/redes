@@ -64,6 +64,26 @@ def test_descricao_nao_repete_o_nome_do_item():
         assert not any(p in descricao.casefold() for p in palavras), (nome, descricao)
 
 
+def test_barra_de_resultados_sem_rotulo_repetido():
+    # O bloco "Mapas" não se chama "Rede" para não parecer a aba "Rede de ...".
+    grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", JS, flags=re.S).group(0)
+    rotulos = re.findall(r'rotulo: "([^"]+)"', grupos)
+    assert "Mapas" in rotulos and "Rede" not in rotulos
+    itens = re.findall(r'<span class="aba-texto">([^<]+)</span>', HTML)
+    # Nomes de aba não repetem o rótulo do próprio bloco.
+    assert "Agrupamentos" not in itens
+    assert "Rede de agrupamentos" not in itens
+    assert "Ligações entre grupos" in itens and "Grupos" in itens
+
+
+def test_evolucao_fala_da_unidade_da_analise():
+    # A evolução não pode dizer "tema" quando a análise é de autores ou referências.
+    assert "function textosEvolucao(" in JS
+    assert "Tema no período anterior" not in JS
+    assert "evolução dos temas…" not in JS
+    assert "SUBSTANTIVO_GRUPO[unidade]" in JS
+
+
 def test_abas_visiveis_e_agrupadas_por_bloco():
     # Nenhuma aba some no modo simples e a personalizada não perde visões.
     assert "ABAS_SIMPLES" not in JS and "ABAS_SO_AVANCADO" not in JS

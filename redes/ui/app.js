@@ -79,7 +79,7 @@ const ABAS_TODAS = ["resumo", "rede", "paises", "ies", "diagrama", "agrupamentos
 // do bloco antes das abas correspondentes. Nada some ao trocar de modo.
 const GRUPOS_ABAS = [
   { rotulo: "Visão geral", abas: ["evolucao", "resumo"] },
-  { rotulo: "Rede", abas: ["rede", "paises", "ies", "diagrama", "agrupamentos"] },
+  { rotulo: "Mapas", abas: ["rede", "paises", "ies", "diagrama", "agrupamentos"] },
   { rotulo: "Tabelas", abas: ["grupos", "indices", "documentos"] },
   { rotulo: "Métodos", abas: ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"] },
   { rotulo: "Comparar", abas: ["longitudinal"] },
@@ -118,7 +118,7 @@ const INTERPRETACAO_PAISES = {
 const ORDEM_QUADRANTES = ["motor", "basico", "nicho", "emergente"];
 
 const ANALISES = [
-  { chave: "conceitual", nome: "Estrutura conceitual",
+  { chave: "conceitual", nome: "Palavras-chave em coocorrência",
     descricao: "Palavras-chave em co-ocorrência: os temas que estruturam o campo.",
     unidade: "Words", matriz: "CoOccurrence", similaridade: "EquivalenceIndex",
     algoritmo: "CentersSimples", mapeadores: "nucleo,interseccao",
@@ -795,7 +795,7 @@ function limparResultado() {
   $("metaHalo").textContent = "—";
   $("metaEstrategico").textContent = "Callon · faixas normalizadas";
   $("metaGrupos").textContent = "ordenados por número de itens";
-  $("metaAgrupamentos").textContent = "temas ligados pela associação entre seus itens";
+  $("metaAgrupamentos").textContent = "ligados pela associação entre seus itens";
   $("linkGrupos").textContent = "—";
 
   const corpo = $("gruposCorpo");
@@ -927,6 +927,57 @@ function atualizarGruposAbas() {
   }
 }
 
+// Textos da aba de evolução: valem para qualquer unidade, sem falar em "tema"
+// quando a análise é de autores, referências, periódicos, países ou IES.
+function textosEvolucao(unidade) {
+  const [sing, plur] = SUBSTANTIVO_GRUPO[unidade] || ["tema", "temas"];
+  const Tema = sing.charAt(0).toUpperCase() + sing.slice(1);
+  const tematico = unidade === "Words";
+  return {
+    aba: tematico ? "Evolução temática" : "Evolução dos grupos",
+    titulo: tematico ? "Evolução temática" : "Evolução dos grupos",
+    meta: `como os ${plur} mudam de um período para o outro`,
+    vazio: `Escolha uma análise para ver a evolução dos ${plur}.`,
+    calculando: `calculando a evolução dos ${plur}…`,
+    legenda: `Cada coluna é um período e cada círculo, um ${sing}. Um elo liga ${plur} de períodos seguidos que compartilham itens; elos azuis indicam o mesmo nó principal, e os cinza, sobreposições menores.`,
+    alt: `Mapa de evolução dos ${plur}`,
+    anterior: `${Tema} no período anterior`,
+    seguinte: `${Tema} no período seguinte`,
+    nota: `Continua: o ${sing} divide ao menos um item com algum ${sing} do período seguinte (ligação fraca: um só item e nós principais diferentes). Some: nenhum item passa ao período seguinte. Surge: o ${sing} não recebe itens do período anterior.`,
+  };
+}
+
+function unidadeDaAnalise(chave) {
+  const analise = ANALISES.find((item) => item.chave === chave);
+  if (analise) return analise.unidade;
+  const seletor = $("unidade");
+  return seletor ? seletor.value : "Words";
+}
+
+function aplicarTextosEvolucao(chave) {
+  const unidade = unidadeDaAnalise(chave);
+  const textos = textosEvolucao(unidade);
+  evolucaoUI.textos = textos;
+  if (evolucaoUI.unidade && evolucaoUI.unidade !== unidade) limparEvolucao();
+  evolucaoUI.unidade = unidade;
+  const aba = document.querySelector('.aba[data-aba="evolucao"]');
+  if (aba) {
+    aba.querySelector(".aba-texto").textContent = textos.aba;
+    aba.title = textos.aba;
+    aba.setAttribute("aria-label", textos.aba);
+  }
+  const titulo = document.querySelector("#blocoEvolucao h2");
+  if (titulo) titulo.textContent = textos.titulo;
+  const meta = $("metaEvolucao");
+  if (meta) meta.textContent = textos.meta;
+  const vazio = $("vazioEvolucao");
+  if (vazio) vazio.textContent = textos.vazio;
+  const legenda = $("legendaEvolucao");
+  if (legenda) legenda.textContent = textos.legenda;
+  const figura = $("figEvolucaoTema");
+  if (figura) figura.alt = textos.alt;
+}
+
 // manter: preserva a aba atual quando ela continua disponível.
 function aplicarAbas(chave, manter = false) {
   const cfg = CONFIG_ABAS[chave];
@@ -942,6 +993,8 @@ function aplicarAbas(chave, manter = false) {
     abaRede.title = nomeRede;
     abaRede.setAttribute("aria-label", nomeRede);
   }
+  aplicarTextosEvolucao(chave);
+
   for (const aba of document.querySelectorAll(".aba[data-aba]")) {
     aba.classList.toggle("oculta", !abas.includes(aba.dataset.aba));
   }
@@ -1482,6 +1535,7 @@ function renderizarResultado(resultado) {
   renderizarResumo(resultado);
   const resumo = resultado.resumo;
   const unidade = UNIDADES[resultado.parametros.unidade];
+  const [sing, plur] = substantivoGrupo(resultado);
 
   const recorteItens = resumo.itens && resumo.itens_reduzidos !== resumo.itens
     ? `${nf.format(resumo.itens_reduzidos)} de ${nf.format(resumo.itens)} itens`
@@ -1582,13 +1636,13 @@ function renderizarResultado(resultado) {
     $("vazioAgrupamentos").hidden = true;
     $("svgAgrupamentos").hidden = false;
     $("metaAgrupamentos").textContent =
-      `${resultado.periodo.nome} · ${resumo.grupos} temas`;
+      `${resultado.periodo.nome} · ${plural(resumo.grupos, sing, plur)}`;
   } else {
     $("figAgrupamentos").hidden = true;
     $("svgAgrupamentos").hidden = true;
     $("vazioAgrupamentos").hidden = false;
     $("metaAgrupamentos").textContent =
-      "temas ligados pela associação entre seus itens";
+      "ligados pela associação entre seus itens";
   }
 
   prepararZoomEstrategico();
@@ -4467,7 +4521,7 @@ function linhaVazia(texto, colunas) {
 
 /* ------------------------------------------------------ evolução temática */
 
-const evolucaoUI = { chave: null, pedido: 0, avisos: null };
+const evolucaoUI = { chave: null, pedido: 0, avisos: null, textos: null, unidade: null };
 
 function limparEvolucao() {
   evolucaoUI.chave = null;
@@ -4478,14 +4532,15 @@ function limparEvolucao() {
   $("downloadEvolucaoTema").hidden = true;
   $("tabelaEvolucao").replaceChildren();
   $("vazioEvolucao").hidden = false;
-  $("vazioEvolucao").textContent = "Escolha uma análise para ver a evolução dos temas.";
+  $("vazioEvolucao").textContent = (evolucaoUI.textos || textosEvolucao("Words")).vazio;
 }
 
 async function carregarEvolucao() {
   if (!estado.projeto || !estado.comEvolucao) return;
+  const textos = evolucaoUI.textos || textosEvolucao("Words");
   if (!estado.resultado) {
     $("vazioEvolucao").hidden = false;
-    $("vazioEvolucao").textContent = "calculando a evolução dos temas…";
+    $("vazioEvolucao").textContent = textos.calculando;
     return;
   }
   const dados = parametros();
@@ -4494,7 +4549,7 @@ async function carregarEvolucao() {
   if (evolucaoUI.chave === chave) return;      // já está na tela
   const pedido = ++evolucaoUI.pedido;
   $("vazioEvolucao").hidden = false;
-  $("vazioEvolucao").textContent = "calculando a evolução dos temas…";
+  $("vazioEvolucao").textContent = textos.calculando;
   $("figEvolucaoTema").hidden = true;
   try {
     const mapa = await api("/api/longitudinal", {
@@ -4515,6 +4570,7 @@ async function carregarEvolucao() {
 function renderizarEvolucao(mapa) {
   const unidade = estado.resultado ? estado.resultado.parametros.unidade : "Words";
   const [sing, plur] = SUBSTANTIVO_GRUPO[unidade] || ["tema", "temas"];
+  const textos = evolucaoUI.textos || textosEvolucao(unidade);
   $("vazioEvolucao").hidden = true;
   $("figEvolucaoTema").src = mapa.figuras.evolucao;
   $("figEvolucaoTema").hidden = false;
@@ -4536,7 +4592,7 @@ function renderizarEvolucao(mapa) {
     bloco.append(elemento("p", "evolucao-resumo", resumo));
     const tab = elemento("table", "tabela");
     const cab = elemento("tr");
-    for (const titulo of ["Situação", "Tema no período anterior", "Tema no período seguinte", "Sobreposição", "Itens em comum"]) {
+    for (const titulo of ["Situação", textos.anterior, textos.seguinte, "Sobreposição", "Itens em comum"]) {
       cab.append(elemento("th", "", titulo));
     }
     const thead = elemento("thead"); thead.append(cab);
@@ -4559,9 +4615,7 @@ function renderizarEvolucao(mapa) {
     tabela.append(bloco);
   }
   if (tabela.childElementCount) {
-    tabela.append(elemento("p", "evolucao-nota",
-      "Continua: o tema divide ao menos um item com algum tema do período seguinte (ligação fraca: um só item e nós principais diferentes). " +
-      "Some: nenhum item passa ao período seguinte. Surge: o tema não recebe itens do período anterior."));
+    tabela.append(elemento("p", "evolucao-nota", textos.nota));
   }
 }
 
