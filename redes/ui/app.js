@@ -41,7 +41,7 @@ const GRUPOS_ANALISE = {
   autores: "Colaboração",
   paises: "Colaboração",
   instituicoes: "Colaboração",
-  veiculos: "Periódicos",
+  veiculos: "Citações",
 };
 const ROTULO_UNIDADE = {
   Words: "Palavras", Authors: "Autores", References: "Referências",

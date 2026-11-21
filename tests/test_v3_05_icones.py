@@ -35,12 +35,22 @@ def test_menu_com_rotulo_curto_e_nome_completo_no_titulo():
 
 
 def test_menu_lateral_com_grupos_e_descricoes():
-    for grupo in ("Temas", "Citações", "Colaboração", "Periódicos"):
+    for grupo in ("Temas", "Citações", "Colaboração"):
         assert f'<p class="grupo-titulo">{grupo}</p>' in HTML, grupo
+    assert HTML.count('class="grupo-titulo"') == 3
     assert HTML.count('class="nav-desc"') == 9
-    for texto in ("Palavras-chave em rede", "Quem publica com quem",
+    for texto in ("Coocorrência entre termos", "Quem publica com quem",
                   "Cooperação internacional", "Periódicos citados juntos"):
         assert texto in HTML, texto
+
+
+def test_menu_nao_repete_o_titulo_do_grupo_no_item():
+    # O cabeçalho do bloco é a categoria; o item nomeia o objeto analisado.
+    grupos = re.findall(r'<p class="grupo-titulo">([^<]+)</p>', HTML)
+    itens = re.findall(r'<span class="nav-texto">([^<]+)</span>', HTML)
+    assert grupos and itens
+    repetidos = [g for g in grupos if g.casefold() in {i.casefold() for i in itens}]
+    assert not repetidos, repetidos
 
 
 def test_abas_visiveis_e_agrupadas_por_bloco():
