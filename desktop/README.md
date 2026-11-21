@@ -15,7 +15,7 @@ PyInstaller — não é preciso instalar Python na máquina.
 - `scripts/build-sidecar.sh`: gera `src-tauri/binaries/redes-servidor-<triple>`
   (`.exe` no Windows).
 - `scripts/gerar-icones.sh`: gera os ícones a partir de
-  `redes/assets/logo-icone.svg` — só a imagem da rede, sem o nome.
+  `redes/assets/logo.png` — o arquivo oficial da marca, usado como está.
 - `scripts/ajustar-versao.sh`: alinha a versão de `tauri.conf.json` e `Cargo.toml`.
 
 O app passa o próprio PID ao servidor (`REDES_PAI_PID`). Se o app for fechado,
