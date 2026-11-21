@@ -30,12 +30,13 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns"
+      "icons/icon.icns",
+      "icons/icon.ico"
     ],
     "externalBin": ["binaries/redes-servidor"],
     "category": "Education",
     "shortDescription": "Mapeamento científico e redes da produção acadêmica",
-    "longDescription": "Redes reúne a interface local de análise bibliométrica em um aplicativo para macOS: importe Scopus, Web of Science, OpenAlex, Zotero, BibTeX, RIS ou CSV e veja temas, autores, referências e colaboração, período a período.",
+    "longDescription": "Redes reúne a interface local de análise bibliométrica em um aplicativo para macOS e Windows: importe Scopus, Web of Science, OpenAlex, Zotero, BibTeX, RIS ou CSV e veja temas, autores, referências e colaboração, período a período.",
     "copyright": "GPL-3.0-or-later",
     "macOS": {
       "minimumSystemVersion": "11.0",

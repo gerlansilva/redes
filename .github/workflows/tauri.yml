@@ -1,7 +1,8 @@
 name: Redes desktop (Tauri)
 
-# Gera o Redes.app e o .dmg do app Tauri (interface local + servidor Python embutido).
-#  - push na branch tauri e pull requests: só o artefato do workflow;
+# Gera o app Tauri (interface local + servidor Python embutido) para macOS e
+# Windows:
+#  - push na branch tauri e pull requests: só os artefatos do workflow;
 #  - tag v* (ex.: v0.3.0) ou execução manual com "versao": publica o GitHub Release.
 on:
   push:
@@ -20,8 +21,45 @@ permissions:
   contents: write
 
 jobs:
+  versao:
+    runs-on: ubuntu-latest
+    outputs:
+      versao: ${{ steps.v.outputs.versao }}
+      publicar: ${{ steps.v.outputs.publicar }}
+      pre: ${{ steps.v.outputs.pre }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versão e publicação
+        id: v
+        env:
+          REF: ${{ github.ref }}
+          REF_TYPE: ${{ github.ref_type }}
+          ENTRADA: ${{ github.event.inputs.versao }}
+        run: |
+          set -euo pipefail
+          publicar=false
+          versao="$(python3 -c 'import json; print(json.load(open("desktop/src-tauri/tauri.conf.json"))["version"])' 2>/dev/null || echo 0.3.0)"
+          if [ "$REF_TYPE" = "tag" ]; then
+            versao="${REF#refs/tags/v}"; publicar=true
+          elif [ -n "${ENTRADA// /}" ]; then
+            versao="${ENTRADA//[[:space:]]/}"; versao="${versao#v}"; publicar=true
+          fi
+          case "$versao" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "Versão inválida: $versao" >&2; exit 1 ;;
+          esac
+          pre=false; case "$versao" in *-*) pre=true ;; esac
+          echo "versao=$versao" >> "$GITHUB_OUTPUT"
+          echo "publicar=$publicar" >> "$GITHUB_OUTPUT"
+          echo "pre=$pre" >> "$GITHUB_OUTPUT"
+          echo "Versão $versao, publicar: $publicar"
+
   dmg:
+    needs: versao
     runs-on: macos-latest
+    env:
+      VERSAO: ${{ needs.versao.outputs.versao }}
     steps:
       - uses: actions/checkout@v4
 
@@ -42,50 +80,8 @@ jobs:
       - name: Ferramentas do pacote
         run: brew install librsvg
 
-      - name: Versão e publicação
-        id: v
-        env:
-          REF: ${{ github.ref }}
-          REF_TYPE: ${{ github.ref_type }}
-          ENTRADA: ${{ github.event.inputs.versao }}
-        run: |
-          set -euo pipefail
-          config_versao="$(python3 -c 'import json; print(json.load(open("desktop/src-tauri/tauri.conf.json"))["version"])')"
-          publicar=false
-          versao="$config_versao"
-          if [ "$REF_TYPE" = "tag" ]; then
-            versao="${REF#refs/tags/v}"; publicar=true
-          elif [ -n "${ENTRADA// /}" ]; then
-            versao="${ENTRADA//[[:space:]]/}"; versao="${versao#v}"; publicar=true
-          fi
-          case "$versao" in
-            [0-9]*.[0-9]*.[0-9]*) ;;
-            *) echo "Versão inválida: $versao" >&2; exit 1 ;;
-          esac
-          pre=false; case "$versao" in *-*) pre=true ;; esac
-          echo "versao=$versao" >> "$GITHUB_OUTPUT"
-          echo "publicar=$publicar" >> "$GITHUB_OUTPUT"
-          echo "pre=$pre" >> "$GITHUB_OUTPUT"
-          echo "Versão $versao (config: $config_versao), publicar: $publicar"
-
       - name: Ajustar a versão pedida
-        env:
-          VERSAO: ${{ steps.v.outputs.versao }}
-        run: |
-          set -euo pipefail
-          python3 - "$VERSAO" <<'PY'
-          import json, sys
-          from pathlib import Path
-          versao = sys.argv[1]
-          caminho = Path("desktop/src-tauri/tauri.conf.json")
-          config = json.loads(caminho.read_text(encoding="utf-8"))
-          config["version"] = versao
-          caminho.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-          caminho = Path("desktop/src-tauri/Cargo.toml")
-          texto = caminho.read_text(encoding="utf-8")
-          texto = texto.replace('version = "0.3.0"', f'version = "{versao}"', 1)
-          caminho.write_text(texto, encoding="utf-8")
-          PY
+        run: bash desktop/scripts/ajustar-versao.sh "$VERSAO"
 
       - name: Dependências
         run: |
@@ -104,8 +100,6 @@ jobs:
         run: bash desktop/scripts/build-sidecar.sh
 
       - name: Empacotar Redes.app e .dmg
-        env:
-          VERSAO: ${{ steps.v.outputs.versao }}
         run: |
           set -euo pipefail
           triple="$(rustc -vV | sed -n 's/^host: //p')"
@@ -115,8 +109,6 @@ jobs:
 
       - name: Nome do arquivo para o release
         id: pacote
-        env:
-          VERSAO: ${{ steps.v.outputs.versao }}
         run: |
           set -euo pipefail
           case "$(uname -m)" in
@@ -128,50 +120,138 @@ jobs:
           test -f "$origem"
           destino="Redes-${VERSAO}-macOS-${arq}.dmg"
           cp "$origem" "$destino"
-          shasum -a 256 "$destino" > "$destino.sha256"
           echo "dmg=$destino" >> "$GITHUB_OUTPUT"
-          echo "sha=$destino.sha256" >> "$GITHUB_OUTPUT"
-          ls -lh "$destino" "$destino.sha256"
+          ls -lh "$destino"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Redes-macOS-Tauri-dmg
-          path: |
-            Redes-*.dmg
-            Redes-*.dmg.sha256
+          name: Redes-macOS-dmg
+          path: Redes-*.dmg
           if-no-files-found: error
 
-      - name: Criar ou atualizar o GitHub Release
-        if: steps.v.outputs.publicar == 'true'
+  exe:
+    needs: versao
+    runs-on: windows-latest
+    env:
+      VERSAO: ${{ needs.versao.outputs.versao }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Ajustar a versão pedida
+        run: bash desktop/scripts/ajustar-versao.sh "$VERSAO"
+
+      - name: Dependências
+        run: |
+          set -euo pipefail
+          python -m venv .venv-desktop
+          .venv-desktop/Scripts/python.exe -m pip install --upgrade pip
+          .venv-desktop/Scripts/python.exe -m pip install pyinstaller .
+          cd desktop && npm install
+
+      - name: Ícones
+        run: bash desktop/scripts/gerar-icones.sh
+
+      - name: Sidecar Python
         env:
-          GH_TOKEN: ${{ github.token }}
-          VERSAO: ${{ steps.v.outputs.versao }}
-          DMG: ${{ steps.pacote.outputs.dmg }}
-          PRE: ${{ steps.v.outputs.pre }}
-          SHA_COMMIT: ${{ github.sha }}
+          PYTHON: ${{ github.workspace }}/.venv-desktop/Scripts/python.exe
+        run: bash desktop/scripts/build-sidecar.sh
+
+      - name: Empacotar instalador do Windows
+        run: |
+          set -euo pipefail
+          triple="$(rustc -vV | sed -n 's/^host: //p')"
+          cd desktop
+          npm run tauri build -- --target "$triple" --bundles nsis
+          echo "triple=$triple" >> "$GITHUB_ENV"
+
+      - name: Nome do arquivo para o release
+        id: pacote
+        run: |
+          set -euo pipefail
+          origem="desktop/src-tauri/target/$triple/release/bundle/nsis/Redes_${VERSAO}_x64-setup.exe"
+          test -f "$origem"
+          destino="Redes-${VERSAO}-Windows-x64-setup.exe"
+          cp "$origem" "$destino"
+          echo "exe=$destino" >> "$GITHUB_OUTPUT"
+          ls -lh "$destino"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Redes-Windows-exe
+          path: Redes-*-setup.exe
+          if-no-files-found: error
+
+  release:
+    needs: [versao, dmg, exe]
+    if: needs.versao.outputs.publicar == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSAO: ${{ needs.versao.outputs.versao }}
+      PRE: ${{ needs.versao.outputs.pre }}
+      SHA_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Redes-*
+          merge-multiple: true
+
+      - name: Somatórios e notas
+        run: |
+          set -euo pipefail
+          ls -lh Redes-*
+          for arquivo in Redes-*; do
+            case "$arquivo" in *.sha256) continue ;; esac
+            sha256sum "$arquivo" | sed 's/  /  /' > "$arquivo.sha256"
+            cat "$arquivo.sha256"
+          done
+          {
+            echo "Redes $VERSAO para macOS e Windows (app desktop em Tauri)."
+            echo
+            echo "O app abre a interface local do Redes em uma janela própria; o"
+            echo "servidor Python vai embutido e nenhum dado sai da máquina."
+            echo
+            echo "**macOS** (Apple Silicon): arraste Redes para Aplicativos. O app não"
+            echo "é notarizado pela Apple: na primeira abertura, clique com o botão"
+            echo "direito em Redes e escolha Abrir."
+            echo
+            echo "**Windows**: execute o instalador e abra o Redes pelo menu Iniciar."
+            echo
+            echo "Somatórios SHA-256:"
+            echo
+            echo '```'
+            cat Redes-*.sha256
+            echo '```'
+          } > notas.md
+          cat notas.md
+
+      - name: Criar ou atualizar o GitHub Release
         run: |
           set -euo pipefail
           tag="v$VERSAO"
-          soma="$(cut -d' ' -f1 "$DMG.sha256")"
-          cat > notas.md <<NOTAS
-          Redes $VERSAO para macOS (app desktop em Tauri, $(uname -m)).
-
-          O app abre a interface local do Redes em uma janela própria; o servidor
-          Python vai embutido e nenhum dado sai da máquina.
-
-          SHA-256 de \`$DMG\`:
-
-          \`$soma\`
-
-          O app não é notarizado pela Apple. Na primeira abertura, clique com o
-          botão direito em Redes e escolha Abrir.
-          NOTAS
           flags=()
           [ "$PRE" = "true" ] && flags+=(--prerelease)
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$DMG" "$DMG.sha256" --clobber
+            gh release upload "$tag" Redes-* --clobber
             gh release edit "$tag" --title "Redes $VERSAO" --notes-file notas.md ${flags[@]+"${flags[@]}"}
           else
-            gh release create "$tag" "$DMG" "$DMG.sha256" --target "$SHA_COMMIT" --title "Redes $VERSAO" --notes-file notas.md ${flags[@]+"${flags[@]}"}
+            gh release create "$tag" Redes-* --target "$SHA_COMMIT" --title "Redes $VERSAO" --notes-file notas.md ${flags[@]+"${flags[@]}"}
           fi
           echo "Release: $(gh release view "$tag" --json url -q .url)" >> "$GITHUB_STEP_SUMMARY"

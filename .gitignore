@@ -17,3 +17,7 @@ desktop/src-tauri/binaries/
 desktop/.pyinstaller/
 desktop/.venv-desktop/
 desktop/src-tauri/gen/
+desktop/src-tauri/icons/android/
+desktop/src-tauri/icons/ios/
+desktop/src-tauri/icons/Square*Logo.png
+desktop/src-tauri/icons/StoreLogo.png

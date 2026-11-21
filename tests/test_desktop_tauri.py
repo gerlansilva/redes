@@ -38,6 +38,19 @@ def test_versao_unica_entre_config_cargo_e_pacote():
     assert json.loads(PACOTE.read_text(encoding="utf-8"))["version"] == versao
 
 
+def test_icone_e_so_a_imagem_da_rede():
+    marca = (RAIZ / "redes" / "assets" / "logo-icone.svg").read_text(encoding="utf-8")
+    assert "<text" not in marca and "<tspan" not in marca
+    # Só a marca: os três traços da rede e os nós coloridos.
+    assert marca.count("<circle") >= 8
+    assert marca.count("<ellipse") == 2
+    icones = _config()["bundle"]["icon"]
+    assert "icons/icon.icns" in icones and "icons/icon.ico" in icones
+    script = (DESKTOP / "scripts" / "gerar-icones.sh").read_text(encoding="utf-8")
+    assert "logo-icone.svg" in script
+    assert "logo.svg" not in script
+
+
 def test_sidecar_e_o_servidor_web():
     rust = (DESKTOP / "src-tauri" / "src" / "main.rs").read_text(encoding="utf-8")
     assert 'sidecar("redes-servidor")' in rust
@@ -49,6 +62,8 @@ def test_sidecar_e_o_servidor_web():
     assert 'main(["web", *sys.argv[1:]])' in entrada
     assert "vigia_do_pai" in entrada
     assert "os._exit(0)" in entrada
+    # No Windows `os.kill(pid, 0)` encerraria o app; usa a API do sistema.
+    assert "OpenProcess" in entrada and 'os.name == "nt"' in entrada
 
 
 def test_script_gera_o_sidecar_com_o_triplo_do_alvo():
@@ -56,12 +71,15 @@ def test_script_gera_o_sidecar_com_o_triplo_do_alvo():
     assert "--onefile" in script and "--name redes-servidor" in script
     assert 'redes-servidor-$ALVO' in script
     assert "--collect-data redes" in script
+    assert 'EXT=".exe"' in script
 
 
-def test_workflow_publica_o_dmg():
+def test_workflow_publica_macos_e_windows():
     texto = WORKFLOW.read_text(encoding="utf-8")
-    assert "macos-latest" in texto
+    assert "macos-latest" in texto and "windows-latest" in texto
     assert "tauri build" in texto
+    assert "--bundles nsis" in texto
     assert "gh release create" in texto and "gh release upload" in texto
     assert "Redes-${VERSAO}-macOS-" in texto
-    assert "shasum -a 256" in texto
+    assert "Redes-${VERSAO}-Windows-x64-setup.exe" in texto
+    assert "sha256sum" in texto
