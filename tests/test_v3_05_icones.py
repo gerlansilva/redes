@@ -40,7 +40,7 @@ def test_menu_lateral_com_grupos_e_descricoes():
     assert HTML.count('class="grupo-titulo"') == 3
     assert HTML.count('class="nav-desc"') == 9
     for texto in ("Coocorrência entre termos", "Quem publica com quem",
-                  "Cooperação internacional", "Periódicos citados juntos"):
+                  "Cooperação internacional", "Revistas citadas juntas"):
         assert texto in HTML, texto
 
 
@@ -51,6 +51,17 @@ def test_menu_nao_repete_o_titulo_do_grupo_no_item():
     assert grupos and itens
     repetidos = [g for g in grupos if g.casefold() in {i.casefold() for i in itens}]
     assert not repetidos, repetidos
+
+
+def test_descricao_nao_repete_o_nome_do_item():
+    # A segunda linha acrescenta informação; repetir o nome só ocupa espaço.
+    pares = re.findall(
+        r'<span class="nav-texto">([^<]+)</span><span class="nav-desc">([^<]+)</span>',
+        HTML)
+    assert len(pares) == 9
+    for nome, descricao in pares:
+        palavras = [p for p in re.split(r"[\s\-]+", nome.casefold()) if len(p) > 3]
+        assert not any(p in descricao.casefold() for p in palavras), (nome, descricao)
 
 
 def test_abas_visiveis_e_agrupadas_por_bloco():
