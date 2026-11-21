@@ -34,14 +34,14 @@ const MEDIDAS_TEMPORAIS = {
 };
 
 const GRUPOS_ANALISE = {
-  conceitual: "Estrutura conceitual",
-  citados: "Estrutura intelectual",
-  referencias: "Estrutura intelectual",
-  frentes: "Estrutura intelectual",
-  autores: "Estrutura social",
-  paises: "Estrutura social",
-  instituicoes: "Estrutura social",
-  veiculos: "Fontes",
+  conceitual: "Temas",
+  citados: "Citações",
+  referencias: "Citações",
+  frentes: "Citações",
+  autores: "Colaboração",
+  paises: "Colaboração",
+  instituicoes: "Colaboração",
+  veiculos: "Periódicos",
 };
 const ROTULO_UNIDADE = {
   Words: "Palavras", Authors: "Autores", References: "Referências",

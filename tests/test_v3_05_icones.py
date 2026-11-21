@@ -34,6 +34,15 @@ def test_menu_com_rotulo_curto_e_nome_completo_no_titulo():
                 or curto.casefold() in titulo.casefold()), (chave, curto, titulo)
 
 
+def test_menu_lateral_com_grupos_e_descricoes():
+    for grupo in ("Temas", "Citações", "Colaboração", "Periódicos"):
+        assert f'<p class="grupo-titulo">{grupo}</p>' in HTML, grupo
+    assert HTML.count('class="nav-desc"') == 9
+    for texto in ("Palavras-chave em rede", "Quem publica com quem",
+                  "Cooperação internacional", "Periódicos citados juntos"):
+        assert texto in HTML, texto
+
+
 def test_abas_visiveis_e_agrupadas_por_bloco():
     # Nenhuma aba some no modo simples e a personalizada não perde visões.
     assert "ABAS_SIMPLES" not in JS and "ABAS_SO_AVANCADO" not in JS
