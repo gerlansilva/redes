@@ -15,8 +15,8 @@
 | | |
 |---|---|
 | ![Boas-vindas](docs/imagens/01-boas-vindas.png) | ![Importação](docs/imagens/02-importacao-opcoes.png) |
-| ![Visão geral](docs/imagens/03-visao-geral-celi.png) | ![Evolução temática](docs/imagens/05-evolucao-tematica-celi.png) |
-| ![Diagrama estratégico](docs/imagens/08-diagrama-estrategico-batanero.png) | ![Cocitação de autores](docs/imagens/12-cocitacao-autores-evolucao-batanero.png) |
+| ![Visão geral](docs/imagens/03-visao-geral-celi.png) | ![Evolução temática](docs/imagens/05-evolucao-tematica.png) |
+| ![Diagrama estratégico](docs/imagens/06-diagrama-estrategico.png) | ![Cocitação de autores](docs/imagens/08-cocitacao-autores-evolucao.png) |
 
 As capturas usam metadados públicos de artigos de dois corpora de pesquisadoras da Educação Estatística. Todas as imagens estão em [`docs/imagens/`](docs/imagens/) e aparecem no [guia de uso](docs/guia-de-uso.md).
 
@@ -79,19 +79,11 @@ CSV tabulado do Redes, BibTeX, RIS, OpenAlex (CSV), Web of Science (texto), Scop
 
 TSV (resumo e grupos por tema), SVG (rede e diagrama estratégico), PNG, SVG e CSV dos gráficos da visão geral, HTML (relatório de uma análise e relatório completo, em arquivo único ou pasta), Pajek (`.net`), GraphML e XML de grupos. A grade completa grava um TSV com todas as configurações.
 
-![Menu Exportar](docs/imagens/19-menu-exportar.png)
+![Menu Exportar](docs/imagens/12-menu-exportar.png)
 
 ## Limites mínimos: como interpretar
 
-O Redes nunca bloqueia uma análise, mas avisa numa faixa no topo quando os dados são poucos: menos de 20 documentos no período, mais da metade dos temas com um só documento, um tema com mais de 40% dos documentos, termo presente em 35% ou mais dos documentos, menos de 10 itens citados por dois ou mais documentos (cocitação) e corpus de autor focal (um autor em mais de 80% dos documentos). Um aviso significa "leia como indício". Veja [docs/analises.md](docs/analises.md#avisos-de-limite-mínimo).
-
-![Aviso de limite mínimo](docs/imagens/16-aviso-limite-minimo-celi.png)
-
-## Modo avançado
-
-Chave no menu lateral. Mostra similaridade, algoritmo de agrupamento, mapeadores, co-ocorrência mínima, corte, tamanho do grupo, a grade completa e as abas de dendrograma, densidade, duplo mapa, similitude e comparação de períodos.
-
-![Modo avançado](docs/imagens/18-modo-avancado.png)
+O Redes nunca bloqueia uma análise. Quando um período tem menos de 20 documentos, mais da metade dos temas com um só documento, um tema com mais de 40% dos documentos, termo presente em 35% ou mais dos documentos, menos de 10 itens citados por dois ou mais documentos (cocitação) ou um corpus de autor focal, o resultado é marcado pelo selo de **Qualidade** e o *Relatório completo* registra a ressalva junto da análise. Um aviso significa "leia como indício". Veja [docs/analises.md](docs/analises.md#avisos-de-limite-mínimo).
 
 ## Desenvolvimento e testes
 
