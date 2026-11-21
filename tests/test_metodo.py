@@ -170,7 +170,8 @@ class MetodoTest(unittest.TestCase):
         self.assertRegex(pagina, r"<caption>Tabela \d+ — Indicadores da análise")
         tabelas = [int(n) for n in re.findall(r"<caption>Tabela (\d+) — ", pagina)]
         self.assertEqual(tabelas, list(range(1, len(tabelas) + 1)))
-        self.assertNotRegex(pagina, r"<script|<link |<img ")
+        self.assertNotRegex(pagina, r"<script|<link ")
+        self.assertNotRegex(pagina, r'<img (?![^>]*src="data:)')
         # Os números do relatório são os dos resultados.
         bloco = _texto(pagina[pagina.index('id="s2-parametros"'):pagina.index('id="s2-periodos"')])
         for r in self.resultados:

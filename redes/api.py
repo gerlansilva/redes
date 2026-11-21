@@ -2120,6 +2120,14 @@ class Manipulador(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(dados)
 
+    def _binario(self, codigo: int, dados: bytes, tipo: str) -> None:
+        self.send_response(codigo)
+        self.send_header("Content-Type", tipo)
+        self.send_header("Content-Length", str(len(dados)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(dados)
+
     def _corpo(self, limite: int) -> bytes:
         tamanho = int(self.headers.get("Content-Length") or 0)
         if tamanho > limite:
@@ -2148,10 +2156,16 @@ class Manipulador(BaseHTTPRequestHandler):
         if not arquivo.exists() or not arquivo.is_file():
             self.send_error(404)
             return
-        tipos = {".html": "text/html", ".css": "text/css",
-                 ".js": "application/javascript", ".svg": "image/svg+xml"}
+        tipos = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
+                 ".js": "application/javascript; charset=utf-8",
+                 ".svg": "image/svg+xml", ".png": "image/png",
+                 ".ico": "image/x-icon"}
         tipo = tipos.get(arquivo.suffix.lower(), "application/octet-stream")
-        self._texto(200, arquivo.read_text(encoding="utf-8"), tipo)
+        if tipo.startswith(("text/", "application/javascript")):
+            self._texto(200, arquivo.read_text(encoding="utf-8"),
+                        tipo.split(";")[0])
+        else:
+            self._binario(200, arquivo.read_bytes(), tipo)
 
     # ------------------------------------------------------------------- rotas
 

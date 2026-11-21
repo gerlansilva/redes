@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="redes/assets/logo.svg" alt="Redes" width="160">
+  <img src="redes/assets/logo.png" alt="Redes" width="180">
 </p>
 
 # Redes
@@ -31,11 +31,20 @@ As análises respondem a quatro perguntas:
 | **Com quem se escreve?** | Coautoria, Países, Instituições | coautoria e afiliações |
 | **Como isso muda no tempo?** | Evolução temática | sobreposição de temas entre períodos |
 
-Além disso: visão geral descritiva (produção, citações, leis de Lotka, Bradford e Zipf, rajadas), diagrama estratégico (centralidade e densidade), rede em halos, índices (h, g e outros), linha do tempo, relatório completo em HTML e avisos de limite mínimo que dizem quando um resultado deve ser lido com cautela. Detalhes em [docs/analises.md](docs/analises.md).
+Além disso: visão geral descritiva (produção, citações, leis de Lotka, Bradford e Zipf, rajadas), diagrama estratégico (centralidade e densidade), rede em halos, índices (h, g e outros), linha do tempo e relatório completo em HTML com as ressalvas de leitura. Detalhes em [docs/analises.md](docs/analises.md).
 
 ## Para quem é
 
 Pesquisadoras e pesquisadores que fazem revisão de literatura, estado da arte ou estudos bibliométricos e querem uma ferramenta em português, local (nenhum dado sai da sua máquina) e sem programar.
+
+## App para macOS e Windows
+
+Baixe o instalador na página de [Releases](https://github.com/gerlansilva/redes/releases):
+
+- `Redes-<versão>-macOS-arm64.dmg` (Apple Silicon): arraste **Redes** para **Aplicativos**. Na primeira abertura, clique com o botão direito em **Redes** e escolha **Abrir**: o app é assinado localmente e não é notarizado pela Apple.
+- `Redes-<versão>-Windows-x64-setup.exe` (Windows 10/11, 64 bits): execute o instalador e abra o **Redes** pelo menu Iniciar.
+
+O app abre a mesma interface em uma janela própria, com o servidor Python embutido — não é preciso instalar Python.
 
 ## Instalação
 
