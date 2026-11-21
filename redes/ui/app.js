@@ -75,8 +75,8 @@ const CONFIG_ABAS = {
   autores: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices",
                     "dendrograma", "linhatempo", "densidade", "longitudinal"],
              padrao: "rede", redeRotulo: "Rede de coautoria" },
-  paises: { abas: ["paises", "rede", "diagrama", "agrupamentos", "grupos", "indices",
-                   "dendrograma", "linhatempo", "densidade", "longitudinal"],
+  // Países: a leitura que importa é o mapa e a densidade da colaboração.
+  paises: { abas: ["paises", "densidade"],
             padrao: "paises", redeRotulo: "Rede de países" },
   instituicoes: { abas: ["rede", "ies", "diagrama", "agrupamentos", "grupos", "indices",
                          "dendrograma", "linhatempo", "densidade", "longitudinal"],
@@ -85,7 +85,7 @@ const CONFIG_ABAS = {
                      "dendrograma", "linhatempo", "densidade", "longitudinal"],
               padrao: "rede", redeRotulo: "Rede de periódicos" },
 };
-const ABAS_TODAS = ["resumo", "rede", "paises", "ies", "diagrama", "agrupamentos",
+const ABAS_TODAS = ["rede", "paises", "ies", "diagrama", "agrupamentos",
                     "grupos", "indices", "documentos", "dendrograma", "linhatempo",
                     "densidade", "duplomapa", "similitude", "longitudinal"];
 // Configuração manual (análise personalizada): usa a mesma lista da unidade
@@ -98,7 +98,7 @@ const ANALISE_POR_UNIDADE = {
 // Blocos da barra de resultados: todas as análises ficam à vista, com o nome
 // do bloco antes das abas correspondentes. Nada some ao trocar de modo.
 const GRUPOS_ABAS = [
-  { rotulo: "Visão geral", abas: ["evolucao", "resumo"] },
+  { rotulo: "Visão geral", abas: ["evolucao"] },
   { rotulo: "Mapas", abas: ["rede", "paises", "ies", "diagrama", "agrupamentos"] },
   { rotulo: "Tabelas", abas: ["grupos", "indices", "documentos"] },
   { rotulo: "Métodos", abas: ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"] },
@@ -109,10 +109,6 @@ const GRUPOS_ABAS = [
 const LIMITE_TEMAS = 14;
 const MINIMO_TEMAS = 4;
 const FREQUENCIA_MAXIMA_AUTO = 6;
-// Resumo: temas com menos documentos que isto vão para "Outros".
-const DOCS_MINIMOS_RESUMO = 3;
-const MAXIMO_TEMAS_RESUMO = 12;
-const FRACAO_TEMA_GENERICO = 0.35;
 
 const SUBSTANTIVO_GRUPO = {
   Words: ["tema", "temas"],
@@ -123,19 +119,6 @@ const SUBSTANTIVO_GRUPO = {
   Countries: ["grupo de países", "grupos de países"],
   Institutions: ["grupo de instituições", "grupos de instituições"],
 };
-const INTERPRETACAO = {
-  motor: "Centrais e bem desenvolvidos: sustentam o campo.",
-  basico: "Centrais, mas ainda pouco desenvolvidos: assuntos de base que atravessam o campo.",
-  nicho: "Bem desenvolvidos, porém isolados: assuntos especializados.",
-  emergente: "Pouco centrais e pouco desenvolvidos: temas em surgimento ou em declínio.",
-};
-const INTERPRETACAO_PAISES = {
-  motor: "Países centrais e muito conectados na colaboração.",
-  basico: "Países com muitas ligações, mas pouco coesas entre si.",
-  nicho: "Parcerias intensas, porém fechadas entre poucos países.",
-  emergente: "Países na periferia da rede de colaboração.",
-};
-const ORDEM_QUADRANTES = ["motor", "basico", "nicho", "emergente"];
 
 const ANALISES = [
   { chave: "conceitual", nome: "Palavras-chave em coocorrência",
@@ -782,7 +765,11 @@ function aplicarProjeto(projeto) {
 }
 
 function limparResultado() {
-  renderizarResumoVazio("Calculando o resumo…");
+  const caixaQualidade = $("qualidadeCaixa");
+  if (caixaQualidade) {
+    fecharQualidade(false);
+    caixaQualidade.hidden = true;
+  }
   limparRedeInterativa();
   limparEvolucao();
   redeUI.carregada = false;
@@ -898,7 +885,7 @@ function abasDaAnalise(chave) {
     configuracao = matriz === "BasicCoupling" ? "frentes" : ANALISE_POR_UNIDADE[unidade];
   }
   const cfg = CONFIG_ABAS[configuracao];
-  let abas = cfg ? ["resumo", ...cfg.abas] : ["resumo", ...ABAS_TODAS];
+  let abas = cfg ? [...cfg.abas] : [...ABAS_TODAS];
   const totalPeriodos = estado.projeto ? estado.projeto.periodos.length : 0;
   const evolucao = usaEvolucao(chave);
   if (totalPeriodos < 2) abas = abas.filter((aba) => aba !== "longitudinal");
@@ -1012,13 +999,12 @@ function aplicarAbas(chave, manter = false) {
     ajustarCorteAbas();
     return;
   }
-  selecionarAba(evolucao ? "evolucao" : "resumo");
+  selecionarAba(evolucao ? "evolucao" : ((cfg && cfg.padrao) || "rede"));
   ajustarCorteAbas();
 }
 
 const BLOCO_POR_ABA = {
   evolucao: "blocoEvolucao",
-  resumo: "blocoResumo",
   rede: "blocoRede",
   paises: "blocoPaises",
   ies: "blocoIes",
@@ -1165,7 +1151,6 @@ function escolherAnalise(chave, executar) {
     previsualizar();
   } else {
     redefinirFrequencia();
-    mostrarCarregandoResumo();
     agendarPrevia();
   }
 }
@@ -1303,7 +1288,6 @@ function aplicarPredefinicao(chave) {
   marcarPredefinicao(chave);
   redefinirFrequencia();
   if (!estado.projeto) return;
-  mostrarCarregandoResumo();
   agendarPrevia(200);
 }
 
@@ -1437,7 +1421,6 @@ async function previsualizar() {
   $("carregandoHalo").hidden = false;
   $("carregandoEstrategico").hidden = false;
   $("estadoTexto").textContent = "Calculando…";
-  if (!estado.resultado || estado.desatualizada) mostrarCarregandoResumo();
 
   try {
     let resultado = await analisar();
@@ -1456,7 +1439,6 @@ async function previsualizar() {
     estado.resultado = null;
     estado.token = null;
     mostrarToast(erro.message, true);
-    renderizarResumoVazio(erro.message);
   } finally {
     estado.calculando = false;
     atualizarMenuExportar();
@@ -1525,7 +1507,6 @@ function renderizarResultado(resultado) {
   $("seloPrevia").hidden = true;
   $("seloPrevia").classList.remove("alerta");
   fecharDrawer();
-  renderizarResumo(resultado);
   const resumo = resultado.resumo;
   const unidade = UNIDADES[resultado.parametros.unidade];
   const [sing, plur] = substantivoGrupo(resultado);
@@ -1674,7 +1655,7 @@ function renderizarResultado(resultado) {
 }
 
 
-/* ------------------------------------------------------------------- resumo */
+/* ----------------------------------------------------- nomes e siglas */
 
 // Siglas que ficam em maiúsculas nas palavras-chave (SPSS, PISA, TIMSS...). A lista
 // vem do servidor (`texto.siglas()`), para que a interface e os relatórios usem a mesma.
@@ -1799,162 +1780,11 @@ function listaComE(itens) {
   }
 }
 
-function mostrarCarregandoResumo() {
-  const p = document.createElement("p");
-  p.className = "resumo-carregando";
-  p.textContent = "Calculando o resumo…";
-  $("resumoCorpo").replaceChildren(p);
-  $("metaResumo").textContent = "—";
-}
-
-function renderizarResumoVazio(texto) {
-  const caixaQualidade = $("qualidadeCaixa");
-  if (caixaQualidade) {
-    fecharQualidade(false);
-    caixaQualidade.hidden = true;
-  }
-  const p = document.createElement("p");
-  p.className = "resumo-vazio";
-  p.textContent = texto;
-  $("resumoCorpo").replaceChildren(p);
-  $("metaResumo").textContent = "—";
-}
-
 function elemento(tag, classe, texto) {
   const el = document.createElement(tag);
   if (classe) el.className = classe;
   if (texto !== undefined) el.textContent = texto;
   return el;
-}
-
-function linhaTema(grupo, unidade, maximo, comQuadrante) {
-  const linha = elemento("button", `tema-linha ${grupo.quadrante}`);
-  linha.type = "button";
-  linha.addEventListener("click", () => abrirGrupo(grupo.selo));
-  const nomeAtual = nomeLegivel(grupo.rotulo, unidade);
-  const nome = grupo.rotulo_novo_curto ? maiuscula(grupo.rotulo_novo_curto) : nomeAtual;
-  const docs = grupo.documentos || 0;
-  const selo = elemento("span", `selo ${grupo.quadrante}`, String(grupo.selo));
-  const titulo = elemento("span", "tema-nome", nome);
-  titulo.title = nome === nomeAtual ? nome : `${nome} (item central: ${nomeAtual})`;
-  const contagem = elemento("span", "tema-docs", plural(docs, "doc", "docs"));
-  const barra = elemento("span", "tema-barra");
-  const preenchimento = document.createElement("i");
-  preenchimento.style.width = `${Math.max(3, Math.round((docs / maximo) * 100))}%`;
-  barra.append(preenchimento);
-  let itens = (grupo.nos || []).slice(0, 4).map((no) => itemLegivel(no, unidade)).join(" · ");
-  if (comQuadrante) {
-    itens = `${rotuloQuadrante(grupo.quadrante, unidade)} · ${itens}`;
-  }
-  const lista = elemento("span", "tema-itens", itens);
-  lista.title = (grupo.nos || []).map((no) => itemLegivel(no, unidade)).join(", ");
-  linha.append(selo, titulo, contagem, barra, lista);
-  return linha;
-}
-
-function renderizarResumo(resultado) {
-  const corpo = $("resumoCorpo");
-  const unidade = resultado.parametros.unidade;
-  const grupos = resultado.grupos || [];
-  const totalDocs = resultado.resumo.documentos;
-  const [sing, plur] = substantivoGrupo(resultado);
-  $("metaResumo").textContent =
-    `${resultado.periodo.nome} · frequência mínima ${resultado.parametros.minimo_frequencia}`;
-
-  if (!grupos.length) {
-    renderizarResumoVazio("Nenhum agrupamento nesta configuração. Reduza a frequência mínima.");
-    return;
-  }
-
-  const porDocs = [...grupos].sort((a, b) =>
-    (b.documentos - a.documentos) || (b.itens - a.itens) || (a.selo - b.selo));
-  const maximo = Math.max(1, porDocs[0].documentos || 1);
-
-  // Temas visíveis: com pelo menos 3 documentos, no máximo 12. Se sobrarem
-  // menos de 4, baixa a régua para 2 documentos e, em último caso, mostra os
-  // 6 maiores: um resumo vazio não ajuda, mas 12 temas de 1 documento também não.
-  let visiveis = porDocs.filter((g) => g.documentos >= DOCS_MINIMOS_RESUMO);
-  if (visiveis.length < MINIMO_TEMAS) visiveis = porDocs.filter((g) => g.documentos >= 2);
-  if (visiveis.length < MINIMO_TEMAS) visiveis = porDocs.slice(0, 6);
-  visiveis = visiveis.slice(0, MAXIMO_TEMAS_RESUMO);
-  const conjuntoVisiveis = new Set(visiveis.map((g) => g.selo));
-  const pequenos = porDocs.filter((g) => !conjuntoVisiveis.has(g.selo));
-
-  // Frase de leitura
-  const motores = porDocs.filter((g) => g.quadrante === "motor");
-  const nomesMotores = motores.slice(0, 3).map((g) => nomeLegivel(g.rotulo, unidade));
-  const rotuloMotor = unidade === "Words"
-    ? (motores.length === 1 ? "Tema motor" : "Temas motores")
-    : (unidade === "Countries" ? "Núcleo"
-      : (motores.length === 1 ? "Grupo motor" : "Grupos motores"));
-  const verbo = totalDocs === 1 ? "forma" : "formam";
-  const frase = `${plural(totalDocs, "documento", "documentos")} ${verbo} ` +
-    `${plural(grupos.length, sing, plur)}.`;
-  const listaMotores = listaComE(nomesMotores);
-  const fraseMotor = nomesMotores.length
-    ? `${rotuloMotor}: ${listaMotores}${listaMotores.endsWith(".") ? "" : "."}`
-    : (unidade === "Words" ? "Nenhum tema motor nesta configuração." : "Nenhum grupo motor nesta configuração.");
-
-  const leitura = elemento("div", "resumo-leitura");
-  leitura.append(elemento("p", "", frase), elemento("p", "", fraseMotor));
-
-  const blocos = [leitura];
-
-  // Etiqueta genérica: um tema que cobre quase todo o corpus.
-  const generico = unidade === "Words" && totalDocs
-    ? porDocs.find((g) => g.documentos / totalDocs >= FRACAO_TEMA_GENERICO) : null;
-  if (generico) {
-    const pct = Math.round((generico.documentos / totalDocs) * 100);
-    const aviso = elemento("div", "resumo-aviso");
-    const texto = elemento("span", "",
-      `"${nomeLegivel(generico.rotulo, unidade)}" cobre ${pct}% dos documentos ` +
-      `(${generico.documentos} de ${totalDocs}). Etiquetas genéricas, como o nome do ` +
-      "periódico ou da área, escondem os demais temas: ignore-a para ver os demais temas.");
-    const botao = elemento("button", "botao-mini", "Ignorar e reanalisar");
-    botao.type = "button";
-    botao.addEventListener("click", () => {
-      estado.ignorar = [...new Set([...(estado.ignorar || []), generico.rotulo])];
-      previsualizar();
-    });
-    aviso.append(texto, botao);
-    blocos.push(aviso);
-  }
-
-  // Temas por quadrante
-  const interpretacao = unidade === "Countries" ? INTERPRETACAO_PAISES : INTERPRETACAO;
-  const grade = elemento("div", "resumo-quadrantes");
-  for (const chave of ORDEM_QUADRANTES) {
-    const doQuadrante = visiveis.filter((g) => g.quadrante === chave);
-    const totalQuadrante = grupos.filter((g) => g.quadrante === chave).length;
-    const bloco = elemento("section", `quadrante-bloco ${chave}`);
-    const cab = elemento("div", "quadrante-cab");
-    cab.append(elemento("h3", "", rotuloQuadrante(chave, unidade)),
-      elemento("span", "qtd", plural(totalQuadrante, sing, plur)));
-    bloco.append(cab, elemento("p", "", interpretacao[chave]));
-    if (doQuadrante.length) {
-      for (const grupo of doQuadrante) bloco.append(linhaTema(grupo, unidade, maximo, false));
-    } else {
-      bloco.append(elemento("div", "nenhum",
-        totalQuadrante ? `Só ${plur} de poucos documentos, em “Outros”.` : "Nenhum nesta análise."));
-    }
-    grade.append(bloco);
-  }
-  blocos.push(grade);
-
-  if (pequenos.length) {
-    const detalhes = elemento("details", "resumo-outros");
-    const fem = sing.startsWith("frente");
-    const nomePequenos = pequenos.length === 1
-      ? `${fem ? "Outra" : "Outro"} ${sing} ${fem ? "pequena" : "pequeno"}`
-      : `${fem ? "Outras" : "Outros"} ${pequenos.length} ${plur} ${fem ? "pequenas" : "pequenos"}`;
-    detalhes.append(elemento("summary", "", nomePequenos));
-    const lista = elemento("div", "lista");
-    for (const grupo of pequenos) lista.append(linhaTema(grupo, unidade, maximo, true));
-    detalhes.append(lista);
-    blocos.push(detalhes);
-  }
-
-  corpo.replaceChildren(...blocos);
 }
 
 function renderizarIes(resultado) {

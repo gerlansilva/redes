@@ -12,7 +12,7 @@ CSS = (UI / "style.css").read_text(encoding="utf-8")
 
 def test_abas_tem_icone_e_nome_acessivel():
     abas = re.findall(r'<div class="aba[^"]*" data-aba="(\w+)"[^>]*>(.*?)</div>', HTML, flags=re.S)
-    assert len(abas) >= 16
+    assert len(abas) >= 15
     for chave, interior in abas:
         assert "<svg" in interior and 'aria-hidden="true"' in interior, chave
         assert "aba-texto" in interior, chave
@@ -98,9 +98,12 @@ def test_cada_analise_so_oferece_abas_que_se_aplicam():
     assert [k for k, v in abas.items() if "ies" in v] == ["instituicoes"]
     # Documentos só onde o agrupamento é de documentos.
     assert sorted(k for k, v in abas.items() if "documentos" in v) == ["conceitual", "frentes"]
-    # Dendrograma, linha do tempo e densidade valem em todas as unidades.
-    for chave in ("dendrograma", "linhatempo", "densidade"):
-        assert all(chave in v for v in abas.values()), chave
+    # Densidade vale em todas as unidades; dendrograma e linha do tempo em
+    # todas, menos países, que mostra só o mapa e a densidade.
+    assert all("densidade" in v for v in abas.values())
+    for chave in ("dendrograma", "linhatempo"):
+        assert all(chave in v for k, v in abas.items() if k != "paises"), chave
+    assert abas["paises"] == ["paises", "densidade"]
 
 
 def test_troca_de_analise_limpa_o_resultado_anterior():
@@ -141,11 +144,21 @@ def test_abas_visiveis_e_agrupadas_por_bloco():
     # Nenhuma aba some no modo simples e a personalizada não perde visões.
     assert "ABAS_SIMPLES" not in JS and "ABAS_SO_AVANCADO" not in JS
     grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", JS, flags=re.S).group(0)
-    for chave in ("resumo", "rede", "grupos", "dendrograma", "similitude", "longitudinal"):
+    for chave in ("rede", "grupos", "dendrograma", "similitude", "longitudinal"):
         assert f'"{chave}"' in grupos, chave
     assert "montarGruposAbas();" in JS
     # O nome de todas as abas fica à vista, não só o da ativa.
     assert ".aba .aba-texto { display: inline; }" in CSS
+
+
+def test_sem_aba_resumo():
+    # O resumo em prosa saiu da tela: cada análise começa numa visão aplicada.
+    assert 'data-aba="resumo"' not in HTML
+    assert 'id="blocoResumo"' not in HTML
+    assert "blocoResumo" not in JS
+    assert "renderizarResumo(" not in JS
+    assert "renderizarResumoVazio(" not in JS
+    assert "mostrarCarregandoResumo(" not in JS
 
 
 def test_sem_biblioteca_externa_de_icones():

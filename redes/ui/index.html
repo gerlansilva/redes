@@ -7,7 +7,7 @@
 <link rel="icon" href="/static/logo-mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="modo-avancado">
+<body>
 <section class="tela apresentacao" id="apresentacao" aria-labelledby="apresentacaoTitulo">
   <div class="apresentacao-miolo">
     <img class="apresentacao-logo" src="/static/logo-mark.svg" alt="" width="132" height="132">
@@ -325,7 +325,6 @@
       <div class="barra-resultados">
       <div class="abas" role="tablist" aria-label="Resultados">
         <div class="aba oculta" data-aba="evolucao" role="tab" tabindex="0" aria-selected="false" title="Evolução temática" aria-label="Evolução temática"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 6c6 0 4 6 10 6M7 18c6 0 4-6 10-6"/></svg><span class="aba-texto">Evolução temática</span></div>
-        <div class="aba ativa" data-aba="resumo" role="tab" tabindex="0" aria-selected="true" title="Resumo" aria-label="Resumo"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="aba-texto">Resumo</span></div>
         <div class="aba" data-aba="rede" role="tab" tabindex="0" aria-selected="false" title="Rede" aria-label="Rede"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="7" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6.5l8 .5M7 8l4 8M17 9l-4 7"/></svg><span class="aba-texto">Rede</span></div>
         <div class="aba" data-aba="paises" role="tab" tabindex="0" aria-selected="false" title="Países" aria-label="Países"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><span class="aba-texto">Países</span></div>
         <div class="aba" data-aba="ies" role="tab" tabindex="0" aria-selected="false" title="Variantes unidas" aria-label="Variantes unidas"><svg class="aba-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg><span class="aba-texto">Variantes unidas</span></div>
@@ -372,18 +371,6 @@
             compartilham itens; elos azuis indicam o mesmo nó principal, e os cinza, sobreposições menores.
           </p>
           <div class="evolucao-tabela" id="tabelaEvolucao"></div>
-        </section>
-
-        <section class="cartao" id="blocoResumo" data-bloco="blocoResumo">
-          <header>
-            <div class="cartao-titulo">
-              <h2>Resumo</h2>
-              <span class="meta" id="metaResumo">—</span>
-            </div>
-          </header>
-          <div class="resumo-corpo" id="resumoCorpo">
-            <p class="resumo-vazio">Escolha uma análise para ver o resumo.</p>
-          </div>
         </section>
 
         <section class="cartao" id="blocoRede" data-bloco="blocoRede">
