@@ -493,13 +493,14 @@ class InterfaceTest(unittest.TestCase):
         cls.js = (UI / "app.js").read_text(encoding="utf-8")
         cls.html = (UI / "index.html").read_text(encoding="utf-8")
 
-    def test_aba_depois_da_densidade_e_so_no_modo_avancado(self):
+    def test_aba_depois_da_densidade_e_sempre_visivel(self):
         ordem = re.findall(r'data-aba="([a-z]+)"', self.html)
         self.assertEqual(ordem.index("densidade") + 1, ordem.index("duplomapa"))
         self.assertIn('id="blocoDuploMapa"', self.html)
         self.assertIn('duplomapa: "blocoDuploMapa"', self.js)
-        self.assertNotIn('"duplomapa"', re.search(r"const ABAS_SIMPLES = .*", self.js).group(0))
-        self.assertIn('"duplomapa"', re.search(r"const ABAS_SO_AVANCADO = .*", self.js).group(0))
+        grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", self.js, re.S).group(0)
+        self.assertIn('"duplomapa"', grupos)
+        self.assertNotIn("ABAS_SIMPLES", self.js)
         self.assertIn('const extras = ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"];', self.js)
         self.assertIn('chave === "duplomapa"', self.js)
 

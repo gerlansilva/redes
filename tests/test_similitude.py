@@ -934,13 +934,14 @@ class InterfaceTest(unittest.TestCase):
         cls.html = (UI / "index.html").read_text(encoding="utf-8")
         cls.css = (UI / "style.css").read_text(encoding="utf-8")
 
-    def test_aba_depois_do_duplo_mapa_e_so_no_modo_avancado(self):
+    def test_aba_depois_do_duplo_mapa_e_sempre_visivel(self):
         ordem = re.findall(r'data-aba="([a-z]+)"', self.html)
         self.assertEqual(ordem.index("duplomapa") + 1, ordem.index("similitude"))
         self.assertIn('id="blocoSimilitude"', self.html)
         self.assertIn('similitude: "blocoSimilitude"', self.js)
-        self.assertNotIn('"similitude"', re.search(r"const ABAS_SIMPLES = .*", self.js).group(0))
-        self.assertIn('"similitude"', re.search(r"const ABAS_SO_AVANCADO = .*", self.js).group(0))
+        grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", self.js, re.S).group(0)
+        self.assertIn('"similitude"', grupos)
+        self.assertNotIn("ABAS_SIMPLES", self.js)
         self.assertIn('const extras = ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"];', self.js)
         self.assertIn('chave === "similitude"', self.js)
 

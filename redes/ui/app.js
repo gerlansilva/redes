@@ -75,11 +75,15 @@ const CONFIG_ABAS = {
 };
 const ABAS_TODAS = ["resumo", "rede", "paises", "ies", "diagrama", "agrupamentos",
                     "grupos", "indices", "documentos", "dendrograma", "linhatempo", "longitudinal"];
-// No modo simples só aparecem estas abas; as demais ficam no modo avançado.
-const ABAS_SIMPLES = ["evolucao", "resumo", "rede", "paises", "ies", "diagrama", "linhatempo", "longitudinal"];
-// Só aparecem com o Modo avançado ligado (a comparação de períodos só quando a
-// evolução temática já é a visão principal da análise).
-const ABAS_SO_AVANCADO = ["dendrograma", "densidade", "duplomapa", "similitude"];
+// Blocos da barra de resultados: todas as análises ficam à vista, com o nome
+// do bloco antes das abas correspondentes. Nada some ao trocar de modo.
+const GRUPOS_ABAS = [
+  { rotulo: "Visão geral", abas: ["evolucao", "resumo"] },
+  { rotulo: "Rede", abas: ["rede", "paises", "ies", "diagrama", "agrupamentos"] },
+  { rotulo: "Tabelas", abas: ["grupos", "indices", "documentos"] },
+  { rotulo: "Métodos", abas: ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"] },
+  { rotulo: "Comparar", abas: ["longitudinal"] },
+];
 
 // Limites da frequência mínima automática (modo simples).
 const LIMITE_TEMAS = 14;
@@ -176,7 +180,6 @@ const estado = {
   desatualizada: false,
   aplicandoAnalise: false,
   avancado: false,
-  detalheAberto: false,
   comEvolucao: false,
   calculando: false,
   pendente: false,
@@ -195,6 +198,7 @@ async function iniciar() {
   let avancado = false;
   try { avancado = localStorage.getItem("redes.avancado") === "1"; } catch (_) { /* sem armazenamento */ }
   aplicarModo(avancado);
+  montarGruposAbas();
   ligarEventos();
   aplicaMenuRecolhido(localStorage.getItem("redes.menu.recolhido") === "1");
   $("freqValor").textContent = String(estado.freq);
@@ -345,14 +349,6 @@ function ligarEventos() {
     temporizadorBusca = setTimeout(carregarDocumentos, 250);
   });
 
-  const grupoAbas = $("abaDetalhe");
-  grupoAbas.addEventListener("click", alternarDetalhe);
-  grupoAbas.addEventListener("keydown", (evento) => {
-    if (evento.key === "Enter" || evento.key === " ") {
-      evento.preventDefault();
-      alternarDetalhe();
-    }
-  });
   document.querySelectorAll(".aba[data-aba]").forEach((aba) => {
     const selecionar = () => selecionarAba(aba.dataset.aba);
     aba.addEventListener("click", selecionar);
@@ -771,7 +767,6 @@ function aplicarProjeto(projeto) {
   $("vgUnidades").textContent = nf.format(projeto.unidades.length);
 
   limparResultado();
-  estado.detalheAberto = false;
   // Retoma a última análise do projeto; o `abrir()` chama a prévia em seguida,
   // então a tela volta com os mesmos parâmetros e a mesma vista da rede.
   restaurarSessao(projeto);
@@ -899,19 +894,38 @@ function abasDaAnalise(chave) {
   for (const extra of extras) {
     if (!abas.includes(extra)) abas.splice(posicao++, 0, extra);
   }
-  if (!cfg) abas = abas.filter((aba) => aba !== "densidade" && aba !== "duplomapa" && aba !== "similitude");
   // "Variantes unidas" só existe na rede de instituições.
   if (!cfg && $("unidade").value !== "Institutions") abas = abas.filter((aba) => aba !== "ies");
-  if (!estado.avancado) {
-    abas = abas.filter((aba) => ABAS_SIMPLES.includes(aba));
-    if (evolucao) abas = abas.filter((aba) => aba !== "longitudinal");
-  }
   if (evolucao) abas.unshift("evolucao");
   return abas;
 }
 
-// Abas que ficam sob "Detalhe por período" quando a evolução é a visão principal.
-function abaDeDetalhe(chave) { return chave !== "evolucao"; }
+// Rótulos de bloco na barra: uma vez, antes da primeira aba de cada grupo.
+function montarGruposAbas() {
+  const barra = document.querySelector(".abas");
+  if (!barra) return;
+  for (const grupo of GRUPOS_ABAS) {
+    const primeira = barra.querySelector(`.aba[data-aba="${grupo.abas[0]}"]`);
+    if (!primeira) continue;
+    const rotulo = document.createElement("span");
+    rotulo.className = "aba-rotulo";
+    rotulo.textContent = grupo.rotulo;
+    rotulo.setAttribute("aria-hidden", "true");
+    barra.insertBefore(rotulo, primeira);
+    grupo.elemento = rotulo;
+  }
+}
+
+// Um bloco sem nenhuma aba visível também esconde o rótulo.
+function atualizarGruposAbas() {
+  for (const grupo of GRUPOS_ABAS) {
+    if (!grupo.elemento) continue;
+    grupo.elemento.hidden = !grupo.abas.some((chave) => {
+      const aba = document.querySelector(`.aba[data-aba="${chave}"]`);
+      return aba && !aba.classList.contains("oculta");
+    });
+  }
+}
 
 // manter: preserva a aba atual quando ela continua disponível.
 function aplicarAbas(chave, manter = false) {
@@ -921,9 +935,6 @@ function aplicarAbas(chave, manter = false) {
   estado.comEvolucao = evolucao;
   const atual = document.querySelector(".aba.ativa");
   const atualOk = manter && atual && abas.includes(atual.dataset.aba);
-  // Quem estava num detalhe continua nele, com o grupo aberto.
-  if (atualOk && evolucao && abaDeDetalhe(atual.dataset.aba)) estado.detalheAberto = true;
-  if (!evolucao) estado.detalheAberto = true;
   const abaRede = document.querySelector('.aba[data-aba="rede"]');
   if (abaRede) {
     const nomeRede = (cfg && cfg.redeRotulo) || "Rede";
@@ -932,32 +943,15 @@ function aplicarAbas(chave, manter = false) {
     abaRede.setAttribute("aria-label", nomeRede);
   }
   for (const aba of document.querySelectorAll(".aba[data-aba]")) {
-    const nela = abas.includes(aba.dataset.aba);
-    const sobGrupo = evolucao && abaDeDetalhe(aba.dataset.aba);
-    aba.classList.toggle("oculta", !nela || (sobGrupo && !estado.detalheAberto));
-    aba.classList.toggle("aba-detalhe", sobGrupo);
+    aba.classList.toggle("oculta", !abas.includes(aba.dataset.aba));
   }
-  const grupo = $("abaDetalhe");
-  if (grupo) {
-    grupo.classList.toggle("oculta", !evolucao);
-    grupo.setAttribute("aria-expanded", estado.detalheAberto ? "true" : "false");
-    grupo.querySelector(".seta").textContent = estado.detalheAberto ? "▾" : "▸";
-  }
+  atualizarGruposAbas();
   if (atualOk) {
     ajustarCorteAbas();
     return;
   }
   selecionarAba(evolucao ? "evolucao" : "resumo");
   ajustarCorteAbas();
-}
-
-function alternarDetalhe() {
-  if (!estado.comEvolucao) return;
-  estado.detalheAberto = !estado.detalheAberto;
-  const atual = abaAtual();
-  // Recolher com um detalhe aberto volta à figura principal.
-  if (!estado.detalheAberto && atual && abaDeDetalhe(atual)) selecionarAba("evolucao");
-  aplicarAbas($("analise").value, true);
 }
 
 const BLOCO_POR_ABA = {

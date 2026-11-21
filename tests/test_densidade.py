@@ -390,13 +390,14 @@ class InterfaceTest(unittest.TestCase):
         cls.js = (UI / "app.js").read_text(encoding="utf-8")
         cls.html = (UI / "index.html").read_text(encoding="utf-8")
 
-    def test_aba_depois_da_linha_do_tempo_e_so_no_modo_avancado(self):
+    def test_aba_depois_da_linha_do_tempo_e_sempre_visivel(self):
         ordem = re.findall(r'data-aba="([a-z]+)"', self.html)
         self.assertEqual(ordem.index("linhatempo") + 1, ordem.index("densidade"))
         self.assertIn('id="blocoDensidade"', self.html)
         self.assertIn('densidade: "blocoDensidade"', self.js)
-        self.assertNotIn('"densidade"', re.search(r"const ABAS_SIMPLES = .*", self.js).group(0))
-        self.assertIn('"densidade"', re.search(r"const ABAS_SO_AVANCADO = .*", self.js).group(0))
+        grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", self.js, re.S).group(0)
+        self.assertIn('"densidade"', grupos)
+        self.assertNotIn("ABAS_SIMPLES", self.js)
         self.assertIn('const extras = ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"];', self.js)
 
     def test_reset_ao_trocar_de_projeto_e_de_analise(self):

@@ -6,6 +6,8 @@ import redes
 
 UI = Path(redes.__file__).parent / "ui"
 HTML = (UI / "index.html").read_text(encoding="utf-8")
+JS = (UI / "app.js").read_text(encoding="utf-8")
+CSS = (UI / "style.css").read_text(encoding="utf-8")
 
 
 def test_abas_tem_icone_e_nome_acessivel():
@@ -30,6 +32,17 @@ def test_menu_com_rotulo_curto_e_nome_completo_no_titulo():
         # qualifica ("Autores" em "Cocitação de autores").
         assert (titulo.startswith(curto)
                 or curto.casefold() in titulo.casefold()), (chave, curto, titulo)
+
+
+def test_abas_visiveis_e_agrupadas_por_bloco():
+    # Nenhuma aba some no modo simples e a personalizada não perde visões.
+    assert "ABAS_SIMPLES" not in JS and "ABAS_SO_AVANCADO" not in JS
+    grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", JS, flags=re.S).group(0)
+    for chave in ("resumo", "rede", "grupos", "dendrograma", "similitude", "longitudinal"):
+        assert f'"{chave}"' in grupos, chave
+    assert "montarGruposAbas();" in JS
+    # O nome de todas as abas fica à vista, não só o da ativa.
+    assert ".aba .aba-texto { display: inline; }" in CSS
 
 
 def test_sem_biblioteca_externa_de_icones():

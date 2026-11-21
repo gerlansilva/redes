@@ -337,8 +337,8 @@ class InterfaceTest(unittest.TestCase):
         self.assertIn('id="blocoLinhaDoTempo"', self.html)
         self.assertIn('linhatempo: "blocoLinhaDoTempo"', self.js)
         self.assertIn('"dendrograma", "linhatempo", "longitudinal"', self.js)
-        self.assertIn('"linhatempo"', re.search(
-            r"const ABAS_SIMPLES = .*", self.js).group(0))     # a main a deixou no modo simples
+        grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", self.js, re.S).group(0)
+        self.assertIn('"linhatempo"', grupos)                 # sempre visível, no bloco Métodos
 
     def test_reset_ao_trocar_de_projeto_e_de_analise(self):
         projeto = re.search(r"function aplicarProjeto\(.*?\n}\n", self.js, re.S).group(0)
