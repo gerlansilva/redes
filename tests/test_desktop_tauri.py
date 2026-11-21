@@ -38,17 +38,24 @@ def test_versao_unica_entre_config_cargo_e_pacote():
     assert json.loads(PACOTE.read_text(encoding="utf-8"))["version"] == versao
 
 
-def test_icone_e_so_a_imagem_da_rede():
-    marca = (RAIZ / "redes" / "assets" / "logo-icone.svg").read_text(encoding="utf-8")
-    assert "<text" not in marca and "<tspan" not in marca
-    # Só a marca: os três traços da rede e os nós coloridos.
-    assert marca.count("<circle") >= 8
-    assert marca.count("<ellipse") == 2
+def test_icone_e_a_marca_oficial_sem_texto():
+    marca = RAIZ / "redes" / "assets" / "logo.png"
+    assert marca.is_file()
+    # Largura e altura do IHDR, sem depender de biblioteca de imagem.
+    dados = marca.read_bytes()
+    assert dados[:8] == b"\x89PNG\r\n\x1a\n"
+    largura = int.from_bytes(dados[16:20], "big")
+    altura = int.from_bytes(dados[20:24], "big")
+    assert largura == altura and largura >= 512
+    # A interface e o relatório servem o mesmo arquivo, sem versão redesenhada.
+    html = (RAIZ / "redes" / "ui" / "index.html").read_text(encoding="utf-8")
+    assert "/static/logo.png" in html
+    assert "logo-mark.svg" not in html
     icones = _config()["bundle"]["icon"]
     assert "icons/icon.icns" in icones and "icons/icon.ico" in icones
     script = (DESKTOP / "scripts" / "gerar-icones.sh").read_text(encoding="utf-8")
-    assert "logo-icone.svg" in script
-    assert "logo.svg" not in script
+    assert "logo.png" in script
+    assert ".svg" not in script
 
 
 def test_app_assinado_sem_quebrar_o_sidecar():

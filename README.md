@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="redes/assets/logo.svg" alt="Redes" width="160">
+  <img src="redes/assets/logo.png" alt="Redes" width="180">
 </p>
 
 # Redes

@@ -19,7 +19,9 @@
 - Saiu a faixa amarela de avisos: os limites mínimos continuam nos dados da API
   e por extenso no *Relatório completo*, mas não repetem o que a tela já mostra.
 - Selo **Qualidade** (OK, Atenção, Ruim, Indefinido) resume a leitura do mapa.
-- A marca passou a ser usada sozinha (a rede em halos), sem o nome ao lado: vale para o cabeçalho e a capa do *Relatório completo*, para o site e para o README.
+- A marca passou a ser o arquivo oficial (`redes/assets/logo.png`), usado como
+  está, sem o nome ao lado: vale para o site, o app desktop, o cabeçalho e a
+  capa do *Relatório completo* e o README.
 
 ### Correções
 - Evolução temática: o *Relatório completo* e a aba *Evolução temática* mostravam contagens diferentes para o mesmo corpus (Celi, 2008-2014, 2015-2020, 2021-2026: 3 temas no relatório e 22 na aba). Causa: não era sobreposição nem contagem diferente de "temas", e sim a **frequência mínima**. A aba usava a da tela (1); o relatório ignorava a tela e escolhia sozinho a maior entre 3, 2 e 1 que ainda dava agrupamento em todos os períodos (3, com um tema por período). Agora o relatório gerado pela interface usa os parâmetros da tela (frequência e co-ocorrência mínimas, corte, tamanho da rede, similaridade e algoritmo); sem frequência informada (uso direto da API), mantém a escolha automática e a descreve no texto da seção ("escolhida automaticamente" ou "a mesma da tela").

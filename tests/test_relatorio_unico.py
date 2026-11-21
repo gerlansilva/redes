@@ -42,7 +42,9 @@ class RelatorioUnicoTest(unittest.TestCase):
                          ["unico.html"])
         self.assertNotIn('src="images/', self.html)
         self.assertNotRegex(self.html, r'href="[^"#][^"]*\.html')
-        self.assertNotRegex(self.html, r'<img |<script|<link ')
+        # Imagens só entram embutidas (data URI); nada de arquivo externo.
+        self.assertNotRegex(self.html, r'<img (?![^>]*src="data:)')
+        self.assertNotRegex(self.html, r'<script|<link ')
         self.assertNotRegex(self.html, r'src="[^d]')
 
     def test_estrutura_numeracao_e_legendas(self):

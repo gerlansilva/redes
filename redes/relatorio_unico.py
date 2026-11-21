@@ -8,6 +8,7 @@ A numeração é contínua, no estilo de artigo: seções "4", subseções "4.2"
 
 from __future__ import annotations
 
+import base64
 import datetime
 import re
 from pathlib import Path
@@ -184,9 +185,11 @@ class _EstiloUnico:
 
 
 def _logo() -> str:
-    svg = (report._ASSETS / "logo.svg").read_text(encoding="utf-8")
-    svg = svg[svg.index("<svg"):]
-    return svg.replace("<svg ", '<svg class="logo-capa" ', 1)
+    # A marca é usada como está no arquivo oficial; vai embutida em base64 para
+    # o relatório continuar sendo um HTML único, sem arquivos externos.
+    dados = base64.b64encode((report._ASSETS / "logo.png").read_bytes()).decode("ascii")
+    return (f'<img class="logo-capa" src="data:image/png;base64,{dados}" '
+            'alt="Redes" width="150" height="150">')
 
 
 def _contagem_documentos(kb) -> int:

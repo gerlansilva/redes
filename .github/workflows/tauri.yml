@@ -77,9 +77,6 @@ jobs:
         with:
           workspaces: desktop/src-tauri
 
-      - name: Ferramentas do pacote
-        run: brew install librsvg
-
       - name: Ajustar a versão pedida
         run: bash desktop/scripts/ajustar-versao.sh "$VERSAO"
 

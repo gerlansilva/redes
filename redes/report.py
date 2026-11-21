@@ -229,12 +229,12 @@ def _pagina(titulo: str, corpo: str, profundidade: int = 0) -> str:
         '<header class="cabecalho">\n'
         '<p class="marca-relatorio">Redes · mapeamento e análise da '
         'produção científica</p>\n'
-        '<img class="logo-relatorio" src="logo.svg" alt="Redes">\n'
+        '<img class="logo-relatorio" src="logo.png" alt="Redes">\n'
         '</header>\n'
         f"{corpo}\n<footer class=\"fonte\">Gerado por Redes.</footer>\n"
         "</body>\n</html>\n"
     ).replace('src="images/', f'src="{raiz}images/').replace(
-        'src="logo.svg"', f'src="{raiz}logo.svg"')
+        'src="logo.png"', f'src="{raiz}logo.png"')
 
 
 def _tabela(cabecalho: list[str], linhas: list[list[str]],
@@ -621,7 +621,7 @@ def gera_html(destino: Path, kb, periodos, config, estendido: bool = False,
     destino.mkdir(parents=True, exist_ok=True)
     (destino / "images").mkdir(exist_ok=True)
     (destino / "misc").mkdir(exist_ok=True)
-    shutil.copyfile(_ASSETS / "logo.svg", destino / "logo.svg")
+    shutil.copyfile(_ASSETS / "logo.png", destino / "logo.png")
 
     if resultados is None:
         resultados = [executa_periodo(kb, p.id, p.nome, config) for p in periodos]
@@ -1231,6 +1231,6 @@ def gera_pagina_completa(destino: Path, kb, secoes: list[dict], ignoradas: list[
             f'<li><b>{_esc(i["rotulo"])}</b>: {_esc(i["motivo"])}</li>' for i in ignoradas) + "</ul>")
     corpo.insert(1, '<nav class="sumario">' + " ".join(sumario) + "</nav>")
     corpo.extend(blocos)
-    shutil.copyfile(_ASSETS / "logo.svg", destino / "logo.svg")
+    shutil.copyfile(_ASSETS / "logo.png", destino / "logo.png")
     (destino / "index.html").write_text(
         _pagina("Relatório completo — Redes", "\n".join(corpo)), encoding="utf-8")
