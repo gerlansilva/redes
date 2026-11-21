@@ -942,7 +942,10 @@ class InterfaceTest(unittest.TestCase):
         grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", self.js, re.S).group(0)
         self.assertIn('"similitude"', grupos)
         self.assertNotIn("ABAS_SIMPLES", self.js)
-        self.assertIn('const extras = ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"];', self.js)
+        config = re.search(r"const CONFIG_ABAS = \{.*?\n\};", self.js, re.S).group(0)
+        conceitual = re.search(r"conceitual: \{.*?\},", config, re.S).group(0)
+        self.assertIn('"similitude"', conceitual)
+        self.assertEqual(config.count('"similitude"'), 1)   # só em palavras-chave
         self.assertIn('chave === "similitude"', self.js)
 
     def test_controles(self):

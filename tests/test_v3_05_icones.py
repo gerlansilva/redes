@@ -84,6 +84,32 @@ def test_evolucao_fala_da_unidade_da_analise():
     assert "SUBSTANTIVO_GRUPO[unidade]" in JS
 
 
+def test_cada_analise_so_oferece_abas_que_se_aplicam():
+    config = re.search(r"const CONFIG_ABAS = \{.*?\n\};", JS, flags=re.S).group(0)
+    entradas = dict(re.findall(r"(\w+): \{\s*abas: \[(.*?)\]", config, flags=re.S))
+    assert len(entradas) == 8
+    abas = {chave: re.findall(r'"(\w+)"', lista) for chave, lista in entradas.items()}
+    # Só palavras-chave pede similitude de resumos.
+    assert [k for k, v in abas.items() if "similitude" in v] == ["conceitual"]
+    # Só periódicos pede duplo mapa de áreas das revistas.
+    assert [k for k, v in abas.items() if "duplomapa" in v] == ["veiculos"]
+    # Mapa de países e variantes unidas só nas unidades correspondentes.
+    assert [k for k, v in abas.items() if "paises" in v] == ["paises"]
+    assert [k for k, v in abas.items() if "ies" in v] == ["instituicoes"]
+    # Documentos só onde o agrupamento é de documentos.
+    assert sorted(k for k, v in abas.items() if "documentos" in v) == ["conceitual", "frentes"]
+    # Dendrograma, linha do tempo e densidade valem em todas as unidades.
+    for chave in ("dendrograma", "linhatempo", "densidade"):
+        assert all(chave in v for v in abas.values()), chave
+
+
+def test_troca_de_analise_limpa_o_resultado_anterior():
+    trecho = re.search(r"function escolherAnalise\(.*?\n}\n", JS, flags=re.S).group(0)
+    assert "limparResultado();" in trecho
+    limpar = re.search(r"function limparResultado\(.*?\n}\n", JS, flags=re.S).group(0)
+    assert "limparEvolucao();" in limpar
+
+
 def test_abas_visiveis_e_agrupadas_por_bloco():
     # Nenhuma aba some no modo simples e a personalizada não perde visões.
     assert "ABAS_SIMPLES" not in JS and "ABAS_SO_AVANCADO" not in JS

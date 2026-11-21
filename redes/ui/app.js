@@ -55,26 +55,46 @@ const ROTULO_MATRIZ = {
   AggregatedCouplingBasedOnJournal: "Acoplamento agregado (periódico)",
 };
 
+// Cada análise declara as visões que fazem sentido para a sua unidade. As que
+// não se aplicam nem chegam à barra (ex.: similitude só em palavras-chave,
+// duplo mapa só em periódicos, documentos onde há agrupamento de documentos).
 const CONFIG_ABAS = {
-  conceitual: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "documentos", "longitudinal"],
+  conceitual: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "documentos",
+                       "dendrograma", "linhatempo", "densidade", "similitude",
+                       "longitudinal"],
                 padrao: "diagrama", redeRotulo: "Rede de co-ocorrência", evolucao: true },
-  citados: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "longitudinal"],
+  citados: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices",
+                    "dendrograma", "linhatempo", "densidade", "longitudinal"],
              padrao: "rede", redeRotulo: "Rede de cocitação", evolucao: true },
-  referencias: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "longitudinal"],
+  referencias: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices",
+                        "dendrograma", "linhatempo", "densidade", "longitudinal"],
                  padrao: "rede", redeRotulo: "Rede de cocitação", evolucao: true },
-  frentes: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "documentos", "longitudinal"],
+  frentes: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "documentos",
+                    "dendrograma", "linhatempo", "densidade", "longitudinal"],
              padrao: "rede", redeRotulo: "Rede de acoplamento" },
-  autores: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "longitudinal"],
+  autores: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices",
+                    "dendrograma", "linhatempo", "densidade", "longitudinal"],
              padrao: "rede", redeRotulo: "Rede de coautoria" },
-  paises: { abas: ["paises", "rede", "diagrama", "agrupamentos", "grupos", "indices", "longitudinal"],
+  paises: { abas: ["paises", "rede", "diagrama", "agrupamentos", "grupos", "indices",
+                   "dendrograma", "linhatempo", "densidade", "longitudinal"],
             padrao: "paises", redeRotulo: "Rede de países" },
-  instituicoes: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "ies", "indices", "longitudinal"],
+  instituicoes: { abas: ["rede", "ies", "diagrama", "agrupamentos", "grupos", "indices",
+                         "dendrograma", "linhatempo", "densidade", "longitudinal"],
                   padrao: "rede", redeRotulo: "Rede de instituições" },
-  veiculos: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "longitudinal"],
+  veiculos: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "duplomapa",
+                     "dendrograma", "linhatempo", "densidade", "longitudinal"],
               padrao: "rede", redeRotulo: "Rede de periódicos" },
 };
 const ABAS_TODAS = ["resumo", "rede", "paises", "ies", "diagrama", "agrupamentos",
-                    "grupos", "indices", "documentos", "dendrograma", "linhatempo", "longitudinal"];
+                    "grupos", "indices", "documentos", "dendrograma", "linhatempo",
+                    "densidade", "duplomapa", "similitude", "longitudinal"];
+// Configuração manual (análise personalizada): usa a mesma lista da unidade
+// escolhida, para a barra não oferecer visões que não se aplicam.
+const ANALISE_POR_UNIDADE = {
+  Words: "conceitual", AuthorsReference: "citados", References: "referencias",
+  ReferenceSources: "veiculos", Authors: "autores", Countries: "paises",
+  Institutions: "instituicoes",
+};
 // Blocos da barra de resultados: todas as análises ficam à vista, com o nome
 // do bloco antes das abas correspondentes. Nada some ao trocar de modo.
 const GRUPOS_ABAS = [
@@ -776,6 +796,7 @@ function aplicarProjeto(projeto) {
 function limparResultado() {
   renderizarResumoVazio("Calculando o resumo…");
   limparRedeInterativa();
+  limparEvolucao();
   redeUI.carregada = false;
   $("figHalo").hidden = true;
   $("figEstrategico").hidden = true;
@@ -882,20 +903,20 @@ function usaEvolucao(chave) {
 }
 
 function abasDaAnalise(chave) {
-  const cfg = CONFIG_ABAS[chave];
-  let abas = cfg ? ["resumo", ...cfg.abas] : [...ABAS_TODAS];
+  const unidade = unidadeDaAnalise(chave);
+  let configuracao = chave;
+  if (!CONFIG_ABAS[configuracao]) {
+    const matriz = $("matriz") ? $("matriz").value : "";
+    configuracao = matriz === "BasicCoupling" ? "frentes" : ANALISE_POR_UNIDADE[unidade];
+  }
+  const cfg = CONFIG_ABAS[configuracao];
+  let abas = cfg ? ["resumo", ...cfg.abas] : ["resumo", ...ABAS_TODAS];
   const totalPeriodos = estado.projeto ? estado.projeto.periodos.length : 0;
   const evolucao = usaEvolucao(chave);
   if (totalPeriodos < 2) abas = abas.filter((aba) => aba !== "longitudinal");
-  // Visões extras de cada período, antes de "Comparar períodos".
-  const extras = ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"];
-  let posicao = abas.indexOf("longitudinal");
-  if (posicao < 0) posicao = abas.length;
-  for (const extra of extras) {
-    if (!abas.includes(extra)) abas.splice(posicao++, 0, extra);
-  }
-  // "Variantes unidas" só existe na rede de instituições.
-  if (!cfg && $("unidade").value !== "Institutions") abas = abas.filter((aba) => aba !== "ies");
+  // Variantes unidas e mapa de países só existem nas unidades correspondentes.
+  if (unidade !== "Institutions") abas = abas.filter((aba) => aba !== "ies");
+  if (unidade !== "Countries") abas = abas.filter((aba) => aba !== "paises");
   if (evolucao) abas.unshift("evolucao");
   return abas;
 }
@@ -1146,6 +1167,12 @@ function escolherAnalise(chave, executar) {
   }
   aplicarAnalise(chave);
   if (!executar) return;
+  // Troca de análise não pode deixar o resultado da anterior na tela.
+  limparResultado();
+  for (const id of ["vazioHalo", "vazioEstrategico", "vazioAgrupamentos"]) {
+    const vazio = $(id);
+    if (vazio) vazio.textContent = "Calculando…";
+  }
   if (estado.avancado) {
     previsualizar();
   } else {

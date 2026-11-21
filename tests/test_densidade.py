@@ -398,7 +398,8 @@ class InterfaceTest(unittest.TestCase):
         grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", self.js, re.S).group(0)
         self.assertIn('"densidade"', grupos)
         self.assertNotIn("ABAS_SIMPLES", self.js)
-        self.assertIn('const extras = ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"];', self.js)
+        config = re.search(r"const CONFIG_ABAS = \{.*?\n\};", self.js, re.S).group(0)
+        self.assertEqual(config.count('"densidade"'), 8)   # vale em todas as unidades
 
     def test_reset_ao_trocar_de_projeto_e_de_analise(self):
         projeto = re.search(r"function aplicarProjeto\(.*?\n}\n", self.js, re.S).group(0)

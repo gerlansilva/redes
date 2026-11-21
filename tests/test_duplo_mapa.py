@@ -501,7 +501,10 @@ class InterfaceTest(unittest.TestCase):
         grupos = re.search(r"const GRUPOS_ABAS = \[.*?\];", self.js, re.S).group(0)
         self.assertIn('"duplomapa"', grupos)
         self.assertNotIn("ABAS_SIMPLES", self.js)
-        self.assertIn('const extras = ["dendrograma", "linhatempo", "densidade", "duplomapa", "similitude"];', self.js)
+        config = re.search(r"const CONFIG_ABAS = \{.*?\n\};", self.js, re.S).group(0)
+        veiculos = re.search(r"veiculos: \{.*?\},", config, re.S).group(0)
+        self.assertIn('"duplomapa"', veiculos)
+        self.assertEqual(config.count('"duplomapa"'), 1)   # só na análise de periódicos
         self.assertIn('chave === "duplomapa"', self.js)
 
     def test_reset_ao_trocar_de_projeto_e_de_analise(self):
