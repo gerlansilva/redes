@@ -72,8 +72,8 @@ const CONFIG_ABAS = {
   frentes: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices", "documentos",
                     "dendrograma", "linhatempo", "densidade", "longitudinal"],
              padrao: "rede", redeRotulo: "Rede de acoplamento" },
-  autores: { abas: ["rede", "diagrama", "agrupamentos", "grupos", "indices",
-                    "dendrograma", "linhatempo", "densidade", "longitudinal"],
+  // Coautoria: rede, dendrograma, linha do tempo e densidade.
+  autores: { abas: ["rede", "dendrograma", "linhatempo", "densidade"],
              padrao: "rede", redeRotulo: "Rede de coautoria" },
   // Países: a leitura que importa é o mapa e a densidade da colaboração.
   paises: { abas: ["paises", "densidade"],

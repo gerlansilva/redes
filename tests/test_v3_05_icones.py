@@ -101,13 +101,15 @@ def test_cada_analise_so_oferece_abas_que_se_aplicam():
     assert sorted(k for k, v in abas.items() if "documentos" in v) == ["conceitual", "frentes"]
     # Densidade vale em todas as unidades; dendrograma e linha do tempo nas
     # análises gerais. Países fica com mapa e densidade; instituições, com a
-    # rede e a densidade.
+    # rede e a densidade; coautoria, com rede, dendrograma, linha do tempo e
+    # densidade.
     assert all("densidade" in v for v in abas.values())
     for chave in ("dendrograma", "linhatempo"):
         assert all(chave in v for k, v in abas.items()
                    if k not in ("paises", "instituicoes")), chave
     assert abas["paises"] == ["paises", "densidade"]
     assert abas["instituicoes"] == ["rede", "densidade"]
+    assert abas["autores"] == ["rede", "dendrograma", "linhatempo", "densidade"]
 
 
 def test_troca_de_analise_limpa_o_resultado_anterior():
